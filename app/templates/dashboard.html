@@ -75,6 +75,8 @@
                         <th class="text-end">Lucro Não Real.</th>
                         <th class="text-end">Custo Total</th>
                         <th class="text-end">Lucro Realizado</th>
+                        <th class="text-end">TIR/mês</th>
+                        <th class="text-end">TIR/ano</th>
                         <th class="text-center">Ações</th>
                     </tr>
                 </thead>
@@ -110,6 +112,12 @@
                         <td class="text-end">R$ {{ "%.2f"|format(p.total_cost) }}</td>
                         <td class="text-end {% if p.realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
                             R$ {{ "%.2f"|format(p.realized_pnl) }}
+                        </td>
+                        <td class="text-end {% if p.irr_monthly is not none %}{% if p.irr_monthly >= 0 %}text-success{% else %}text-danger{% endif %}{% endif %}">
+                            {% if p.irr_monthly is not none %}{{ "%.2f"|format(p.irr_monthly * 100) }}%{% else %}—{% endif %}
+                        </td>
+                        <td class="text-end {% if p.irr_annual is not none %}{% if p.irr_annual >= 0 %}text-success{% else %}text-danger{% endif %}{% endif %}">
+                            {% if p.irr_annual is not none %}{{ "%.2f"|format(p.irr_annual * 100) }}%{% else %}—{% endif %}
                         </td>
                         <td class="text-center">
                             <a href="/transactions/?ticker={{ p.ticker }}" class="btn btn-sm btn-outline-secondary">

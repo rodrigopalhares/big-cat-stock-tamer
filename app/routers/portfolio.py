@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Asset
 from app.schemas import AssetPosition, PortfolioSummary
-from app.services.calculations import calculate_position, calculate_irr, calculate_unrealized_pnl
+from app.services.calculations import calculate_position, calculate_irr, calculate_unrealized_pnl, calculate_xirr
 from app.services.quotes import fetch_quote
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
@@ -34,8 +34,13 @@ def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[Ass
         current_value = (current_price * calc["quantity"]) if current_price and calc["quantity"] > 0 else None
 
         irr = None
+        irr_annual = None
+        irr_monthly = None
         if calc["cash_flows"]:
             irr = calculate_irr(calc["cash_flows"], current_value)
+            irr_annual = calculate_xirr(calc["cash_flows"], current_value)
+            if irr_annual is not None:
+                irr_monthly = (1 + irr_annual) ** (1 / 12) - 1
 
         positions.append(
             AssetPosition(
@@ -50,6 +55,8 @@ def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[Ass
                 unrealized_pnl=unrealized_pnl,
                 realized_pnl=calc["realized_pnl"],
                 irr=irr,
+                irr_annual=irr_annual,
+                irr_monthly=irr_monthly,
             )
         )
 

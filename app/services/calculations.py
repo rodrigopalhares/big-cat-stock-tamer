@@ -1,3 +1,4 @@
+from datetime import date
 from typing import List, Optional, Tuple
 import numpy_financial as npf
 from app.models import Transaction
@@ -79,3 +80,52 @@ def calculate_irr(cash_flows: List[Tuple], current_value: Optional[float] = None
 def calculate_unrealized_pnl(quantity: float, avg_price: float, current_price: float) -> float:
     """Unrealized profit/loss based on current market price."""
     return (current_price - avg_price) * quantity
+
+
+def _xirr_npv(rate: float, flows: List[Tuple]) -> float:
+    """Net present value for a given rate using actual dates (XIRR formula)."""
+    ref = flows[0][0]
+    return sum(v / (1 + rate) ** ((d - ref).days / 365.0) for d, v in flows)
+
+
+def calculate_xirr(
+    cash_flows: List[Tuple], current_value: Optional[float] = None
+) -> Optional[float]:
+    """
+    Compute the annualized IRR (XIRR) using actual transaction dates via bisection.
+    Returns the annual rate as a decimal (e.g. 0.15 = 15%) or None if it cannot converge.
+    """
+    if not cash_flows:
+        return None
+
+    flows = list(cash_flows)
+    if current_value is not None and current_value > 0:
+        flows.append((date.today(), current_value))
+
+    if len(flows) < 2:
+        return None
+
+    values = [v for _, v in flows]
+    if not (any(v < 0 for v in values) and any(v > 0 for v in values)):
+        return None
+
+    try:
+        lo, hi = -0.9999, 100.0
+        npv_lo = _xirr_npv(lo, flows)
+        npv_hi = _xirr_npv(hi, flows)
+        if npv_lo * npv_hi > 0:
+            return None
+        for _ in range(200):
+            mid = (lo + hi) / 2.0
+            npv_mid = _xirr_npv(mid, flows)
+            if abs(npv_mid) < 1e-7 or (hi - lo) < 1e-9:
+                return float(mid)
+            if npv_lo * npv_mid < 0:
+                hi = mid
+                npv_hi = npv_mid
+            else:
+                lo = mid
+                npv_lo = npv_mid
+        return float((lo + hi) / 2.0)
+    except Exception:
+        return None

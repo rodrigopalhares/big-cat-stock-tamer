@@ -79,6 +79,8 @@ class AssetPosition(BaseModel):
     unrealized_pnl: Optional[float] = None
     realized_pnl: float
     irr: Optional[float] = None
+    irr_monthly: Optional[float] = None
+    irr_annual: Optional[float] = None
 
 
 class PortfolioSummary(BaseModel):
