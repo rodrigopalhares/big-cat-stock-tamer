@@ -27,16 +27,26 @@
     <div class="col-sm-6 col-lg-3">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
-                <div class="text-muted small mb-1">Ativos em Carteira</div>
-                <div class="fs-4 fw-bold">{{ positions|selectattr("quantity", "gt", 0)|list|length }}</div>
+                <div class="text-muted small mb-1">Valor de Mercado</div>
+                {% if current_value is not none %}
+                <div class="fs-4 fw-bold">R$ {{ "%.2f"|format(current_value) }}</div>
+                {% else %}
+                <div class="fs-4 fw-bold text-muted">—</div>
+                {% endif %}
             </div>
         </div>
     </div>
     <div class="col-sm-6 col-lg-3">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
-                <div class="text-muted small mb-1">Total de Posições</div>
-                <div class="fs-4 fw-bold">{{ positions|length }}</div>
+                <div class="text-muted small mb-1">Lucro Não Realizado</div>
+                {% if unrealized_pnl is not none %}
+                <div class="fs-4 fw-bold {% if unrealized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    R$ {{ "%.2f"|format(unrealized_pnl) }}
+                </div>
+                {% else %}
+                <div class="fs-4 fw-bold text-muted">—</div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -60,6 +70,9 @@
                         <th>Tipo</th>
                         <th class="text-end">Qtd</th>
                         <th class="text-end">Preço Médio</th>
+                        <th class="text-end">Cotação</th>
+                        <th class="text-end">Valor Atual</th>
+                        <th class="text-end">Lucro Não Real.</th>
                         <th class="text-end">Custo Total</th>
                         <th class="text-end">Lucro Realizado</th>
                         <th class="text-center">Ações</th>
@@ -85,6 +98,15 @@
                         </td>
                         <td class="text-end">{{ "%.0f"|format(p.quantity) if p.quantity == p.quantity|int else "%.4f"|format(p.quantity) }}</td>
                         <td class="text-end">R$ {{ "%.2f"|format(p.avg_price) }}</td>
+                        <td class="text-end">
+                            {% if p.current_price is not none %}R$ {{ "%.2f"|format(p.current_price) }}{% else %}—{% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if p.current_value is not none %}R$ {{ "%.2f"|format(p.current_value) }}{% else %}—{% endif %}
+                        </td>
+                        <td class="text-end {% if p.unrealized_pnl is not none %}{% if p.unrealized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}{% endif %}">
+                            {% if p.unrealized_pnl is not none %}R$ {{ "%.2f"|format(p.unrealized_pnl) }}{% else %}—{% endif %}
+                        </td>
                         <td class="text-end">R$ {{ "%.2f"|format(p.total_cost) }}</td>
                         <td class="text-end {% if p.realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
                             R$ {{ "%.2f"|format(p.realized_pnl) }}

@@ -74,7 +74,8 @@ class AssetPosition(BaseModel):
     quantity: float
     avg_price: float
     total_cost: float
-    current_value: Optional[float] = None
+    current_price: Optional[float] = None   # market price per share
+    current_value: Optional[float] = None   # current_price × quantity
     unrealized_pnl: Optional[float] = None
     realized_pnl: float
     irr: Optional[float] = None

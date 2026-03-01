@@ -26,11 +26,12 @@ def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[Ass
             continue
 
         quote = fetch_quote(asset.ticker) if fetch_quotes else None
+        current_price = quote
         unrealized_pnl = None
-        if quote and calc["quantity"] > 0:
-            unrealized_pnl = calculate_unrealized_pnl(calc["quantity"], calc["avg_price"], quote)
+        if current_price and calc["quantity"] > 0:
+            unrealized_pnl = calculate_unrealized_pnl(calc["quantity"], calc["avg_price"], current_price)
 
-        current_value = (quote * calc["quantity"]) if quote and calc["quantity"] > 0 else None
+        current_value = (current_price * calc["quantity"]) if current_price and calc["quantity"] > 0 else None
 
         irr = None
         if calc["cash_flows"]:
@@ -44,6 +45,7 @@ def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[Ass
                 quantity=calc["quantity"],
                 avg_price=calc["avg_price"],
                 total_cost=calc["total_cost"],
+                current_price=current_price,
                 current_value=current_value,
                 unrealized_pnl=unrealized_pnl,
                 realized_pnl=calc["realized_pnl"],
@@ -59,10 +61,14 @@ def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[Ass
 @router.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):
     assets = db.query(Asset).all()
-    positions = build_positions(assets, fetch_quotes=False)
+    positions = build_positions(assets, fetch_quotes=True)
 
     total_invested = sum(p.total_cost for p in positions)
     realized_pnl = sum(p.realized_pnl for p in positions)
+    values = [p.current_value for p in positions if p.current_value is not None]
+    current_value = sum(values) if values else None
+    unrealized = [p.unrealized_pnl for p in positions if p.unrealized_pnl is not None]
+    unrealized_pnl = sum(unrealized) if unrealized else None
 
     return templates.TemplateResponse(
         "dashboard.html",
@@ -71,8 +77,8 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
             "positions": positions,
             "total_invested": total_invested,
             "realized_pnl": realized_pnl,
-            "current_value": None,
-            "unrealized_pnl": None,
+            "current_value": current_value,
+            "unrealized_pnl": unrealized_pnl,
         },
     )
 
