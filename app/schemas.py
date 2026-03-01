@@ -3,27 +3,27 @@ from typing import Optional, List
 from pydantic import BaseModel, field_validator
 
 
-class AtivoBase(BaseModel):
+class AssetBase(BaseModel):
     ticker: str
-    nome: Optional[str] = None
-    tipo: Optional[str] = None
+    name: Optional[str] = None
+    type: Optional[str] = None
 
 
-class AtivoCreate(AtivoBase):
+class AssetCreate(AssetBase):
     @field_validator("ticker")
     @classmethod
     def ticker_upper(cls, v: str) -> str:
         return v.upper().strip()
 
-    @field_validator("tipo")
+    @field_validator("type")
     @classmethod
-    def tipo_valido(cls, v: Optional[str]) -> Optional[str]:
-        if v and v not in ("ACAO", "FII", "ETF", "BDR"):
-            raise ValueError("tipo deve ser ACAO, FII, ETF ou BDR")
+    def type_valid(cls, v: Optional[str]) -> Optional[str]:
+        if v and v not in ("STOCK", "REIT", "ETF", "BDR"):
+            raise ValueError("type must be STOCK, REIT, ETF or BDR")
         return v
 
 
-class AtivoOut(AtivoBase):
+class AssetOut(AssetBase):
     id: int
     created_at: datetime
 
@@ -31,35 +31,35 @@ class AtivoOut(AtivoBase):
         from_attributes = True
 
 
-class TransacaoBase(BaseModel):
-    ativo_id: int
-    tipo: str
-    quantidade: float
-    preco: float
-    taxas: float = 0.0
-    data: date
-    corretora: Optional[str] = None
-    notas: Optional[str] = None
+class TransactionBase(BaseModel):
+    asset_id: int
+    type: str
+    quantity: float
+    price: float
+    fees: float = 0.0
+    date: date
+    broker: Optional[str] = None
+    notes: Optional[str] = None
 
 
-class TransacaoCreate(TransacaoBase):
-    @field_validator("tipo")
+class TransactionCreate(TransactionBase):
+    @field_validator("type")
     @classmethod
-    def tipo_valido(cls, v: str) -> str:
+    def type_valid(cls, v: str) -> str:
         v = v.upper().strip()
-        if v not in ("COMPRA", "VENDA"):
-            raise ValueError("tipo deve ser COMPRA ou VENDA")
+        if v not in ("BUY", "SELL"):
+            raise ValueError("type must be BUY or SELL")
         return v
 
-    @field_validator("quantidade", "preco")
+    @field_validator("quantity", "price")
     @classmethod
-    def positivo(cls, v: float) -> float:
+    def must_be_positive(cls, v: float) -> float:
         if v <= 0:
-            raise ValueError("deve ser maior que zero")
+            raise ValueError("must be greater than zero")
         return v
 
 
-class TransacaoOut(TransacaoBase):
+class TransactionOut(TransactionBase):
     id: int
     created_at: datetime
 
@@ -67,22 +67,22 @@ class TransacaoOut(TransacaoBase):
         from_attributes = True
 
 
-class PosicaoAtivo(BaseModel):
+class AssetPosition(BaseModel):
     ticker: str
-    nome: Optional[str]
-    tipo: Optional[str]
-    quantidade: float
-    preco_medio: float
-    custo_total: float
-    valor_atual: Optional[float] = None
-    lucro_nao_realizado: Optional[float] = None
-    lucro_realizado: float
-    tir: Optional[float] = None
+    name: Optional[str]
+    type: Optional[str]
+    quantity: float
+    avg_price: float
+    total_cost: float
+    current_value: Optional[float] = None
+    unrealized_pnl: Optional[float] = None
+    realized_pnl: float
+    irr: Optional[float] = None
 
 
-class ResumoCarteira(BaseModel):
-    total_investido: float
-    valor_atual: Optional[float]
-    lucro_realizado: float
-    lucro_nao_realizado: Optional[float]
-    posicoes: List[PosicaoAtivo]
+class PortfolioSummary(BaseModel):
+    total_invested: float
+    current_value: Optional[float]
+    realized_pnl: float
+    unrealized_pnl: Optional[float]
+    positions: List[AssetPosition]

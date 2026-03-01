@@ -1,28 +1,27 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from app.database import engine
 from app import models
-from app.routers import ativos, transacoes, carteira
+from app.routers import assets, transactions, portfolio
 
-# Cria tabelas no banco automaticamente na inicialização
+# Create database tables on startup
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="Gestão de Carteira de Ações",
-    description="Acompanhe seus investimentos em ações brasileiras",
+    title="Stock Portfolio Manager",
+    description="Track your Brazilian stock market investments",
     version="0.1.0",
 )
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-app.include_router(carteira.router)
-app.include_router(ativos.router)
-app.include_router(transacoes.router)
+app.include_router(portfolio.router)
+app.include_router(assets.router)
+app.include_router(transactions.router)
 
 
 @app.get("/")
 def root():
-    return RedirectResponse(url="/carteira/")
+    return RedirectResponse(url="/portfolio/")

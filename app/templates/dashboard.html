@@ -10,7 +10,7 @@
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="text-muted small mb-1">Total Investido</div>
-                <div class="fs-4 fw-bold">R$ {{ "%.2f"|format(total_investido) }}</div>
+                <div class="fs-4 fw-bold">R$ {{ "%.2f"|format(total_invested) }}</div>
             </div>
         </div>
     </div>
@@ -18,8 +18,8 @@
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="text-muted small mb-1">Lucro Realizado</div>
-                <div class="fs-4 fw-bold {% if lucro_realizado >= 0 %}text-success{% else %}text-danger{% endif %}">
-                    R$ {{ "%.2f"|format(lucro_realizado) }}
+                <div class="fs-4 fw-bold {% if realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    R$ {{ "%.2f"|format(realized_pnl) }}
                 </div>
             </div>
         </div>
@@ -28,7 +28,7 @@
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="text-muted small mb-1">Ativos em Carteira</div>
-                <div class="fs-4 fw-bold">{{ posicoes|selectattr("quantidade", "gt", 0)|list|length }}</div>
+                <div class="fs-4 fw-bold">{{ positions|selectattr("quantity", "gt", 0)|list|length }}</div>
             </div>
         </div>
     </div>
@@ -36,7 +36,7 @@
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="text-muted small mb-1">Total de Posições</div>
-                <div class="fs-4 fw-bold">{{ posicoes|length }}</div>
+                <div class="fs-4 fw-bold">{{ positions|length }}</div>
             </div>
         </div>
     </div>
@@ -46,12 +46,12 @@
 <div class="card border-0 shadow-sm">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <span class="fw-semibold">Posições</span>
-        <a href="/transacoes/nova" class="btn btn-sm btn-primary">
+        <a href="/transactions/" class="btn btn-sm btn-primary">
             <i class="bi bi-plus-lg"></i> Nova Transação
         </a>
     </div>
     <div class="card-body p-0">
-        {% if posicoes %}
+        {% if positions %}
         <div class="table-responsive">
             <table class="table table-hover mb-0 align-middle">
                 <thead class="table-light">
@@ -66,31 +66,31 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for p in posicoes %}
+                    {% for p in positions %}
                     <tr>
                         <td>
                             <span class="fw-bold">{{ p.ticker }}</span>
-                            {% if p.nome %}<br><small class="text-muted">{{ p.nome }}</small>{% endif %}
+                            {% if p.name %}<br><small class="text-muted">{{ p.name }}</small>{% endif %}
                         </td>
                         <td>
-                            {% if p.tipo %}
+                            {% if p.type %}
                             <span class="badge
-                                {% if p.tipo == 'ACAO' %}bg-primary
-                                {% elif p.tipo == 'FII' %}bg-success
-                                {% elif p.tipo == 'ETF' %}bg-info
+                                {% if p.type == 'STOCK' %}bg-primary
+                                {% elif p.type == 'REIT' %}bg-success
+                                {% elif p.type == 'ETF' %}bg-info
                                 {% else %}bg-secondary{% endif %}">
-                                {{ p.tipo }}
+                                {{ p.type }}
                             </span>
                             {% endif %}
                         </td>
-                        <td class="text-end">{{ "%.0f"|format(p.quantidade) if p.quantidade == p.quantidade|int else "%.4f"|format(p.quantidade) }}</td>
-                        <td class="text-end">R$ {{ "%.2f"|format(p.preco_medio) }}</td>
-                        <td class="text-end">R$ {{ "%.2f"|format(p.custo_total) }}</td>
-                        <td class="text-end {% if p.lucro_realizado >= 0 %}text-success{% else %}text-danger{% endif %}">
-                            R$ {{ "%.2f"|format(p.lucro_realizado) }}
+                        <td class="text-end">{{ "%.0f"|format(p.quantity) if p.quantity == p.quantity|int else "%.4f"|format(p.quantity) }}</td>
+                        <td class="text-end">R$ {{ "%.2f"|format(p.avg_price) }}</td>
+                        <td class="text-end">R$ {{ "%.2f"|format(p.total_cost) }}</td>
+                        <td class="text-end {% if p.realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            R$ {{ "%.2f"|format(p.realized_pnl) }}
                         </td>
                         <td class="text-center">
-                            <a href="/transacoes/?ativo_id={{ p.ticker }}" class="btn btn-sm btn-outline-secondary">
+                            <a href="/transactions/?ticker={{ p.ticker }}" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-list-ul"></i>
                             </a>
                         </td>
@@ -103,7 +103,7 @@
         <div class="text-center py-5 text-muted">
             <i class="bi bi-inbox fs-1"></i>
             <p class="mt-2">Nenhuma posição encontrada.</p>
-            <a href="/ativos/" class="btn btn-primary">Cadastrar Ativo</a>
+            <a href="/assets/" class="btn btn-primary">Cadastrar Ativo</a>
         </div>
         {% endif %}
     </div>

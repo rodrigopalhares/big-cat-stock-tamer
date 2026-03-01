@@ -14,18 +14,18 @@
                 <i class="bi bi-plus-circle"></i> Nova Transação
             </div>
             <div class="card-body">
-                {% if not ativos %}
+                {% if not assets %}
                 <div class="alert alert-warning">
-                    <a href="/ativos/">Cadastre um ativo</a> primeiro.
+                    <a href="/assets/">Cadastre um ativo</a> primeiro.
                 </div>
                 {% else %}
-                <form method="post" action="/transacoes/nova">
+                <form method="post" action="/transactions/new">
                     <div class="mb-3">
                         <label class="form-label">Ativo <span class="text-danger">*</span></label>
-                        <select name="ativo_id" class="form-select" required>
-                            {% for a in ativos %}
-                            <option value="{{ a.id }}" {% if ativo_id_filtro == a.id %}selected{% endif %}>
-                                {{ a.ticker }} {% if a.nome %}— {{ a.nome }}{% endif %}
+                        <select name="asset_id" class="form-select" required>
+                            {% for a in assets %}
+                            <option value="{{ a.id }}" {% if asset_id_filter == a.id %}selected{% endif %}>
+                                {{ a.ticker }} {% if a.name %}— {{ a.name }}{% endif %}
                             </option>
                             {% endfor %}
                         </select>
@@ -33,12 +33,12 @@
                     <div class="mb-3">
                         <label class="form-label">Tipo <span class="text-danger">*</span></label>
                         <div class="btn-group w-100" role="group">
-                            <input type="radio" class="btn-check" name="tipo" id="tipoCompra" value="COMPRA" checked>
-                            <label class="btn btn-outline-success" for="tipoCompra">
+                            <input type="radio" class="btn-check" name="type" id="typeBuy" value="BUY" checked>
+                            <label class="btn btn-outline-success" for="typeBuy">
                                 <i class="bi bi-arrow-down-circle"></i> Compra
                             </label>
-                            <input type="radio" class="btn-check" name="tipo" id="tipoVenda" value="VENDA">
-                            <label class="btn btn-outline-danger" for="tipoVenda">
+                            <input type="radio" class="btn-check" name="type" id="typeSell" value="SELL">
+                            <label class="btn btn-outline-danger" for="typeSell">
                                 <i class="bi bi-arrow-up-circle"></i> Venda
                             </label>
                         </div>
@@ -46,31 +46,31 @@
                     <div class="row g-2 mb-3">
                         <div class="col-6">
                             <label class="form-label">Quantidade <span class="text-danger">*</span></label>
-                            <input type="number" name="quantidade" class="form-control"
+                            <input type="number" name="quantity" class="form-control"
                                    step="0.0001" min="0.0001" required>
                         </div>
                         <div class="col-6">
                             <label class="form-label">Preço Unit. (R$) <span class="text-danger">*</span></label>
-                            <input type="number" name="preco" class="form-control"
+                            <input type="number" name="price" class="form-control"
                                    step="0.01" min="0.01" required>
                         </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Taxas (R$)</label>
-                        <input type="number" name="taxas" class="form-control"
+                        <input type="number" name="fees" class="form-control"
                                step="0.01" min="0" value="0">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Data <span class="text-danger">*</span></label>
-                        <input type="date" name="data" class="form-control" value="{{ hoje }}" required>
+                        <input type="date" name="date" class="form-control" value="{{ today }}" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Corretora</label>
-                        <input type="text" name="corretora" class="form-control" placeholder="Ex: Clear, XP">
+                        <input type="text" name="broker" class="form-control" placeholder="Ex: Clear, XP">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Notas</label>
-                        <textarea name="notas" class="form-control" rows="2" placeholder="Opcional"></textarea>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="Opcional"></textarea>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="bi bi-check-lg"></i> Registrar
@@ -87,16 +87,16 @@
             <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <span class="fw-semibold">
                     Histórico
-                    <span class="badge bg-secondary ms-1">{{ transacoes|length }}</span>
+                    <span class="badge bg-secondary ms-1">{{ transactions|length }}</span>
                 </span>
-                {% if ativo_id_filtro %}
-                <a href="/transacoes/" class="btn btn-sm btn-outline-secondary">
+                {% if asset_id_filter %}
+                <a href="/transactions/" class="btn btn-sm btn-outline-secondary">
                     <i class="bi bi-x-lg"></i> Limpar filtro
                 </a>
                 {% endif %}
             </div>
             <div class="card-body p-0">
-                {% if transacoes %}
+                {% if transactions %}
                 <div class="table-responsive">
                     <table class="table table-hover mb-0 align-middle small">
                         <thead class="table-light">
@@ -113,28 +113,28 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for t in transacoes %}
+                            {% for t in transactions %}
                             <tr>
-                                <td>{{ t.data.strftime("%d/%m/%Y") }}</td>
-                                <td class="fw-bold">{{ t.ativo.ticker }}</td>
+                                <td>{{ t.date.strftime("%d/%m/%Y") }}</td>
+                                <td class="fw-bold">{{ t.asset.ticker }}</td>
                                 <td>
-                                    <span class="badge {% if t.tipo == 'COMPRA' %}bg-success{% else %}bg-danger{% endif %}">
-                                        {{ t.tipo }}
+                                    <span class="badge {% if t.type == 'BUY' %}bg-success{% else %}bg-danger{% endif %}">
+                                        {% if t.type == 'BUY' %}Compra{% else %}Venda{% endif %}
                                     </span>
                                 </td>
-                                <td class="text-end">{{ "%.4f"|format(t.quantidade) }}</td>
-                                <td class="text-end">R$ {{ "%.2f"|format(t.preco) }}</td>
-                                <td class="text-end text-muted">R$ {{ "%.2f"|format(t.taxas) }}</td>
+                                <td class="text-end">{{ "%.4f"|format(t.quantity) }}</td>
+                                <td class="text-end">R$ {{ "%.2f"|format(t.price) }}</td>
+                                <td class="text-end text-muted">R$ {{ "%.2f"|format(t.fees) }}</td>
                                 <td class="text-end fw-semibold">
-                                    {% if t.tipo == 'COMPRA' %}
-                                    R$ {{ "%.2f"|format(t.quantidade * t.preco + t.taxas) }}
+                                    {% if t.type == 'BUY' %}
+                                    R$ {{ "%.2f"|format(t.quantity * t.price + t.fees) }}
                                     {% else %}
-                                    R$ {{ "%.2f"|format(t.quantidade * t.preco - t.taxas) }}
+                                    R$ {{ "%.2f"|format(t.quantity * t.price - t.fees) }}
                                     {% endif %}
                                 </td>
-                                <td class="text-muted">{{ t.corretora or "—" }}</td>
+                                <td class="text-muted">{{ t.broker or "—" }}</td>
                                 <td class="text-center">
-                                    <form method="post" action="/transacoes/{{ t.id }}/excluir"
+                                    <form method="post" action="/transactions/{{ t.id }}/delete"
                                           class="d-inline"
                                           onsubmit="return confirm('Excluir esta transação?')">
                                         <button type="submit" class="btn btn-sm btn-outline-danger border-0">

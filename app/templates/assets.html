@@ -6,9 +6,9 @@
     <h2 class="mb-0"><i class="bi bi-building"></i> Ativos</h2>
 </div>
 
-{% if erro %}
+{% if error %}
 <div class="alert alert-danger alert-dismissible fade show" role="alert">
-    {{ erro }}
+    {{ error }}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
 {% endif %}
@@ -21,7 +21,7 @@
                 <i class="bi bi-plus-circle"></i> Novo Ativo
             </div>
             <div class="card-body">
-                <form method="post" action="/ativos/novo">
+                <form method="post" action="/assets/new">
                     <div class="mb-3">
                         <label class="form-label">Ticker <span class="text-danger">*</span></label>
                         <input type="text" name="ticker" class="form-control text-uppercase"
@@ -29,13 +29,13 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Nome</label>
-                        <input type="text" name="nome" class="form-control"
+                        <input type="text" name="name" class="form-control"
                                placeholder="Ex: Petrobras PN">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Tipo</label>
-                        <select name="tipo" class="form-select">
-                            {% for t in tipos %}
+                        <select name="type" class="form-select">
+                            {% for t in asset_types %}
                             <option value="{{ t }}">{{ t }}</option>
                             {% endfor %}
                         </select>
@@ -53,10 +53,10 @@
         <div class="card border-0 shadow-sm">
             <div class="card-header bg-white fw-semibold">
                 Ativos Cadastrados
-                <span class="badge bg-secondary ms-1">{{ ativos|length }}</span>
+                <span class="badge bg-secondary ms-1">{{ assets|length }}</span>
             </div>
             <div class="card-body p-0">
-                {% if ativos %}
+                {% if assets %}
                 <div class="table-responsive">
                     <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
@@ -68,29 +68,29 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for ativo in ativos %}
+                            {% for asset in assets %}
                             <tr>
-                                <td class="fw-bold">{{ ativo.ticker }}</td>
-                                <td class="text-muted">{{ ativo.nome or "—" }}</td>
+                                <td class="fw-bold">{{ asset.ticker }}</td>
+                                <td class="text-muted">{{ asset.name or "—" }}</td>
                                 <td>
-                                    {% if ativo.tipo %}
+                                    {% if asset.type %}
                                     <span class="badge
-                                        {% if ativo.tipo == 'ACAO' %}bg-primary
-                                        {% elif ativo.tipo == 'FII' %}bg-success
-                                        {% elif ativo.tipo == 'ETF' %}bg-info
+                                        {% if asset.type == 'STOCK' %}bg-primary
+                                        {% elif asset.type == 'REIT' %}bg-success
+                                        {% elif asset.type == 'ETF' %}bg-info
                                         {% else %}bg-secondary{% endif %}">
-                                        {{ ativo.tipo }}
+                                        {{ asset.type }}
                                     </span>
                                     {% else %}—{% endif %}
                                 </td>
                                 <td class="text-center">
-                                    <a href="/transacoes/?ativo_id={{ ativo.id }}"
+                                    <a href="/transactions/?asset_id={{ asset.id }}"
                                        class="btn btn-sm btn-outline-secondary" title="Ver transações">
                                         <i class="bi bi-list-ul"></i>
                                     </a>
-                                    <form method="post" action="/ativos/{{ ativo.id }}/excluir"
+                                    <form method="post" action="/assets/{{ asset.id }}/delete"
                                           class="d-inline"
-                                          onsubmit="return confirm('Excluir {{ ativo.ticker }}? As transações também serão removidas.')">
+                                          onsubmit="return confirm('Excluir {{ asset.ticker }}? As transações também serão removidas.')">
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
                                             <i class="bi bi-trash"></i>
                                         </button>
