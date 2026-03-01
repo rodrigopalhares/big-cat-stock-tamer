@@ -1,0 +1,15 @@
+[project]
+name = "stocks"
+version = "0.1.0"
+description = "Gestão de carteira de ações brasileiras"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "sqlalchemy",
+    "jinja2",
+    "python-multipart",
+    "numpy-financial",
+    "pandas",
+    "yfinance",
+]

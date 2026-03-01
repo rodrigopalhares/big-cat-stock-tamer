@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Transações{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0"><i class="bi bi-arrow-left-right"></i> Transações</h2>
+</div>
+
+<div class="row g-4">
+    <!-- Formulário de nova transação -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-semibold">
+                <i class="bi bi-plus-circle"></i> Nova Transação
+            </div>
+            <div class="card-body">
+                {% if not ativos %}
+                <div class="alert alert-warning">
+                    <a href="/ativos/">Cadastre um ativo</a> primeiro.
+                </div>
+                {% else %}
+                <form method="post" action="/transacoes/nova">
+                    <div class="mb-3">
+                        <label class="form-label">Ativo <span class="text-danger">*</span></label>
+                        <select name="ativo_id" class="form-select" required>
+                            {% for a in ativos %}
+                            <option value="{{ a.id }}" {% if ativo_id_filtro == a.id %}selected{% endif %}>
+                                {{ a.ticker }} {% if a.nome %}— {{ a.nome }}{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo <span class="text-danger">*</span></label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="tipo" id="tipoCompra" value="COMPRA" checked>
+                            <label class="btn btn-outline-success" for="tipoCompra">
+                                <i class="bi bi-arrow-down-circle"></i> Compra
+                            </label>
+                            <input type="radio" class="btn-check" name="tipo" id="tipoVenda" value="VENDA">
+                            <label class="btn btn-outline-danger" for="tipoVenda">
+                                <i class="bi bi-arrow-up-circle"></i> Venda
+                            </label>
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Quantidade <span class="text-danger">*</span></label>
+                            <input type="number" name="quantidade" class="form-control"
+                                   step="0.0001" min="0.0001" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Preço Unit. (R$) <span class="text-danger">*</span></label>
+                            <input type="number" name="preco" class="form-control"
+                                   step="0.01" min="0.01" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Taxas (R$)</label>
+                        <input type="number" name="taxas" class="form-control"
+                               step="0.01" min="0" value="0">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Data <span class="text-danger">*</span></label>
+                        <input type="date" name="data" class="form-control" value="{{ hoje }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Corretora</label>
+                        <input type="text" name="corretora" class="form-control" placeholder="Ex: Clear, XP">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea name="notas" class="form-control" rows="2" placeholder="Opcional"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-lg"></i> Registrar
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Histórico de transações -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">
+                    Histórico
+                    <span class="badge bg-secondary ms-1">{{ transacoes|length }}</span>
+                </span>
+                {% if ativo_id_filtro %}
+                <a href="/transacoes/" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i> Limpar filtro
+                </a>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                {% if transacoes %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Data</th>
+                                <th>Ativo</th>
+                                <th>Tipo</th>
+                                <th class="text-end">Qtd</th>
+                                <th class="text-end">Preço</th>
+                                <th class="text-end">Taxas</th>
+                                <th class="text-end">Total</th>
+                                <th>Corretora</th>
+                                <th class="text-center">Del.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in transacoes %}
+                            <tr>
+                                <td>{{ t.data.strftime("%d/%m/%Y") }}</td>
+                                <td class="fw-bold">{{ t.ativo.ticker }}</td>
+                                <td>
+                                    <span class="badge {% if t.tipo == 'COMPRA' %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ t.tipo }}
+                                    </span>
+                                </td>
+                                <td class="text-end">{{ "%.4f"|format(t.quantidade) }}</td>
+                                <td class="text-end">R$ {{ "%.2f"|format(t.preco) }}</td>
+                                <td class="text-end text-muted">R$ {{ "%.2f"|format(t.taxas) }}</td>
+                                <td class="text-end fw-semibold">
+                                    {% if t.tipo == 'COMPRA' %}
+                                    R$ {{ "%.2f"|format(t.quantidade * t.preco + t.taxas) }}
+                                    {% else %}
+                                    R$ {{ "%.2f"|format(t.quantidade * t.preco - t.taxas) }}
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted">{{ t.corretora or "—" }}</td>
+                                <td class="text-center">
+                                    <form method="post" action="/transacoes/{{ t.id }}/excluir"
+                                          class="d-inline"
+                                          onsubmit="return confirm('Excluir esta transação?')">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger border-0">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox fs-1"></i>
+                    <p class="mt-2">Nenhuma transação registrada.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
