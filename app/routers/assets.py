@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from app.constants import ASSET_TYPES
 from app.database import get_db
 from app.models import Asset
 from app.schemas import AssetCreate, AssetOut
@@ -11,8 +12,6 @@ from app.services.quotes import fetch_asset_info
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 templates = Jinja2Templates(directory="app/templates")
-
-ASSET_TYPES = ["STOCK", "REIT", "ETF", "BDR"]
 
 
 # --- HTML Routes ---

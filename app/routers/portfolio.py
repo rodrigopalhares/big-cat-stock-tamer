@@ -14,6 +14,27 @@ router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 templates = Jinja2Templates(directory="app/templates")
 
 
+def _aggregate_positions(positions: List[AssetPosition]) -> dict:
+    total_invested = sum(
+        (p.total_cost * p.exchange_rate if p.exchange_rate else p.total_cost)
+        for p in positions
+    )
+    realized_pnl = sum(
+        (p.realized_pnl * p.exchange_rate if p.exchange_rate else p.realized_pnl)
+        for p in positions
+    )
+    values_brl = [p.current_value_brl for p in positions if p.current_value_brl is not None]
+    current_value = sum(values_brl) if values_brl else None
+    unrealized_brl = [p.unrealized_pnl_brl for p in positions if p.unrealized_pnl_brl is not None]
+    unrealized_pnl = sum(unrealized_brl) if unrealized_brl else None
+    return {
+        "total_invested": total_invested,
+        "realized_pnl": realized_pnl,
+        "current_value": current_value,
+        "unrealized_pnl": unrealized_pnl,
+    }
+
+
 def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[AssetPosition]:
     positions = []
     for asset in assets:
@@ -80,18 +101,11 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     assets = db.query(Asset).all()
     positions = build_positions(assets, fetch_quotes=True)
 
-    total_invested = sum(
-        (p.total_cost * p.exchange_rate if p.exchange_rate else p.total_cost)
-        for p in positions
-    )
-    realized_pnl = sum(
-        (p.realized_pnl * p.exchange_rate if p.exchange_rate else p.realized_pnl)
-        for p in positions
-    )
-    values_brl = [p.current_value_brl for p in positions if p.current_value_brl is not None]
-    current_value = sum(values_brl) if values_brl else None
-    unrealized_brl = [p.unrealized_pnl_brl for p in positions if p.unrealized_pnl_brl is not None]
-    unrealized_pnl = sum(unrealized_brl) if unrealized_brl else None
+    agg = _aggregate_positions(positions)
+    total_invested = agg["total_invested"]
+    realized_pnl = agg["realized_pnl"]
+    current_value = agg["current_value"]
+    unrealized_pnl = agg["unrealized_pnl"]
 
     # collect unique exchange rates used (for display)
     usd_rate = next(
@@ -122,24 +136,13 @@ def portfolio_summary(db: Session = Depends(get_db)):
     assets = db.query(Asset).all()
     positions = build_positions(assets, fetch_quotes=True)
 
-    total_invested = sum(
-        (p.total_cost * p.exchange_rate if p.exchange_rate else p.total_cost)
-        for p in positions
-    )
-    realized_pnl = sum(
-        (p.realized_pnl * p.exchange_rate if p.exchange_rate else p.realized_pnl)
-        for p in positions
-    )
-    values_brl = [p.current_value_brl for p in positions if p.current_value_brl is not None]
-    current_value = sum(values_brl) if values_brl else None
-    unrealized_brl = [p.unrealized_pnl_brl for p in positions if p.unrealized_pnl_brl is not None]
-    unrealized_pnl = sum(unrealized_brl) if unrealized_brl else None
+    agg = _aggregate_positions(positions)
 
     return PortfolioSummary(
-        total_invested=total_invested,
-        current_value=current_value,
-        realized_pnl=realized_pnl,
-        unrealized_pnl=unrealized_pnl,
+        total_invested=agg["total_invested"],
+        current_value=agg["current_value"],
+        realized_pnl=agg["realized_pnl"],
+        unrealized_pnl=agg["unrealized_pnl"],
         positions=positions,
     )
 

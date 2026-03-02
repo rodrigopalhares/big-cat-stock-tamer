@@ -6,6 +6,3 @@ python-multipart
 numpy-financial
 pandas
 yfinance
-pytest
-httpx
-pytest-cov

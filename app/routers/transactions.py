@@ -139,10 +139,10 @@ def create_transaction_form(
 
 @router.post("/{transaction_id}/delete")
 def delete_transaction(transaction_id: int, db: Session = Depends(get_db)):
-    t = db.query(Transaction).filter(Transaction.id == transaction_id).first()
-    if not t:
+    transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+    if not transaction:
         raise HTTPException(status_code=404, detail="Transaction not found")
-    db.delete(t)
+    db.delete(transaction)
     db.commit()
     return RedirectResponse(url="/transactions/", status_code=303)
 
@@ -158,21 +158,21 @@ def list_transactions_api(ticker: Optional[str] = None, db: Session = Depends(ge
 
 
 @router.post("/api", response_model=TransactionOut, status_code=201)
-def create_transaction(t: TransactionCreate, db: Session = Depends(get_db)):
-    asset = db.query(Asset).filter(Asset.ticker == t.asset_id).first()
+def create_transaction(transaction: TransactionCreate, db: Session = Depends(get_db)):
+    asset = db.query(Asset).filter(Asset.ticker == transaction.asset_id).first()
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
-    new_t = Transaction(**t.model_dump())
-    db.add(new_t)
+    new_transaction = Transaction(**transaction.model_dump())
+    db.add(new_transaction)
     db.commit()
-    db.refresh(new_t)
-    return new_t
+    db.refresh(new_transaction)
+    return new_transaction
 
 
 @router.delete("/api/{transaction_id}", status_code=204)
 def delete_transaction_api(transaction_id: int, db: Session = Depends(get_db)):
-    t = db.query(Transaction).filter(Transaction.id == transaction_id).first()
-    if not t:
+    transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+    if not transaction:
         raise HTTPException(status_code=404, detail="Transaction not found")
-    db.delete(t)
+    db.delete(transaction)
     db.commit()

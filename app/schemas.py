@@ -2,6 +2,8 @@ from datetime import date, datetime
 from typing import Optional, List
 from pydantic import BaseModel, field_validator
 
+from app.constants import ASSET_TYPES
+
 
 class AssetBase(BaseModel):
     ticker: str
@@ -20,8 +22,8 @@ class AssetCreate(AssetBase):
     @field_validator("type")
     @classmethod
     def type_valid(cls, v: Optional[str]) -> Optional[str]:
-        if v and v not in ("STOCK", "REIT", "ETF", "BDR"):
-            raise ValueError("type must be STOCK, REIT, ETF or BDR")
+        if v and v not in ASSET_TYPES:
+            raise ValueError(f"type must be one of {', '.join(ASSET_TYPES)}")
         return v
 
 

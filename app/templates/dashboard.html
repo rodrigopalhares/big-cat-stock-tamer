@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros.html" import asset_badge %}
 {% block title %}Dashboard — Carteira{% endblock %}
 
 {% block content %}
@@ -100,15 +101,7 @@
                             {% if p.name %}<br><small class="text-muted">{{ p.name }}</small>{% endif %}
                         </td>
                         <td>
-                            {% if p.type %}
-                            <span class="badge
-                                {% if p.type == 'STOCK' %}bg-primary
-                                {% elif p.type == 'REIT' %}bg-success
-                                {% elif p.type == 'ETF' %}bg-info
-                                {% else %}bg-secondary{% endif %}">
-                                {{ p.type }}
-                            </span>
-                            {% endif %}
+                            {% if p.type %}{{ asset_badge(p.type) }}{% endif %}
                         </td>
                         <td>
                             <span class="badge bg-light text-dark border">{{ p.currency }}</span>

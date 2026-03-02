@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -27,8 +27,8 @@ def test_exchange_rate_same_currency():
 
 def test_exchange_rate_cache_valid():
     """A fresh cache entry is returned without calling yfinance."""
-    now = datetime.utcnow().timestamp()
-    quotes_module._rate_cache["USDBRL"] = (5.5, now)
+    now = datetime.now(timezone.utc).timestamp()
+    quotes_module._rate_cache["USD_BRL"] = (5.5, now)
 
     with patch("app.services.quotes.yf") as mock_yf:
         result = fetch_exchange_rate("USD", "BRL")
@@ -39,8 +39,8 @@ def test_exchange_rate_cache_valid():
 
 def test_exchange_rate_cache_expired():
     """An expired cache entry causes yfinance to be called and result re-cached."""
-    old_time = datetime.utcnow().timestamp() - 400  # > 300 s ago
-    quotes_module._rate_cache["USDBRL"] = (4.9, old_time)
+    old_time = datetime.now(timezone.utc).timestamp() - 400  # > 300 s ago
+    quotes_module._rate_cache["USD_BRL"] = (4.9, old_time)
 
     mock_ticker = MagicMock()
     mock_ticker.fast_info.last_price = 5.5

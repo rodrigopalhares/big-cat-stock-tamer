@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 try:
@@ -7,7 +7,7 @@ try:
 except ImportError:
     YFINANCE_AVAILABLE = False
 
-_rate_cache: dict = {}  # {"USDBRL": (rate, timestamp)}
+_rate_cache: dict = {}  # {"USD_BRL": (rate, timestamp)}
 
 
 def fetch_asset_info(ticker: str) -> dict:
@@ -84,8 +84,8 @@ def fetch_exchange_rate(from_currency: str, to_currency: str = "BRL") -> float:
     if from_currency == to_currency:
         return 1.0
 
-    key = f"{from_currency}{to_currency}"
-    now = datetime.utcnow().timestamp()
+    key = f"{from_currency}_{to_currency}"
+    now = datetime.now(timezone.utc).timestamp()
 
     cached = _rate_cache.get(key)
     if cached and now - cached[1] < 300:
@@ -93,7 +93,8 @@ def fetch_exchange_rate(from_currency: str, to_currency: str = "BRL") -> float:
 
     if YFINANCE_AVAILABLE:
         try:
-            ticker = yf.Ticker(f"{key}=X")
+            yf_pair = f"{from_currency}{to_currency}=X"
+            ticker = yf.Ticker(yf_pair)
             rate = ticker.fast_info.last_price
             if rate and rate > 0:
                 _rate_cache[key] = (float(rate), now)
