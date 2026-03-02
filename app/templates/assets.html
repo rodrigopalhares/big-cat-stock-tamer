@@ -95,6 +95,12 @@
                                        class="btn btn-sm btn-outline-secondary" title="Ver transações">
                                         <i class="bi bi-list-ul"></i>
                                     </a>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-primary"
+                                            title="Editar"
+                                            onclick="openEditModal({{ asset.id }}, '{{ asset.ticker }}', {{ asset.name | tojson }}, '{{ asset.type or '' }}')">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
                                     <form method="post" action="/assets/{{ asset.id }}/delete"
                                           class="d-inline"
                                           onsubmit="return confirm('Excluir {{ asset.ticker }}? As transações também serão removidas.')">
@@ -118,4 +124,54 @@
         </div>
     </div>
 </div>
+
+<!-- Modal de edição -->
+<div class="modal fade" id="editAssetModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> Editar Ativo — <span id="editModalTicker"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editAssetForm" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nome</label>
+                        <input type="text" id="editName" name="name" class="form-control"
+                               placeholder="Ex: Petrobras PN">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo</label>
+                        <select id="editType" name="type" class="form-select">
+                            {% for t in asset_types %}
+                            <option value="{{ t }}">{{ t }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openEditModal(id, ticker, name, type) {
+    document.getElementById('editModalTicker').textContent = ticker;
+    document.getElementById('editAssetForm').action = '/assets/' + id + '/edit';
+    document.getElementById('editName').value = name || '';
+    const sel = document.getElementById('editType');
+    for (let opt of sel.options) {
+        opt.selected = opt.value === (type || 'STOCK');
+    }
+    new bootstrap.Modal(document.getElementById('editAssetModal')).show();
+}
+</script>
 {% endblock %}

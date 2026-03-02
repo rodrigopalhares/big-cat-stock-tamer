@@ -111,6 +111,22 @@ def create_asset_form(
     return RedirectResponse(url="/assets/", status_code=303)
 
 
+@router.post("/{asset_id}/edit")
+def edit_asset(
+    asset_id: int,
+    name: str = Form(""),
+    type: str = Form("STOCK"),
+    db: Session = Depends(get_db),
+):
+    asset = db.query(Asset).filter(Asset.id == asset_id).first()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    asset.name = name or None
+    asset.type = type or "STOCK"
+    db.commit()
+    return RedirectResponse(url="/assets/", status_code=303)
+
+
 @router.post("/{asset_id}/delete")
 def delete_asset(asset_id: int, db: Session = Depends(get_db)):
     asset = db.query(Asset).filter(Asset.id == asset_id).first()
