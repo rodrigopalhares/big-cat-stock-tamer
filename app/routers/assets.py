@@ -128,16 +128,16 @@ def create_asset_form(
     return RedirectResponse(url="/assets/", status_code=303)
 
 
-@router.post("/{asset_id}/edit")
+@router.post("/{ticker}/edit")
 def edit_asset(
-    asset_id: int,
+    ticker: str,
     name: str = Form(""),
     type: str = Form("STOCK"),
     yf_ticker: str = Form(""),
     currency: str = Form("BRL"),
     db: Session = Depends(get_db),
 ):
-    asset = db.query(Asset).filter(Asset.id == asset_id).first()
+    asset = db.query(Asset).filter(Asset.ticker == ticker.upper()).first()
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
     asset.name = name or None
@@ -148,9 +148,9 @@ def edit_asset(
     return RedirectResponse(url="/assets/", status_code=303)
 
 
-@router.post("/{asset_id}/delete")
-def delete_asset(asset_id: int, db: Session = Depends(get_db)):
-    asset = db.query(Asset).filter(Asset.id == asset_id).first()
+@router.post("/{ticker}/delete")
+def delete_asset(ticker: str, db: Session = Depends(get_db)):
+    asset = db.query(Asset).filter(Asset.ticker == ticker.upper()).first()
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
     db.delete(asset)
@@ -177,9 +177,9 @@ def create_asset(asset: AssetCreate, db: Session = Depends(get_db)):
     return new_asset
 
 
-@router.get("/api/{asset_id}", response_model=AssetOut)
-def get_asset(asset_id: int, db: Session = Depends(get_db)):
-    asset = db.query(Asset).filter(Asset.id == asset_id).first()
+@router.get("/api/{ticker}", response_model=AssetOut)
+def get_asset(ticker: str, db: Session = Depends(get_db)):
+    asset = db.query(Asset).filter(Asset.ticker == ticker.upper()).first()
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
     return asset

@@ -105,14 +105,13 @@
                                 </td>
                                 <td class="text-muted small">{{ asset.yf_ticker or "—" }}</td>
                                 <td class="text-center">
-                                    <a href="/transactions/?asset_id={{ asset.id }}"
+                                    <a href="/transactions/?ticker={{ asset.ticker }}"
                                        class="btn btn-sm btn-outline-secondary" title="Ver transações">
                                         <i class="bi bi-list-ul"></i>
                                     </a>
                                     <button type="button"
                                             class="btn btn-sm btn-outline-primary"
                                             title="Editar"
-                                            data-asset-id="{{ asset.id }}"
                                             data-asset-ticker="{{ asset.ticker }}"
                                             data-asset-name="{{ asset.name or '' }}"
                                             data-asset-type="{{ asset.type or 'STOCK' }}"
@@ -121,7 +120,7 @@
                                             onclick="openEditModal(this)">
                                         <i class="bi bi-pencil"></i>
                                     </button>
-                                    <form method="post" action="/assets/{{ asset.id }}/delete"
+                                    <form method="post" action="/assets/{{ asset.ticker }}/delete"
                                           class="d-inline"
                                           onsubmit="return confirm('Excluir {{ asset.ticker }}? As transações também serão removidas.')">
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
@@ -196,14 +195,13 @@
 {% block scripts %}
 <script>
 function openEditModal(btn) {
-    const id       = btn.dataset.assetId;
     const ticker   = btn.dataset.assetTicker;
     const name     = btn.dataset.assetName;
     const type     = btn.dataset.assetType || 'STOCK';
     const yfTicker = btn.dataset.assetYfTicker || '';
     const currency = btn.dataset.assetCurrency || 'BRL';
     document.getElementById('editModalTicker').textContent = ticker;
-    document.getElementById('editAssetForm').action = '/assets/' + id + '/edit';
+    document.getElementById('editAssetForm').action = '/assets/' + ticker + '/edit';
     document.getElementById('editName').value = name;
     document.getElementById('editYfTicker').value = yfTicker;
     for (let opt of document.getElementById('editType').options)

@@ -1,14 +1,13 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 from app.database import Base
 
 
 class Asset(Base):
     __tablename__ = "assets"
 
-    id = Column(Integer, primary_key=True, index=True)
-    ticker = Column(String, unique=True, nullable=False, index=True)
+    ticker = Column(String, primary_key=True, nullable=False)
     yf_ticker = Column(String)  # resolved Yahoo Finance symbol (e.g. PETR4.SA)
     name = Column(String)
     type = Column(String)  # STOCK, REIT, ETF, BDR
@@ -17,12 +16,16 @@ class Asset(Base):
 
     transactions = relationship("Transaction", back_populates="asset", cascade="all, delete-orphan")
 
+    @validates("ticker")
+    def _normalize_ticker(self, key, value):
+        return value.upper().strip() if value else value
+
 
 class Transaction(Base):
     __tablename__ = "transactions"
 
     id = Column(Integer, primary_key=True, index=True)
-    asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False)
+    asset_id = Column(String, ForeignKey("assets.ticker"), nullable=False)  # str FK → ticker
     type = Column(String, nullable=False)  # BUY or SELL
     quantity = Column(Float, nullable=False)
     price = Column(Float, nullable=False)

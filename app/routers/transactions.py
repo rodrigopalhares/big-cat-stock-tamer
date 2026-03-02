@@ -59,18 +59,12 @@ def ticker_info(ticker: str = "", db: Session = Depends(get_db)):
 @router.get("/", response_class=HTMLResponse)
 def list_transactions(
     request: Request,
-    asset_id: Optional[int] = None,
     ticker: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     query = db.query(Transaction).order_by(Transaction.date.desc(), Transaction.id.desc())
     selected_ticker = None
-    if asset_id:
-        query = query.filter(Transaction.asset_id == asset_id)
-        asset = db.query(Asset).filter(Asset.id == asset_id).first()
-        if asset:
-            selected_ticker = asset.ticker
-    elif ticker:
+    if ticker:
         ticker = ticker.upper()
         query = query.join(Transaction.asset).filter(Asset.ticker == ticker)
         selected_ticker = ticker
@@ -82,7 +76,6 @@ def list_transactions(
             "request": request,
             "transactions": transactions,
             "assets": assets,
-            "asset_id_filter": asset_id,
             "selected_ticker": selected_ticker,
             "today": date.today().isoformat(),
         },
@@ -130,7 +123,7 @@ def create_transaction_form(
         db.flush()
 
     transaction = Transaction(
-        asset_id=asset.id,
+        asset_id=asset.ticker,
         type=type.upper(),
         quantity=quantity,
         price=price,
@@ -157,16 +150,16 @@ def delete_transaction(transaction_id: int, db: Session = Depends(get_db)):
 # --- JSON API Routes ---
 
 @router.get("/api", response_model=List[TransactionOut])
-def list_transactions_api(asset_id: Optional[int] = None, db: Session = Depends(get_db)):
+def list_transactions_api(ticker: Optional[str] = None, db: Session = Depends(get_db)):
     query = db.query(Transaction).order_by(Transaction.date.desc())
-    if asset_id:
-        query = query.filter(Transaction.asset_id == asset_id)
+    if ticker:
+        query = query.filter(Transaction.asset_id == ticker.upper())
     return query.all()
 
 
 @router.post("/api", response_model=TransactionOut, status_code=201)
 def create_transaction(t: TransactionCreate, db: Session = Depends(get_db)):
-    asset = db.query(Asset).filter(Asset.id == t.asset_id).first()
+    asset = db.query(Asset).filter(Asset.ticker == t.asset_id).first()
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
     new_t = Transaction(**t.model_dump())

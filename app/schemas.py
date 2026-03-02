@@ -26,7 +26,6 @@ class AssetCreate(AssetBase):
 
 
 class AssetOut(AssetBase):
-    id: int
     created_at: datetime
 
     class Config:
@@ -34,7 +33,7 @@ class AssetOut(AssetBase):
 
 
 class TransactionBase(BaseModel):
-    asset_id: int
+    asset_id: str  # FK → Asset.ticker
     type: str
     quantity: float
     price: float

@@ -51,16 +51,15 @@ def test_edit_asset_form(client, db_session):
     asset = Asset(ticker="PETR4", name="Petrobras", type="STOCK", currency="BRL")
     db_session.add(asset)
     db_session.commit()
-    db_session.refresh(asset)
 
     response = client.post(
-        f"/assets/{asset.id}/edit",
+        f"/assets/{asset.ticker}/edit",
         data={"name": "Petrobras Novo", "type": "REIT", "currency": "USD", "yf_ticker": ""},
         follow_redirects=False,
     )
     assert response.status_code == 303
 
-    updated = db_session.query(Asset).filter(Asset.id == asset.id).first()
+    updated = db_session.query(Asset).filter(Asset.ticker == asset.ticker).first()
     assert updated.name == "Petrobras Novo"
     assert updated.type == "REIT"
     assert updated.currency == "USD"
@@ -70,13 +69,12 @@ def test_delete_asset_form(client, db_session):
     asset = Asset(ticker="PETR4", name="Petrobras", type="STOCK", currency="BRL")
     db_session.add(asset)
     db_session.commit()
-    db_session.refresh(asset)
-    asset_id = asset.id
+    ticker = asset.ticker
 
-    response = client.post(f"/assets/{asset_id}/delete", follow_redirects=False)
+    response = client.post(f"/assets/{ticker}/delete", follow_redirects=False)
     assert response.status_code == 303
 
-    deleted = db_session.query(Asset).filter(Asset.id == asset_id).first()
+    deleted = db_session.query(Asset).filter(Asset.ticker == ticker).first()
     assert deleted is None
 
 
@@ -115,7 +113,7 @@ def test_create_asset_api_duplicate(client):
 
 
 def test_get_asset_api_not_found(client):
-    response = client.get("/assets/api/9999")
+    response = client.get("/assets/api/NONEXISTENT")
     assert response.status_code == 404
 
 
@@ -128,7 +126,7 @@ def test_create_transaction_api_invalid_asset(client):
     response = client.post(
         "/transactions/api",
         json={
-            "asset_id": 9999,
+            "asset_id": "NONEXISTENT",
             "type": "BUY",
             "quantity": 10.0,
             "price": 10.0,
@@ -142,12 +140,11 @@ def test_create_transaction_api_success(client, db_session):
     asset = Asset(ticker="PETR4", name="Petrobras", type="STOCK", currency="BRL")
     db_session.add(asset)
     db_session.commit()
-    db_session.refresh(asset)
 
     response = client.post(
         "/transactions/api",
         json={
-            "asset_id": asset.id,
+            "asset_id": asset.ticker,
             "type": "BUY",
             "quantity": 10.0,
             "price": 25.0,
@@ -167,21 +164,21 @@ def test_list_transactions_api_filter_by_asset(client, db_session):
     db_session.flush()
 
     tx1 = Transaction(
-        asset_id=asset1.id, type="BUY", quantity=10, price=25.0, fees=0.0,
+        asset_id=asset1.ticker, type="BUY", quantity=10, price=25.0, fees=0.0,
         date=date(2024, 1, 1),
     )
     tx2 = Transaction(
-        asset_id=asset2.id, type="BUY", quantity=5, price=60.0, fees=0.0,
+        asset_id=asset2.ticker, type="BUY", quantity=5, price=60.0, fees=0.0,
         date=date(2024, 1, 1),
     )
     db_session.add_all([tx1, tx2])
     db_session.commit()
 
-    response = client.get(f"/transactions/api?asset_id={asset1.id}")
+    response = client.get(f"/transactions/api?ticker={asset1.ticker}")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
-    assert data[0]["asset_id"] == asset1.id
+    assert data[0]["asset_id"] == asset1.ticker
 
 
 def test_delete_transaction_api_success(client, db_session):
@@ -190,7 +187,7 @@ def test_delete_transaction_api_success(client, db_session):
     db_session.flush()
 
     tx = Transaction(
-        asset_id=asset.id, type="BUY", quantity=10, price=25.0, fees=0.0,
+        asset_id=asset.ticker, type="BUY", quantity=10, price=25.0, fees=0.0,
         date=date(2024, 1, 1),
     )
     db_session.add(tx)
@@ -226,7 +223,7 @@ def test_portfolio_api_with_brl_transaction(client, db_session):
     db_session.flush()
 
     tx = Transaction(
-        asset_id=asset.id, type="BUY", quantity=10, price=10.0, fees=0.0,
+        asset_id=asset.ticker, type="BUY", quantity=10, price=10.0, fees=0.0,
         date=date(2024, 1, 1),
     )
     db_session.add(tx)

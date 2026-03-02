@@ -39,7 +39,7 @@ def test_asset_currency_default():
 
 def test_transaction_type_normalized():
     tx = TransactionCreate(
-        asset_id=1, type="buy", quantity=10.0, price=10.0, date=date(2024, 1, 1)
+        asset_id="PETR4", type="buy", quantity=10.0, price=10.0, date=date(2024, 1, 1)
     )
     assert tx.type == "BUY"
 
@@ -47,41 +47,41 @@ def test_transaction_type_normalized():
 def test_transaction_type_invalid():
     with pytest.raises(ValidationError):
         TransactionCreate(
-            asset_id=1, type="HOLD", quantity=10.0, price=10.0, date=date(2024, 1, 1)
+            asset_id="PETR4", type="HOLD", quantity=10.0, price=10.0, date=date(2024, 1, 1)
         )
 
 
 def test_transaction_quantity_zero():
     with pytest.raises(ValidationError):
         TransactionCreate(
-            asset_id=1, type="BUY", quantity=0.0, price=10.0, date=date(2024, 1, 1)
+            asset_id="PETR4", type="BUY", quantity=0.0, price=10.0, date=date(2024, 1, 1)
         )
 
 
 def test_transaction_quantity_negative():
     with pytest.raises(ValidationError):
         TransactionCreate(
-            asset_id=1, type="BUY", quantity=-5.0, price=10.0, date=date(2024, 1, 1)
+            asset_id="PETR4", type="BUY", quantity=-5.0, price=10.0, date=date(2024, 1, 1)
         )
 
 
 def test_transaction_price_zero():
     with pytest.raises(ValidationError):
         TransactionCreate(
-            asset_id=1, type="BUY", quantity=10.0, price=0.0, date=date(2024, 1, 1)
+            asset_id="PETR4", type="BUY", quantity=10.0, price=0.0, date=date(2024, 1, 1)
         )
 
 
 def test_transaction_price_negative():
     with pytest.raises(ValidationError):
         TransactionCreate(
-            asset_id=1, type="BUY", quantity=10.0, price=-1.0, date=date(2024, 1, 1)
+            asset_id="PETR4", type="BUY", quantity=10.0, price=-1.0, date=date(2024, 1, 1)
         )
 
 
 def test_transaction_valid():
     tx = TransactionCreate(
-        asset_id=1,
+        asset_id="PETR4",
         type="BUY",
         quantity=10.0,
         price=20.5,
