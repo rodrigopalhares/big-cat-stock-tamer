@@ -26,6 +26,7 @@
                             placeholder="Ex: PETR4, MXRF11, BOVA11"
                             autocomplete="off"
                             required
+                            value="{{ selected_ticker or '' }}"
                             oninput="this.value = this.value.toUpperCase()"
                             hx-get="/transactions/ticker-info"
                             hx-trigger="change, keyup changed delay:600ms"

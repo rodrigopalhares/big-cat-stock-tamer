@@ -122,6 +122,7 @@ def edit_asset(
     asset_id: int,
     name: str = Form(""),
     type: str = Form("STOCK"),
+    yf_ticker: str = Form(""),
     db: Session = Depends(get_db),
 ):
     asset = db.query(Asset).filter(Asset.id == asset_id).first()
@@ -129,6 +130,7 @@ def edit_asset(
         raise HTTPException(status_code=404, detail="Asset not found")
     asset.name = name or None
     asset.type = type or "STOCK"
+    asset.yf_ticker = yf_ticker or None
     db.commit()
     return RedirectResponse(url="/assets/", status_code=303)
 

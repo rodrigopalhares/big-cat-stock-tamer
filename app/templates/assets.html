@@ -72,6 +72,7 @@
                                 <th>Ticker</th>
                                 <th>Nome</th>
                                 <th>Tipo</th>
+                                <th>YF Ticker</th>
                                 <th class="text-center">Ações</th>
                             </tr>
                         </thead>
@@ -91,6 +92,7 @@
                                     </span>
                                     {% else %}—{% endif %}
                                 </td>
+                                <td class="text-muted small">{{ asset.yf_ticker or "—" }}</td>
                                 <td class="text-center">
                                     <a href="/transactions/?asset_id={{ asset.id }}"
                                        class="btn btn-sm btn-outline-secondary" title="Ver transações">
@@ -103,6 +105,7 @@
                                             data-asset-ticker="{{ asset.ticker }}"
                                             data-asset-name="{{ asset.name or '' }}"
                                             data-asset-type="{{ asset.type or 'STOCK' }}"
+                                            data-asset-yf-ticker="{{ asset.yf_ticker or '' }}"
                                             onclick="openEditModal(this)">
                                         <i class="bi bi-pencil"></i>
                                     </button>
@@ -153,6 +156,11 @@
                             {% endfor %}
                         </select>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">YF Ticker <span class="text-muted small">(Yahoo Finance)</span></label>
+                        <input type="text" id="editYfTicker" name="yf_ticker" class="form-control"
+                               placeholder="Ex: PETR4.SA">
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -169,13 +177,15 @@
 {% block scripts %}
 <script>
 function openEditModal(btn) {
-    const id     = btn.dataset.assetId;
-    const ticker = btn.dataset.assetTicker;
-    const name   = btn.dataset.assetName;
-    const type   = btn.dataset.assetType || 'STOCK';
+    const id       = btn.dataset.assetId;
+    const ticker   = btn.dataset.assetTicker;
+    const name     = btn.dataset.assetName;
+    const type     = btn.dataset.assetType || 'STOCK';
+    const yfTicker = btn.dataset.assetYfTicker || '';
     document.getElementById('editModalTicker').textContent = ticker;
     document.getElementById('editAssetForm').action = '/assets/' + id + '/edit';
     document.getElementById('editName').value = name;
+    document.getElementById('editYfTicker').value = yfTicker;
     const sel = document.getElementById('editType');
     for (let opt of sel.options) {
         opt.selected = opt.value === type;

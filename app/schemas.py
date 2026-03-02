@@ -5,6 +5,7 @@ from pydantic import BaseModel, field_validator
 
 class AssetBase(BaseModel):
     ticker: str
+    yf_ticker: Optional[str] = None
     name: Optional[str] = None
     type: Optional[str] = None
 

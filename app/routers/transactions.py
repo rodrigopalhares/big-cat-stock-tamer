@@ -64,10 +64,16 @@ def list_transactions(
     db: Session = Depends(get_db),
 ):
     query = db.query(Transaction).order_by(Transaction.date.desc(), Transaction.id.desc())
+    selected_ticker = None
     if asset_id:
         query = query.filter(Transaction.asset_id == asset_id)
+        asset = db.query(Asset).filter(Asset.id == asset_id).first()
+        if asset:
+            selected_ticker = asset.ticker
     elif ticker:
-        query = query.join(Transaction.asset).filter(Asset.ticker == ticker.upper())
+        ticker = ticker.upper()
+        query = query.join(Transaction.asset).filter(Asset.ticker == ticker)
+        selected_ticker = ticker
     transactions = query.all()
     assets = db.query(Asset).order_by(Asset.ticker).all()
     return templates.TemplateResponse(
@@ -77,6 +83,7 @@ def list_transactions(
             "transactions": transactions,
             "assets": assets,
             "asset_id_filter": asset_id,
+            "selected_ticker": selected_ticker,
             "today": date.today().isoformat(),
         },
     )
