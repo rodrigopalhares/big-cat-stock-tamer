@@ -55,19 +55,28 @@
                     <div class="row g-2 mb-3">
                         <div class="col-6">
                             <label class="form-label">Quantidade <span class="text-danger">*</span></label>
-                            <input type="number" name="quantity" class="form-control"
-                                   step="0.0001" min="0.0001" required>
+                            <input type="number" id="txQty" name="quantity" class="form-control"
+                                   step="0.0001" min="0.0001" required oninput="txCalcFromPrice()">
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Preço Unit. (R$) <span class="text-danger">*</span></label>
-                            <input type="number" name="price" class="form-control"
-                                   step="0.01" min="0.01" required>
+                            <label class="form-label">Preço Unit. (R$)</label>
+                            <input type="number" id="txPrice" name="price" class="form-control"
+                                   step="0.0001" min="0" placeholder="ou informe o total"
+                                   oninput="txCalcFromPrice()">
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Taxas (R$)</label>
-                        <input type="number" name="fees" class="form-control"
-                               step="0.01" min="0" value="0">
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Valor Total (R$)</label>
+                            <input type="number" id="txTotal" name="total_price" class="form-control"
+                                   step="0.01" min="0" placeholder="opcional"
+                                   oninput="txCalcFromTotal()">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Taxas (R$)</label>
+                            <input type="number" id="txFees" name="fees" class="form-control"
+                                   step="0.01" min="0" value="0" oninput="txCalcFromFees()">
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Data <span class="text-danger">*</span></label>
@@ -165,4 +174,45 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function txVals() {
+    return {
+        qty:   parseFloat(document.getElementById('txQty').value)   || 0,
+        price: parseFloat(document.getElementById('txPrice').value),
+        total: parseFloat(document.getElementById('txTotal').value),
+        fees:  parseFloat(document.getElementById('txFees').value)  || 0,
+    };
+}
+
+// Qty or unit price changed → refresh total
+function txCalcFromPrice() {
+    const v = txVals();
+    if (v.qty > 0 && v.price > 0) {
+        document.getElementById('txTotal').value = (v.qty * v.price + v.fees).toFixed(2);
+    }
+}
+
+// Total changed → update fees (if price known) or unit price (if not)
+function txCalcFromTotal() {
+    const v = txVals();
+    if (!isNaN(v.total) && v.qty > 0 && v.total > 0) {
+        if (v.price > 0) {
+            document.getElementById('txFees').value = (v.total - v.qty * v.price).toFixed(2);
+        } else {
+            document.getElementById('txPrice').value = ((v.total - v.fees) / v.qty).toFixed(4);
+        }
+    }
+}
+
+// Fees changed → refresh total (if price known)
+function txCalcFromFees() {
+    const v = txVals();
+    if (v.qty > 0 && v.price > 0) {
+        document.getElementById('txTotal').value = (v.qty * v.price + v.fees).toFixed(2);
+    }
+}
+</script>
 {% endblock %}

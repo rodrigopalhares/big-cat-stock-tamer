@@ -88,7 +88,8 @@ def create_transaction_form(
     ticker: str = Form(...),
     type: str = Form(...),
     quantity: float = Form(...),
-    price: float = Form(...),
+    price: Optional[float] = Form(None),
+    total_price: Optional[float] = Form(None),
     fees: float = Form(0.0),
     date: date = Form(...),
     broker: str = Form(""),
@@ -96,6 +97,18 @@ def create_transaction_form(
     db: Session = Depends(get_db),
 ):
     ticker = ticker.upper().strip()
+
+    # Resolve price / fees from total_price when provided
+    if total_price is not None and total_price > 0:
+        if price:
+            # Both given: derive fees from the difference
+            fees = total_price - quantity * price
+        else:
+            # Only total given: derive unit price after fees
+            price = (total_price - fees) / quantity
+
+    if not price or price <= 0:
+        raise HTTPException(status_code=400, detail="Informe o preço unitário ou o valor total")
 
     asset = db.query(Asset).filter(Asset.ticker == ticker).first()
     if not asset:
