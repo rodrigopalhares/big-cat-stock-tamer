@@ -15,6 +15,7 @@
 | CSS | Bootstrap 5 (CDN) |
 | Cálculos | numpy-financial + pandas |
 | Runner | Uvicorn |
+| Testes | pytest + httpx + pytest-cov |
 
 ## Estrutura
 
@@ -25,41 +26,40 @@ C:\ws\stocks\
 ├── requirements.txt
 ├── run.py
 ├── app/
-│   ├── __init__.py
 │   ├── main.py
 │   ├── database.py
 │   ├── models.py
 │   ├── schemas.py
 │   ├── routers/
-│   │   ├── ativos.py
-│   │   ├── transacoes.py
-│   │   └── carteira.py
+│   │   ├── assets.py
+│   │   ├── transactions.py
+│   │   └── portfolio.py
 │   ├── services/
-│   │   ├── calculos.py
-│   │   └── cotacoes.py
+│   │   ├── calculations.py
+│   │   └── quotes.py
 │   ├── templates/
 │   │   ├── base.html
 │   │   ├── dashboard.html
-│   │   ├── ativos.html
-│   │   └── transacoes.html
+│   │   ├── assets.html
+│   │   └── transactions.html
 │   └── static/css/custom.css
+├── tests/
+│   ├── conftest.py
+│   ├── test_calculations.py
+│   ├── test_schemas.py
+│   ├── test_quotes.py
+│   └── test_routers.py
 └── data/
     └── stocks.db  (gerado automaticamente)
 ```
 
 ## Modelos
 
-### Ativo
-- id, ticker (UNIQUE), nome, tipo (ACAO/FII/ETF/BDR), created_at
+### Asset
+- `id`, `ticker` (UNIQUE), `yf_ticker`, `name`, `type` (STOCK/REIT/ETF/BDR), `currency` (BRL/USD), `created_at`
 
-### Transacao
-- id, ativo_id (FK), tipo (COMPRA/VENDA), quantidade, preco, taxas, data, corretora, notas, created_at
-
-## Lógica de Cálculos
-
-- **Preço médio**: custo_total_acumulado / quantidade_total (compras somam, vendas reduzem quantidade mas não alteram PM)
-- **Lucro realizado por venda**: (preco_venda - preco_medio) * quantidade - taxas
-- **TIR**: `npf.irr(fluxos)` — compras negativas, vendas positivas, posição atual como último fluxo
+### Transaction
+- `id`, `asset_id` (FK), `type` (BUY/SELL), `quantity`, `price`, `fees`, `date`, `broker`, `notes`, `created_at`
 
 ## Como Rodar
 
@@ -68,4 +68,11 @@ pip install -r requirements.txt
 python run.py
 # Acesse: http://localhost:8000
 # Docs:   http://localhost:8000/docs
+```
+
+## Testes
+
+```bash
+pytest tests/ -v
+pytest tests/ --cov=app --cov-report=term-missing
 ```
