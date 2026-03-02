@@ -11,6 +11,7 @@ from app.routers import assets, transactions, portfolio
 models.Base.metadata.create_all(bind=engine)
 
 # Migrate existing databases: promote ticker to PK (drop id column)
+engine.dispose()  # release pool connections so SQLite allows DDL
 with engine.connect() as _conn:
     try:
         rows = _conn.execute(text("PRAGMA table_info(assets)")).fetchall()
