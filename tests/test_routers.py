@@ -209,8 +209,9 @@ def test_delete_transaction_api_not_found(client):
 
 
 def test_portfolio_api_empty(client):
-    with patch("app.routers.portfolio.fetch_quote", return_value=None):
-        response = client.get("/portfolio/api")
+    with patch("app.services.portfolio_service.fetch_quotes_batch", return_value={}):
+        with patch("app.services.portfolio_service.fetch_td_quotes_batch", return_value={}):
+            response = client.get("/portfolio/api")
     assert response.status_code == 200
     data = response.json()
     assert data["positions"] == []
@@ -229,8 +230,9 @@ def test_portfolio_api_with_brl_transaction(client, db_session):
     db_session.add(tx)
     db_session.commit()
 
-    with patch("app.routers.portfolio.fetch_quote", return_value=None):
-        response = client.get("/portfolio/api")
+    with patch("app.services.portfolio_service.fetch_quotes_batch", return_value={}):
+        with patch("app.services.portfolio_service.fetch_td_quotes_batch", return_value={}):
+            response = client.get("/portfolio/api")
 
     assert response.status_code == 200
     data = response.json()
@@ -248,7 +250,8 @@ def test_portfolio_api_ticker_no_transactions(client, db_session):
     db_session.add(asset)
     db_session.commit()
 
-    with patch("app.routers.portfolio.fetch_quote", return_value=None):
-        response = client.get("/portfolio/api/PETR4")
+    with patch("app.services.portfolio_service.fetch_quotes_batch", return_value={}):
+        with patch("app.services.portfolio_service.fetch_td_quotes_batch", return_value={}):
+            response = client.get("/portfolio/api/PETR4")
 
     assert response.status_code == 404

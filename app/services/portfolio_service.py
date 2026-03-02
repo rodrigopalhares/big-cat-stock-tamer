@@ -2,7 +2,7 @@ from typing import List
 from app.models import Asset
 from app.schemas import AssetPosition
 from app.services.calculations import calculate_position, calculate_irr, calculate_unrealized_pnl, calculate_xirr
-from app.services.quotes import fetch_quotes_batch, fetch_exchange_rate
+from app.services.quotes import fetch_quotes_batch, fetch_exchange_rate, fetch_td_quotes_batch
 
 def _aggregate_positions(positions: List[AssetPosition]) -> dict:
     total_invested = sum(
@@ -32,14 +32,20 @@ def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[Ass
     quotes = {}
     if fetch_quotes:
         yf_tickers = []
+        td_tickers = []
         for asset in assets:
             if not asset.transactions:
                 continue
-            yf_ticker = asset.yf_ticker or (asset.ticker if "." in asset.ticker else f"{asset.ticker}.SA")
-            yf_tickers.append(yf_ticker)
+            if asset.type == "TESOURO_DIRETO":
+                td_tickers.append(asset.ticker)
+            else:
+                yf_ticker = asset.yf_ticker or (asset.ticker if "." in asset.ticker else f"{asset.ticker}.SA")
+                yf_tickers.append(yf_ticker)
             
         if yf_tickers:
-            quotes = fetch_quotes_batch(yf_tickers)
+            quotes.update(fetch_quotes_batch(yf_tickers))
+        if td_tickers:
+            quotes.update(fetch_td_quotes_batch(td_tickers))
 
     for asset in assets:
         if not asset.transactions:
@@ -50,9 +56,11 @@ def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[Ass
         if calc["quantity"] <= 0 and calc["realized_pnl"] == 0:
             continue
 
-        yf_ticker = asset.yf_ticker or (asset.ticker if "." in asset.ticker else f"{asset.ticker}.SA")
-        
-        current_price = quotes.get(yf_ticker) if fetch_quotes else None
+        if asset.type == "TESOURO_DIRETO":
+            current_price = quotes.get(asset.ticker) if fetch_quotes else None
+        else:
+            yf_ticker = asset.yf_ticker or (asset.ticker if "." in asset.ticker else f"{asset.ticker}.SA")
+            current_price = quotes.get(yf_ticker) if fetch_quotes else None
         
         unrealized_pnl = None
         if current_price and calc["quantity"] > 0:

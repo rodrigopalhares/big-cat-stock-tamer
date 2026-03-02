@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional, List, Dict
 import logging
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -134,3 +135,64 @@ def fetch_exchange_rate(from_currency: str, to_currency: str = "BRL") -> float:
 
     # fallback: last known value or 6.0
     return _rate_cache.get(key, (6.0, 0))[0]
+
+
+_td_cache: dict = {"df": None, "timestamp": 0}
+
+def _get_td_dataframe() -> pd.DataFrame:
+    """
+    Fetch the latest Tesouro Direto prices from the Tesouro Transparente Open Data CSV.
+    Caches the results for 1 hour to prevent redundant heavy downloads.
+    """
+    now = datetime.now(timezone.utc).timestamp()
+    if _td_cache["df"] is not None and (now - _td_cache["timestamp"]) < 3600:
+        return _td_cache["df"]
+
+    url = 'https://www.tesourotransparente.gov.br/ckan/dataset/df56aa42-484a-4a59-8184-7676580c81e3/resource/796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv'
+    try:
+        df = pd.read_csv(url, sep=';', decimal=',')
+        df['Data Base'] = pd.to_datetime(df['Data Base'], format='%d/%m/%Y')
+        # Keep only the rows corresponding to the most recent 'Data Base' date
+        latest_date = df['Data Base'].max()
+        df_latest = df[df['Data Base'] == latest_date].copy()
+        
+        # We index by 'Tipo Titulo' to make lookups fast
+        df_latest.set_index('Tipo Titulo', inplace=True)
+        
+        _td_cache["df"] = df_latest
+        _td_cache["timestamp"] = now
+        return df_latest
+    except Exception as e:
+        logger.error(f"Error fetching Tesouro Direto CSV: {e}")
+        return pd.DataFrame()
+
+def fetch_td_quotes_batch(tickers: List[str]) -> Dict[str, float]:
+    """
+    Given a list of internal Tesouro Direto tickers (e.g. 'Tesouro Selic 2029'),
+    looks them up in the cached CSV and maps them to their respective 'PU Compra Manha'.
+    """
+    if not tickers:
+        return {}
+    
+    df = _get_td_dataframe()
+    if df.empty:
+        return {}
+
+    results = {}
+    for ticker in tickers:
+        try:
+            # We assume the user creates the Asset ticker identical to the exact TD name (e.g. "Tesouro IPCA+ com Juros Semestrais 2032")
+            # If there are slight variations, some fuzzy matching might be needed in the future.
+            if ticker in df.index:
+                price = df.loc[ticker, 'PU Compra Manha']
+                
+                # If there are multiple entries for the same title (not common but possible), pick the first/max
+                if isinstance(price, pd.Series):
+                    price = price.iloc[0]
+
+                if pd.notna(price) and price > 0:
+                    results[ticker] = float(price)
+        except Exception as e:
+            logger.warning(f"Error parsing TD quote for {ticker}: {e}")
+            
+    return results
