@@ -1,5 +1,8 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List, Dict
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     import yfinance as yf
@@ -70,10 +73,37 @@ def fetch_quote(yf_ticker: str) -> Optional[float]:
         price = getattr(info, "last_price", None)
         if price and price > 0:
             return float(price)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Error fetching quote for {yf_ticker}: {e}")
 
     return None
+
+
+def fetch_quotes_batch(yf_tickers: List[str]) -> Dict[str, float]:
+    """
+    Fetch current prices for multiple Yahoo Finance tickers in a single request.
+    Returns a dictionary mapping yf_ticker to its price.
+    """
+    if not YFINANCE_AVAILABLE or not yf_tickers:
+        return {}
+
+    try:
+        tickers_str = " ".join(yf_tickers)
+        tickers = yf.Tickers(tickers_str)
+        results = {}
+        for ticker_symbol in yf_tickers:
+            try:
+                info = tickers.tickers[ticker_symbol].fast_info
+                price = getattr(info, "last_price", None)
+                if price and price > 0:
+                    results[ticker_symbol] = float(price)
+            except Exception as e:
+                logger.warning(f"Error extracting batch quote for {ticker_symbol}: {e}")
+                continue
+        return results
+    except Exception as e:
+        logger.warning(f"Error fetching batch quotes: {e}")
+        return {}
 
 
 def fetch_exchange_rate(from_currency: str, to_currency: str = "BRL") -> float:
