@@ -52,7 +52,7 @@ def ticker_info(ticker: str = "", db: Session = Depends(get_db)):
             f'</div>'
         )
 
-    # OOB swaps: fill name input and select the correct type
+    # OOB swaps: fill name, type and hidden yf_ticker fields
     type_options = "".join(
         f'<option value="{t}"{"selected" if t == info["type"] else ""}>{t}</option>'
         for t in ASSET_TYPES
@@ -64,6 +64,7 @@ def ticker_info(ticker: str = "", db: Session = Depends(get_db)):
         f'<select hx-swap-oob="true" id="assetType" name="type" class="form-select">'
         f'{type_options}'
         f'</select>'
+        f'<input hx-swap-oob="true" id="assetYfTicker" type="hidden" name="yf_ticker" value="{info["yf_ticker"]}">'
     )
     return HTMLResponse(preview + oob)
 
@@ -83,6 +84,7 @@ def create_asset_form(
     ticker: str = Form(...),
     name: str = Form(""),
     type: str = Form("STOCK"),
+    yf_ticker: str = Form(""),
     db: Session = Depends(get_db),
 ):
     ticker = ticker.upper().strip()
@@ -100,12 +102,16 @@ def create_asset_form(
         )
     if not name:
         info = fetch_asset_info(ticker)
-        if info["name"] != ticker:
-            name = info["name"]
-        if not type:
-            type = info["type"]
+        name = info["name"] if info["name"] != ticker else ""
+        type = type or info["type"]
+        yf_ticker = yf_ticker or info["yf_ticker"]
 
-    asset = Asset(ticker=ticker, name=name or None, type=type or "STOCK")
+    asset = Asset(
+        ticker=ticker,
+        yf_ticker=yf_ticker or None,
+        name=name or None,
+        type=type or "STOCK",
+    )
     db.add(asset)
     db.commit()
     return RedirectResponse(url="/assets/", status_code=303)

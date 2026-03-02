@@ -115,6 +115,7 @@ def create_transaction_form(
         info = fetch_asset_info(ticker)
         asset = Asset(
             ticker=ticker,
+            yf_ticker=info["yf_ticker"],
             name=info["name"] if info["name"] != ticker else None,
             type=info["type"],
         )

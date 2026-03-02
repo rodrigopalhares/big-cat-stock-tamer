@@ -9,6 +9,7 @@ class Asset(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     ticker = Column(String, unique=True, nullable=False, index=True)
+    yf_ticker = Column(String)  # resolved Yahoo Finance symbol (e.g. PETR4.SA)
     name = Column(String)
     type = Column(String)  # STOCK, REIT, ETF, BDR
     created_at = Column(DateTime, default=datetime.utcnow)

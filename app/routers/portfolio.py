@@ -25,7 +25,8 @@ def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[Ass
         if calc["quantity"] <= 0 and calc["realized_pnl"] == 0:
             continue
 
-        quote = fetch_quote(asset.ticker) if fetch_quotes else None
+        yf_ticker = asset.yf_ticker or (asset.ticker if "." in asset.ticker else f"{asset.ticker}.SA")
+        quote = fetch_quote(yf_ticker) if fetch_quotes else None
         current_price = quote
         unrealized_pnl = None
         if current_price and calc["quantity"] > 0:
