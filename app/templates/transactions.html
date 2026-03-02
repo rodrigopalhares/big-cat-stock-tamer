@@ -14,21 +14,30 @@
                 <i class="bi bi-plus-circle"></i> Nova Transação
             </div>
             <div class="card-body">
-                {% if not assets %}
-                <div class="alert alert-warning">
-                    <a href="/assets/">Cadastre um ativo</a> primeiro.
-                </div>
-                {% else %}
                 <form method="post" action="/transactions/new">
                     <div class="mb-3">
-                        <label class="form-label">Ativo <span class="text-danger">*</span></label>
-                        <select name="asset_id" class="form-select" required>
+                        <label class="form-label">Ticker <span class="text-danger">*</span></label>
+                        <input
+                            type="text"
+                            name="ticker"
+                            id="tickerInput"
+                            class="form-control"
+                            list="ticker-list"
+                            placeholder="Ex: PETR4, MXRF11, BOVA11"
+                            autocomplete="off"
+                            required
+                            oninput="this.value = this.value.toUpperCase()"
+                            hx-get="/transactions/ticker-info"
+                            hx-trigger="change, keyup changed delay:600ms"
+                            hx-target="#ticker-preview"
+                            hx-include="this"
+                        >
+                        <datalist id="ticker-list">
                             {% for a in assets %}
-                            <option value="{{ a.id }}" {% if asset_id_filter == a.id %}selected{% endif %}>
-                                {{ a.ticker }} {% if a.name %}— {{ a.name }}{% endif %}
-                            </option>
+                            <option value="{{ a.ticker }}">{{ a.name or "" }}</option>
                             {% endfor %}
-                        </select>
+                        </datalist>
+                        <div id="ticker-preview" class="mt-2"></div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Tipo <span class="text-danger">*</span></label>
@@ -76,7 +85,6 @@
                         <i class="bi bi-check-lg"></i> Registrar
                     </button>
                 </form>
-                {% endif %}
             </div>
         </div>
     </div>

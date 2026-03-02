@@ -7,6 +7,36 @@ except ImportError:
     YFINANCE_AVAILABLE = False
 
 
+def fetch_asset_info(ticker: str) -> dict:
+    """
+    Fetch asset name and type from yfinance for a given ticker.
+    Brazilian tickers automatically receive the .SA suffix.
+    Returns a dict with 'name' and 'type' (STOCK/REIT/ETF/BDR).
+    Falls back to {'name': ticker, 'type': 'STOCK'} on any error.
+    """
+    if not YFINANCE_AVAILABLE:
+        return {"name": ticker, "type": "STOCK"}
+
+    yf_ticker = ticker if "." in ticker else f"{ticker}.SA"
+
+    try:
+        data = yf.Ticker(yf_ticker).info
+        name = data.get("longName") or data.get("shortName") or ticker
+        quote_type = (data.get("quoteType") or "").upper()
+        sector = (data.get("sector") or "").lower()
+
+        if quote_type == "ETF":
+            asset_type = "ETF"
+        elif quote_type == "EQUITY" and "real estate" in sector:
+            asset_type = "REIT"
+        else:
+            asset_type = "STOCK"
+
+        return {"name": name, "type": asset_type}
+    except Exception:
+        return {"name": ticker, "type": "STOCK"}
+
+
 def fetch_quote(ticker: str) -> Optional[float]:
     """
     Fetch the current price for a given ticker via yfinance.

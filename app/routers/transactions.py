@@ -8,12 +8,53 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Asset, Transaction
 from app.schemas import TransactionCreate, TransactionOut
+from app.services.quotes import fetch_asset_info
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 templates = Jinja2Templates(directory="app/templates")
 
 
 # --- HTML Routes ---
+
+@router.get("/ticker-info", response_class=HTMLResponse)
+def ticker_info(ticker: str = "", db: Session = Depends(get_db)):
+    """HTMX endpoint: returns an inline preview card for the given ticker."""
+    ticker = ticker.upper().strip()
+    if len(ticker) < 3:
+        return HTMLResponse("")
+
+    existing = db.query(Asset).filter(Asset.ticker == ticker).first()
+    if existing:
+        return HTMLResponse(
+            f'<div class="alert alert-success small p-2 mb-0">'
+            f'<i class="bi bi-check-circle-fill me-1"></i>'
+            f'<strong>{existing.ticker}</strong>'
+            f'{" — " + existing.name if existing.name else ""} '
+            f'<span class="badge bg-secondary">{existing.type or "STOCK"}</span>'
+            f'<span class="text-muted ms-2">já cadastrado</span>'
+            f"</div>"
+        )
+
+    info = fetch_asset_info(ticker)
+    found = info["name"] != ticker
+    if found:
+        return HTMLResponse(
+            f'<div class="alert alert-info small p-2 mb-0">'
+            f'<i class="bi bi-cloud-download me-1"></i>'
+            f'<strong>{ticker}</strong> — {info["name"]} '
+            f'<span class="badge bg-secondary">{info["type"]}</span>'
+            f'<span class="text-muted ms-2">será cadastrado automaticamente</span>'
+            f"</div>"
+        )
+
+    return HTMLResponse(
+        f'<div class="alert alert-warning small p-2 mb-0">'
+        f'<i class="bi bi-question-circle me-1"></i>'
+        f'<strong>{ticker}</strong>'
+        f'<span class="text-muted ms-2">não encontrado na internet — será criado mesmo assim</span>'
+        f"</div>"
+    )
+
 
 @router.get("/", response_class=HTMLResponse)
 def list_transactions(
@@ -44,7 +85,7 @@ def list_transactions(
 @router.post("/new", response_class=HTMLResponse)
 def create_transaction_form(
     request: Request,
-    asset_id: int = Form(...),
+    ticker: str = Form(...),
     type: str = Form(...),
     quantity: float = Form(...),
     price: float = Form(...),
@@ -54,12 +95,21 @@ def create_transaction_form(
     notes: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    asset = db.query(Asset).filter(Asset.id == asset_id).first()
+    ticker = ticker.upper().strip()
+
+    asset = db.query(Asset).filter(Asset.ticker == ticker).first()
     if not asset:
-        raise HTTPException(status_code=404, detail="Asset not found")
+        info = fetch_asset_info(ticker)
+        asset = Asset(
+            ticker=ticker,
+            name=info["name"] if info["name"] != ticker else None,
+            type=info["type"],
+        )
+        db.add(asset)
+        db.flush()
 
     transaction = Transaction(
-        asset_id=asset_id,
+        asset_id=asset.id,
         type=type.upper(),
         quantity=quantity,
         price=price,
