@@ -98,7 +98,11 @@
                                     <button type="button"
                                             class="btn btn-sm btn-outline-primary"
                                             title="Editar"
-                                            onclick="openEditModal({{ asset.id }}, '{{ asset.ticker }}', {{ asset.name | tojson }}, '{{ asset.type or '' }}')">
+                                            data-asset-id="{{ asset.id }}"
+                                            data-asset-ticker="{{ asset.ticker }}"
+                                            data-asset-name="{{ asset.name or '' }}"
+                                            data-asset-type="{{ asset.type or 'STOCK' }}"
+                                            onclick="openEditModal(this)">
                                         <i class="bi bi-pencil"></i>
                                     </button>
                                     <form method="post" action="/assets/{{ asset.id }}/delete"
@@ -163,13 +167,17 @@
 
 {% block scripts %}
 <script>
-function openEditModal(id, ticker, name, type) {
+function openEditModal(btn) {
+    const id     = btn.dataset.assetId;
+    const ticker = btn.dataset.assetTicker;
+    const name   = btn.dataset.assetName;
+    const type   = btn.dataset.assetType || 'STOCK';
     document.getElementById('editModalTicker').textContent = ticker;
     document.getElementById('editAssetForm').action = '/assets/' + id + '/edit';
-    document.getElementById('editName').value = name || '';
+    document.getElementById('editName').value = name;
     const sel = document.getElementById('editType');
     for (let opt of sel.options) {
-        opt.selected = opt.value === (type || 'STOCK');
+        opt.selected = opt.value === type;
     }
     new bootstrap.Modal(document.getElementById('editAssetModal')).show();
 }
