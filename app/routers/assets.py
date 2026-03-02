@@ -52,10 +52,15 @@ def ticker_info(ticker: str = "", db: Session = Depends(get_db)):
             f'</div>'
         )
 
-    # OOB swaps: fill name, type and hidden yf_ticker fields
+    # OOB swaps: fill name, type, yf_ticker and currency fields
     type_options = "".join(
         f'<option value="{t}"{"selected" if t == info["type"] else ""}>{t}</option>'
         for t in ASSET_TYPES
+    )
+    currency = info.get("currency", "BRL")
+    currency_options = (
+        f'<option value="BRL"{"selected" if currency == "BRL" else ""}>BRL — Real</option>'
+        f'<option value="USD"{"selected" if currency == "USD" else ""}>USD — Dólar</option>'
     )
     name_val = info["name"] if found else ""
     oob = (
@@ -65,6 +70,9 @@ def ticker_info(ticker: str = "", db: Session = Depends(get_db)):
         f'{type_options}'
         f'</select>'
         f'<input hx-swap-oob="true" id="assetYfTicker" type="hidden" name="yf_ticker" value="{info["yf_ticker"]}">'
+        f'<select hx-swap-oob="true" id="assetCurrency" name="currency" class="form-select">'
+        f'{currency_options}'
+        f'</select>'
     )
     return HTMLResponse(preview + oob)
 
@@ -85,6 +93,7 @@ def create_asset_form(
     name: str = Form(""),
     type: str = Form("STOCK"),
     yf_ticker: str = Form(""),
+    currency: str = Form("BRL"),
     db: Session = Depends(get_db),
 ):
     ticker = ticker.upper().strip()
@@ -105,12 +114,14 @@ def create_asset_form(
         name = info["name"] if info["name"] != ticker else ""
         type = type or info["type"]
         yf_ticker = yf_ticker or info["yf_ticker"]
+        currency = currency or info.get("currency", "BRL")
 
     asset = Asset(
         ticker=ticker,
         yf_ticker=yf_ticker or None,
         name=name or None,
         type=type or "STOCK",
+        currency=currency or "BRL",
     )
     db.add(asset)
     db.commit()
@@ -123,6 +134,7 @@ def edit_asset(
     name: str = Form(""),
     type: str = Form("STOCK"),
     yf_ticker: str = Form(""),
+    currency: str = Form("BRL"),
     db: Session = Depends(get_db),
 ):
     asset = db.query(Asset).filter(Asset.id == asset_id).first()
@@ -131,6 +143,7 @@ def edit_asset(
     asset.name = name or None
     asset.type = type or "STOCK"
     asset.yf_ticker = yf_ticker or None
+    asset.currency = currency or "BRL"
     db.commit()
     return RedirectResponse(url="/assets/", status_code=303)
 

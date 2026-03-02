@@ -14,6 +14,7 @@ models.Base.metadata.create_all(bind=engine)
 with engine.connect() as _conn:
     for _col, _ddl in [
         ("yf_ticker", "ALTER TABLE assets ADD COLUMN yf_ticker VARCHAR"),
+        ("currency", "ALTER TABLE assets ADD COLUMN currency VARCHAR DEFAULT 'BRL'"),
     ]:
         try:
             _conn.execute(text(_ddl))

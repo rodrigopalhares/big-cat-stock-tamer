@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models import Asset
 from app.schemas import AssetPosition, PortfolioSummary
 from app.services.calculations import calculate_position, calculate_irr, calculate_unrealized_pnl, calculate_xirr
-from app.services.quotes import fetch_quote
+from app.services.quotes import fetch_quote, fetch_exchange_rate
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 templates = Jinja2Templates(directory="app/templates")
@@ -43,6 +43,11 @@ def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[Ass
             if irr_annual is not None:
                 irr_monthly = (1 + irr_annual) ** (1 / 12) - 1
 
+        currency = asset.currency or "BRL"
+        exchange_rate = fetch_exchange_rate(currency) if currency != "BRL" else None
+        current_value_brl = (current_value * exchange_rate) if exchange_rate and current_value is not None else current_value
+        unrealized_pnl_brl = (unrealized_pnl * exchange_rate) if exchange_rate and unrealized_pnl is not None else unrealized_pnl
+
         positions.append(
             AssetPosition(
                 ticker=asset.ticker,
@@ -58,6 +63,10 @@ def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[Ass
                 irr=irr,
                 irr_annual=irr_annual,
                 irr_monthly=irr_monthly,
+                currency=currency,
+                exchange_rate=exchange_rate,
+                current_value_brl=current_value_brl,
+                unrealized_pnl_brl=unrealized_pnl_brl,
             )
         )
 
@@ -71,12 +80,25 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
     assets = db.query(Asset).all()
     positions = build_positions(assets, fetch_quotes=True)
 
-    total_invested = sum(p.total_cost for p in positions)
-    realized_pnl = sum(p.realized_pnl for p in positions)
-    values = [p.current_value for p in positions if p.current_value is not None]
-    current_value = sum(values) if values else None
-    unrealized = [p.unrealized_pnl for p in positions if p.unrealized_pnl is not None]
-    unrealized_pnl = sum(unrealized) if unrealized else None
+    total_invested = sum(
+        (p.total_cost * p.exchange_rate if p.exchange_rate else p.total_cost)
+        for p in positions
+    )
+    realized_pnl = sum(
+        (p.realized_pnl * p.exchange_rate if p.exchange_rate else p.realized_pnl)
+        for p in positions
+    )
+    values_brl = [p.current_value_brl for p in positions if p.current_value_brl is not None]
+    current_value = sum(values_brl) if values_brl else None
+    unrealized_brl = [p.unrealized_pnl_brl for p in positions if p.unrealized_pnl_brl is not None]
+    unrealized_pnl = sum(unrealized_brl) if unrealized_brl else None
+
+    # collect unique exchange rates used (for display)
+    usd_rate = next(
+        (p.exchange_rate for p in positions if p.currency == "USD" and p.exchange_rate),
+        None,
+    )
+    has_usd = any(p.currency == "USD" for p in positions)
 
     return templates.TemplateResponse(
         "dashboard.html",
@@ -87,6 +109,8 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
             "realized_pnl": realized_pnl,
             "current_value": current_value,
             "unrealized_pnl": unrealized_pnl,
+            "has_usd": has_usd,
+            "usd_rate": usd_rate,
         },
     )
 
@@ -98,12 +122,18 @@ def portfolio_summary(db: Session = Depends(get_db)):
     assets = db.query(Asset).all()
     positions = build_positions(assets, fetch_quotes=True)
 
-    total_invested = sum(p.total_cost for p in positions)
-    realized_pnl = sum(p.realized_pnl for p in positions)
-    values = [p.current_value for p in positions if p.current_value is not None]
-    current_value = sum(values) if values else None
-    unrealized = [p.unrealized_pnl for p in positions if p.unrealized_pnl is not None]
-    unrealized_pnl = sum(unrealized) if unrealized else None
+    total_invested = sum(
+        (p.total_cost * p.exchange_rate if p.exchange_rate else p.total_cost)
+        for p in positions
+    )
+    realized_pnl = sum(
+        (p.realized_pnl * p.exchange_rate if p.exchange_rate else p.realized_pnl)
+        for p in positions
+    )
+    values_brl = [p.current_value_brl for p in positions if p.current_value_brl is not None]
+    current_value = sum(values_brl) if values_brl else None
+    unrealized_brl = [p.unrealized_pnl_brl for p in positions if p.unrealized_pnl_brl is not None]
+    unrealized_pnl = sum(unrealized_brl) if unrealized_brl else None
 
     return PortfolioSummary(
         total_invested=total_invested,

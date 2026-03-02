@@ -12,6 +12,7 @@ class Asset(Base):
     yf_ticker = Column(String)  # resolved Yahoo Finance symbol (e.g. PETR4.SA)
     name = Column(String)
     type = Column(String)  # STOCK, REIT, ETF, BDR
+    currency = Column(String, default="BRL")  # ISO 4217: BRL or USD
     created_at = Column(DateTime, default=datetime.utcnow)
 
     transactions = relationship("Transaction", back_populates="asset", cascade="all, delete-orphan")

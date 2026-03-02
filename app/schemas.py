@@ -8,6 +8,7 @@ class AssetBase(BaseModel):
     yf_ticker: Optional[str] = None
     name: Optional[str] = None
     type: Optional[str] = None
+    currency: str = "BRL"
 
 
 class AssetCreate(AssetBase):
@@ -82,6 +83,10 @@ class AssetPosition(BaseModel):
     irr: Optional[float] = None
     irr_monthly: Optional[float] = None
     irr_annual: Optional[float] = None
+    currency: str = "BRL"
+    exchange_rate: Optional[float] = None       # USD→BRL rate (if currency != BRL)
+    current_value_brl: Optional[float] = None   # current_value converted to BRL
+    unrealized_pnl_brl: Optional[float] = None  # unrealized_pnl converted to BRL
 
 
 class PortfolioSummary(BaseModel):

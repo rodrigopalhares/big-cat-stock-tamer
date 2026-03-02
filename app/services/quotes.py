@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 try:
@@ -5,6 +6,8 @@ try:
     YFINANCE_AVAILABLE = True
 except ImportError:
     YFINANCE_AVAILABLE = False
+
+_rate_cache: dict = {}  # {"USDBRL": (rate, timestamp)}
 
 
 def fetch_asset_info(ticker: str) -> dict:
@@ -43,11 +46,14 @@ def fetch_asset_info(ticker: str) -> dict:
             else:
                 asset_type = "STOCK"
 
-            return {"name": name, "type": asset_type, "yf_ticker": yf_ticker}
+            currency = (data.get("currency") or "BRL").upper()
+            if currency not in ("BRL", "USD"):
+                currency = "BRL"
+            return {"name": name, "type": asset_type, "yf_ticker": yf_ticker, "currency": currency}
         except Exception:
             continue
 
-    return {"name": ticker, "type": "STOCK", "yf_ticker": fallback_yf}
+    return {"name": ticker, "type": "STOCK", "yf_ticker": fallback_yf, "currency": "BRL"}
 
 
 def fetch_quote(yf_ticker: str) -> Optional[float]:
@@ -68,3 +74,32 @@ def fetch_quote(yf_ticker: str) -> Optional[float]:
         pass
 
     return None
+
+
+def fetch_exchange_rate(from_currency: str, to_currency: str = "BRL") -> float:
+    """Return how many `to_currency` units equal 1 `from_currency`.
+
+    Results are cached for 5 minutes. Falls back to the last known rate or 6.0.
+    """
+    if from_currency == to_currency:
+        return 1.0
+
+    key = f"{from_currency}{to_currency}"
+    now = datetime.utcnow().timestamp()
+
+    cached = _rate_cache.get(key)
+    if cached and now - cached[1] < 300:
+        return cached[0]
+
+    if YFINANCE_AVAILABLE:
+        try:
+            ticker = yf.Ticker(f"{key}=X")
+            rate = ticker.fast_info.last_price
+            if rate and rate > 0:
+                _rate_cache[key] = (float(rate), now)
+                return float(rate)
+        except Exception:
+            pass
+
+    # fallback: last known value or 6.0
+    return _rate_cache.get(key, (6.0, 0))[0]

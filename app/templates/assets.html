@@ -48,6 +48,13 @@
                             {% endfor %}
                         </select>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Moeda</label>
+                        <select id="assetCurrency" name="currency" class="form-select">
+                            <option value="BRL" selected>BRL — Real</option>
+                            <option value="USD">USD — Dólar</option>
+                        </select>
+                    </div>
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="bi bi-check-lg"></i> Cadastrar
                     </button>
@@ -72,6 +79,7 @@
                                 <th>Ticker</th>
                                 <th>Nome</th>
                                 <th>Tipo</th>
+                                <th>Moeda</th>
                                 <th>YF Ticker</th>
                                 <th class="text-center">Ações</th>
                             </tr>
@@ -92,6 +100,9 @@
                                     </span>
                                     {% else %}—{% endif %}
                                 </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border">{{ asset.currency or "BRL" }}</span>
+                                </td>
                                 <td class="text-muted small">{{ asset.yf_ticker or "—" }}</td>
                                 <td class="text-center">
                                     <a href="/transactions/?asset_id={{ asset.id }}"
@@ -106,6 +117,7 @@
                                             data-asset-name="{{ asset.name or '' }}"
                                             data-asset-type="{{ asset.type or 'STOCK' }}"
                                             data-asset-yf-ticker="{{ asset.yf_ticker or '' }}"
+                                            data-asset-currency="{{ asset.currency or 'BRL' }}"
                                             onclick="openEditModal(this)">
                                         <i class="bi bi-pencil"></i>
                                     </button>
@@ -161,6 +173,13 @@
                         <input type="text" id="editYfTicker" name="yf_ticker" class="form-control"
                                placeholder="Ex: PETR4.SA">
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Moeda</label>
+                        <select id="editCurrency" name="currency" class="form-select">
+                            <option value="BRL">BRL — Real</option>
+                            <option value="USD">USD — Dólar</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -182,14 +201,15 @@ function openEditModal(btn) {
     const name     = btn.dataset.assetName;
     const type     = btn.dataset.assetType || 'STOCK';
     const yfTicker = btn.dataset.assetYfTicker || '';
+    const currency = btn.dataset.assetCurrency || 'BRL';
     document.getElementById('editModalTicker').textContent = ticker;
     document.getElementById('editAssetForm').action = '/assets/' + id + '/edit';
     document.getElementById('editName').value = name;
     document.getElementById('editYfTicker').value = yfTicker;
-    const sel = document.getElementById('editType');
-    for (let opt of sel.options) {
+    for (let opt of document.getElementById('editType').options)
         opt.selected = opt.value === type;
-    }
+    for (let opt of document.getElementById('editCurrency').options)
+        opt.selected = opt.value === currency;
     new bootstrap.Modal(document.getElementById('editAssetModal')).show();
 }
 </script>
