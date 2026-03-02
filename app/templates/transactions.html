@@ -56,13 +56,13 @@
                         <div class="col-6">
                             <label class="form-label">Quantidade <span class="text-danger">*</span></label>
                             <input type="number" id="txQty" name="quantity" class="form-control"
-                                   step="0.0001" min="0.0001" required oninput="txCalcFromPrice()">
+                                   step="0.0001" min="0.0001" required oninput="txOnQtyInput()">
                         </div>
                         <div class="col-6">
                             <label class="form-label">Preço Unit. (R$)</label>
                             <input type="number" id="txPrice" name="price" class="form-control"
                                    step="0.0001" min="0" placeholder="ou informe o total"
-                                   oninput="txCalcFromPrice()">
+                                   oninput="txOnPriceInput()">
                         </div>
                     </div>
                     <div class="row g-2 mb-3">
@@ -70,12 +70,12 @@
                             <label class="form-label">Valor Total (R$)</label>
                             <input type="number" id="txTotal" name="total_price" class="form-control"
                                    step="0.01" min="0" placeholder="opcional"
-                                   oninput="txCalcFromTotal()">
+                                   oninput="txOnTotalInput()">
                         </div>
                         <div class="col-6">
                             <label class="form-label">Taxas (R$)</label>
                             <input type="number" id="txFees" name="fees" class="form-control"
-                                   step="0.01" min="0" value="0" oninput="txCalcFromFees()">
+                                   step="0.01" min="0" value="0" oninput="txOnFeesInput()">
                         </div>
                     </div>
                     <div class="mb-3">
@@ -178,37 +178,48 @@
 
 {% block scripts %}
 <script>
+// True only when the user has manually typed in the price field.
+// Auto-derived price (from total) does NOT set this flag.
+let priceIsUserSet = false;
+
 function txVals() {
     return {
         qty:   parseFloat(document.getElementById('txQty').value)   || 0,
-        price: parseFloat(document.getElementById('txPrice').value),
-        total: parseFloat(document.getElementById('txTotal').value),
+        price: parseFloat(document.getElementById('txPrice').value) || 0,
+        total: parseFloat(document.getElementById('txTotal').value) || 0,
         fees:  parseFloat(document.getElementById('txFees').value)  || 0,
     };
 }
 
-// Qty or unit price changed → refresh total
-function txCalcFromPrice() {
+function txOnQtyInput() {
     const v = txVals();
     if (v.qty > 0 && v.price > 0) {
         document.getElementById('txTotal').value = (v.qty * v.price + v.fees).toFixed(2);
     }
 }
 
-// Total changed → update fees (if price known) or unit price (if not)
-function txCalcFromTotal() {
+function txOnPriceInput() {
+    priceIsUserSet = document.getElementById('txPrice').value !== '';
     const v = txVals();
-    if (!isNaN(v.total) && v.qty > 0 && v.total > 0) {
-        if (v.price > 0) {
+    if (v.qty > 0 && v.price > 0) {
+        document.getElementById('txTotal').value = (v.qty * v.price + v.fees).toFixed(2);
+    }
+}
+
+function txOnTotalInput() {
+    const v = txVals();
+    if (v.total > 0 && v.qty > 0) {
+        if (priceIsUserSet && v.price > 0) {
+            // Price was explicitly typed → derive fees
             document.getElementById('txFees').value = (v.total - v.qty * v.price).toFixed(2);
         } else {
+            // Price is empty or was auto-filled → derive price (keep flag false)
             document.getElementById('txPrice').value = ((v.total - v.fees) / v.qty).toFixed(4);
         }
     }
 }
 
-// Fees changed → refresh total (if price known)
-function txCalcFromFees() {
+function txOnFeesInput() {
     const v = txVals();
     if (v.qty > 0 && v.price > 0) {
         document.getElementById('txTotal').value = (v.qty * v.price + v.fees).toFixed(2);
