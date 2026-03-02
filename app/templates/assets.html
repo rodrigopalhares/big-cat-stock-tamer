@@ -24,17 +24,24 @@
                 <form method="post" action="/assets/new">
                     <div class="mb-3">
                         <label class="form-label">Ticker <span class="text-danger">*</span></label>
-                        <input type="text" name="ticker" class="form-control text-uppercase"
-                               placeholder="Ex: PETR4" required maxlength="10">
+                        <input type="text" name="ticker" id="assetTicker"
+                               class="form-control"
+                               placeholder="Ex: PETR4" required maxlength="10"
+                               oninput="this.value = this.value.toUpperCase()"
+                               hx-get="/assets/ticker-info"
+                               hx-trigger="change, keyup changed delay:600ms"
+                               hx-target="#asset-ticker-preview"
+                               hx-include="this">
+                        <div id="asset-ticker-preview" class="mt-2"></div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Nome</label>
-                        <input type="text" name="name" class="form-control"
-                               placeholder="Ex: Petrobras PN">
+                        <input type="text" id="assetName" name="name" class="form-control"
+                               placeholder="preenchido automaticamente">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Tipo</label>
-                        <select name="type" class="form-select">
+                        <select id="assetType" name="type" class="form-select">
                             {% for t in asset_types %}
                             <option value="{{ t }}">{{ t }}</option>
                             {% endfor %}
