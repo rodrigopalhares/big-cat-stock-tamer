@@ -138,7 +138,7 @@
                             {% if p.irr_annual is not none %}{{ "%.2f"|format(p.irr_annual * 100) }}%{% else %}—{% endif %}
                         </td>
                         <td class="text-center">
-                            <a href="/transactions/?ticker={{ p.ticker }}" class="btn btn-sm btn-outline-secondary">
+                            <a href="/transactions/?ticker={{ p.ticker|urlencode }}" class="btn btn-sm btn-outline-secondary">
                                 <i class="bi bi-list-ul"></i>
                             </a>
                         </td>

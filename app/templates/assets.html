@@ -98,7 +98,7 @@
                                 </td>
                                 <td class="text-muted small">{{ asset.yf_ticker or "—" }}</td>
                                 <td class="text-center">
-                                    <a href="/transactions/?ticker={{ asset.ticker }}"
+                                    <a href="/transactions/?ticker={{ asset.ticker|urlencode }}"
                                        class="btn btn-sm btn-outline-secondary" title="Ver transações">
                                         <i class="bi bi-list-ul"></i>
                                     </a>

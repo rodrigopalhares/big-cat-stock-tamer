@@ -22,11 +22,12 @@
                             name="ticker"
                             id="tickerInput"
                             class="form-control"
-                            list="ticker-list"
+                            {% if not selected_ticker %}list="ticker-list"{% endif %}
                             placeholder="Ex: PETR4, MXRF11, BOVA11"
                             autocomplete="off"
                             required
                             value="{{ selected_ticker or '' }}"
+                            {% if selected_ticker %}readonly{% endif %}
                             oninput="this.value = this.value.toUpperCase()"
                             hx-get="/transactions/ticker-info"
                             hx-trigger="change, keyup changed delay:600ms"
