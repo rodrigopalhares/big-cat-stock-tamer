@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from typing import Optional, List, Dict
+from datetime import datetime, timezone, date as date_type
+from typing import Optional, List, Dict, Tuple
 import logging
 import pandas as pd
 
@@ -135,6 +135,135 @@ def fetch_exchange_rate(from_currency: str, to_currency: str = "BRL") -> float:
 
     # fallback: last known value or 6.0
     return _rate_cache.get(key, (6.0, 0))[0]
+
+
+def fetch_historical_quotes_batch(
+    yf_ticker_map: Dict[str, str], start_date: date_type
+) -> Dict[str, List[Tuple[date_type, float]]]:
+    """
+    Fetch historical close prices for multiple yfinance tickers in a single request.
+
+    Args:
+        yf_ticker_map: mapping of {yf_ticker: asset_ticker}
+        start_date: earliest date to fetch (inclusive)
+
+    Returns:
+        {asset_ticker: [(date, close), ...]} sorted ascending by date
+    """
+    if not YFINANCE_AVAILABLE or not yf_ticker_map:
+        return {}
+
+    try:
+        tickers_str = " ".join(yf_ticker_map.keys())
+        raw = yf.download(tickers_str, start=start_date.isoformat(), auto_adjust=True, progress=False)
+
+        if raw.empty:
+            return {}
+
+        # yf.download returns MultiIndex columns when multiple tickers are requested
+        close = raw["Close"] if "Close" in raw.columns else raw
+
+        results: Dict[str, List[Tuple[date_type, float]]] = {}
+        for yf_ticker, asset_ticker in yf_ticker_map.items():
+            try:
+                if isinstance(close.columns, pd.MultiIndex):
+                    series = close[yf_ticker] if yf_ticker in close.columns else None
+                else:
+                    # single ticker: close is a Series
+                    series = close if len(yf_ticker_map) == 1 else close.get(yf_ticker)
+
+                if series is None:
+                    continue
+
+                records = []
+                for ts, val in series.dropna().items():
+                    if hasattr(ts, "date"):
+                        d = ts.date()
+                    else:
+                        d = ts
+                    if float(val) > 0:
+                        records.append((d, float(val)))
+                if records:
+                    results[asset_ticker] = sorted(records, key=lambda x: x[0])
+            except Exception as e:
+                logger.warning(f"Error extracting historical data for {yf_ticker}: {e}")
+
+        return results
+    except Exception as e:
+        logger.warning(f"Error fetching historical quotes batch: {e}")
+        return {}
+
+
+_td_full_cache: dict = {"df": None, "timestamp": 0}
+
+
+def _get_td_full_dataframe() -> pd.DataFrame:
+    """
+    Fetch the complete (all dates) Tesouro Direto prices CSV.
+    Cached for 1 hour.
+    """
+    now = datetime.now(timezone.utc).timestamp()
+    if _td_full_cache["df"] is not None and (now - _td_full_cache["timestamp"]) < 3600:
+        return _td_full_cache["df"]
+
+    url = (
+        "https://www.tesourotransparente.gov.br/ckan/dataset/"
+        "df56aa42-484a-4a59-8184-7676580c81e3/resource/"
+        "796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv"
+    )
+    try:
+        df = pd.read_csv(url, sep=";", decimal=",")
+        df["Data Base"] = pd.to_datetime(df["Data Base"], format="%d/%m/%Y")
+        _td_full_cache["df"] = df
+        _td_full_cache["timestamp"] = now
+        return df
+    except Exception as e:
+        logger.error(f"Error fetching full Tesouro Direto CSV: {e}")
+        return pd.DataFrame()
+
+
+def fetch_td_historical_quotes_batch(
+    yf_tickers: List[str],
+) -> Dict[str, List[Tuple[date_type, float]]]:
+    """
+    Fetch full price history for Tesouro Direto assets.
+
+    Args:
+        yf_tickers: list of yf_ticker strings in 'Tipo Titulo;dd/mm/yyyy' format
+
+    Returns:
+        {yf_ticker: [(date, close), ...]} sorted ascending by date
+    """
+    if not yf_tickers:
+        return {}
+
+    df = _get_td_full_dataframe()
+    if df.empty:
+        return {}
+
+    results: Dict[str, List[Tuple[date_type, float]]] = {}
+    for yf_ticker in yf_tickers:
+        try:
+            if ";" not in yf_ticker:
+                logger.warning(f"Invalid TD yf_ticker format: {yf_ticker}")
+                continue
+
+            title, maturity = yf_ticker.split(";", 1)
+            mask = (df["Tipo Titulo"] == title) & (df["Data Vencimento"] == maturity)
+            matched = df.loc[mask, ["Data Base", "PU Compra Manha"]].dropna()
+
+            records = []
+            for _, row in matched.iterrows():
+                val = row["PU Compra Manha"]
+                if pd.notna(val) and float(val) > 0:
+                    records.append((row["Data Base"].date(), float(val)))
+
+            if records:
+                results[yf_ticker] = sorted(records, key=lambda x: x[0])
+        except Exception as e:
+            logger.warning(f"Error extracting TD historical data for {yf_ticker}: {e}")
+
+    return results
 
 
 _td_cache: dict = {"df": None, "timestamp": 0}

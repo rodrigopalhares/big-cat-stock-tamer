@@ -18,7 +18,7 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, db: Session = Depends(get_db)):
     assets = db.query(Asset).options(selectinload(Asset.transactions)).all()
-    positions = build_positions(assets, fetch_quotes=True)
+    positions = build_positions(assets, fetch_quotes=True, db=db)
 
     agg = _aggregate_positions(positions)
     total_invested = agg["total_invested"]
@@ -53,7 +53,7 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
 @router.get("/api", response_model=PortfolioSummary)
 def portfolio_summary(db: Session = Depends(get_db)):
     assets = db.query(Asset).options(selectinload(Asset.transactions)).all()
-    positions = build_positions(assets, fetch_quotes=True)
+    positions = build_positions(assets, fetch_quotes=True, db=db)
 
     agg = _aggregate_positions(positions)
 

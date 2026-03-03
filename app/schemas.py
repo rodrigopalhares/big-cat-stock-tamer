@@ -90,6 +90,15 @@ class AssetPosition(BaseModel):
     unrealized_pnl_brl: Optional[float] = None  # unrealized_pnl converted to BRL
 
 
+class PriceHistoryOut(BaseModel):
+    asset_id: str
+    date: date
+    close: float
+
+    class Config:
+        from_attributes = True
+
+
 class PortfolioSummary(BaseModel):
     total_invested: float
     current_value: Optional[float]

@@ -1,5 +1,5 @@
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, Text
+from datetime import datetime, timezone
+from sqlalchemy import Column, Integer, String, Float, Date, DateTime, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship, validates
 from app.database import Base
 
@@ -15,6 +15,7 @@ class Asset(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     transactions = relationship("Transaction", back_populates="asset", cascade="all, delete-orphan")
+    price_history = relationship("PriceHistory", back_populates="asset", cascade="all, delete-orphan")
 
     @validates("ticker")
     def _normalize_ticker(self, key, value):
@@ -36,3 +37,17 @@ class Transaction(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     asset = relationship("Asset", back_populates="transactions")
+
+
+class PriceHistory(Base):
+    __tablename__ = "price_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    asset_id = Column(String, ForeignKey("assets.ticker", ondelete="CASCADE"), nullable=False)
+    date = Column(Date, nullable=False)
+    close = Column(Float, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    asset = relationship("Asset", back_populates="price_history")
+
+    __table_args__ = (UniqueConstraint("asset_id", "date", name="uq_price_history_asset_date"),)
