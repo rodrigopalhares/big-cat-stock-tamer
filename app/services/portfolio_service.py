@@ -1,8 +1,10 @@
-from typing import List
+from typing import List, Optional
+from sqlalchemy.orm import Session
 from app.models import Asset
 from app.schemas import AssetPosition
 from app.services.calculations import calculate_position, calculate_irr, calculate_unrealized_pnl, calculate_xirr
 from app.services.quotes import fetch_quotes_batch, fetch_exchange_rate, fetch_td_quotes_batch
+
 
 def _aggregate_positions(positions: List[AssetPosition]) -> dict:
     total_invested = sum(
@@ -25,11 +27,15 @@ def _aggregate_positions(positions: List[AssetPosition]) -> dict:
     }
 
 
-def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[AssetPosition]:
+def build_positions(
+    assets: List[Asset],
+    fetch_quotes: bool = False,
+    db: Optional[Session] = None,
+) -> List[AssetPosition]:
     positions = []
-    
-    # Pre-fetch quotes if required to avoid N+1 API calls
-    quotes = {}
+
+    # Pre-fetch live quotes (fallback) if required
+    live_quotes = {}
     if fetch_quotes:
         yf_tickers = []
         td_tickers = []
@@ -42,11 +48,11 @@ def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[Ass
             else:
                 yf_ticker = asset.yf_ticker or (asset.ticker if "." in asset.ticker else f"{asset.ticker}.SA")
                 yf_tickers.append(yf_ticker)
-            
+
         if yf_tickers:
-            quotes.update(fetch_quotes_batch(yf_tickers))
+            live_quotes.update(fetch_quotes_batch(yf_tickers))
         if td_tickers:
-            quotes.update(fetch_td_quotes_batch(td_tickers))
+            live_quotes.update(fetch_td_quotes_batch(td_tickers))
 
     for asset in assets:
         if not asset.transactions:
@@ -57,12 +63,19 @@ def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[Ass
         if calc["quantity"] <= 0 and calc["realized_pnl"] == 0:
             continue
 
-        if asset.type == "TESOURO_DIRETO":
-            current_price = quotes.get(asset.yf_ticker) if fetch_quotes and asset.yf_ticker else None
-        else:
-            yf_ticker = asset.yf_ticker or (asset.ticker if "." in asset.ticker else f"{asset.ticker}.SA")
-            current_price = quotes.get(yf_ticker) if fetch_quotes else None
-        
+        # Resolve current price: prefer DB stored price, fall back to live quote
+        current_price = None
+        if db is not None:
+            from app.services.price_history_service import get_latest_price
+            current_price = get_latest_price(asset.ticker, db)
+
+        if current_price is None and fetch_quotes:
+            if asset.type == "TESOURO_DIRETO":
+                current_price = live_quotes.get(asset.yf_ticker) if asset.yf_ticker else None
+            else:
+                yf_ticker = asset.yf_ticker or (asset.ticker if "." in asset.ticker else f"{asset.ticker}.SA")
+                current_price = live_quotes.get(yf_ticker)
+
         unrealized_pnl = None
         if current_price and calc["quantity"] > 0:
             unrealized_pnl = calculate_unrealized_pnl(calc["quantity"], calc["avg_price"], current_price)
