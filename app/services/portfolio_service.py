@@ -37,7 +37,8 @@ def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[Ass
             if not asset.transactions:
                 continue
             if asset.type == "TESOURO_DIRETO":
-                td_tickers.append(asset.ticker)
+                if asset.yf_ticker:
+                    td_tickers.append(asset.yf_ticker)
             else:
                 yf_ticker = asset.yf_ticker or (asset.ticker if "." in asset.ticker else f"{asset.ticker}.SA")
                 yf_tickers.append(yf_ticker)
@@ -57,7 +58,7 @@ def build_positions(assets: List[Asset], fetch_quotes: bool = False) -> List[Ass
             continue
 
         if asset.type == "TESOURO_DIRETO":
-            current_price = quotes.get(asset.ticker) if fetch_quotes else None
+            current_price = quotes.get(asset.yf_ticker) if fetch_quotes and asset.yf_ticker else None
         else:
             yf_ticker = asset.yf_ticker or (asset.ticker if "." in asset.ticker else f"{asset.ticker}.SA")
             current_price = quotes.get(yf_ticker) if fetch_quotes else None

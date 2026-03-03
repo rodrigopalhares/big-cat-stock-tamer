@@ -152,13 +152,9 @@ def _get_td_dataframe() -> pd.DataFrame:
     try:
         df = pd.read_csv(url, sep=';', decimal=',')
         df['Data Base'] = pd.to_datetime(df['Data Base'], format='%d/%m/%Y')
-        # Keep only the rows corresponding to the most recent 'Data Base' date
         latest_date = df['Data Base'].max()
         df_latest = df[df['Data Base'] == latest_date].copy()
-        
-        # We index by 'Tipo Titulo' to make lookups fast
-        df_latest.set_index('Tipo Titulo', inplace=True)
-        
+
         _td_cache["df"] = df_latest
         _td_cache["timestamp"] = now
         return df_latest
@@ -166,33 +162,35 @@ def _get_td_dataframe() -> pd.DataFrame:
         logger.error(f"Error fetching Tesouro Direto CSV: {e}")
         return pd.DataFrame()
 
-def fetch_td_quotes_batch(tickers: List[str]) -> Dict[str, float]:
+def fetch_td_quotes_batch(yf_tickers: List[str]) -> Dict[str, float]:
     """
-    Given a list of internal Tesouro Direto tickers (e.g. 'Tesouro Selic 2029'),
-    looks them up in the cached CSV and maps them to their respective 'PU Compra Manha'.
+    Given a list of Tesouro Direto yf_ticker values (format: 'Tipo Titulo;dd/mm/yyyy'),
+    looks them up in the cached CSV matching both 'Tipo Titulo' and 'Data Vencimento',
+    and returns their 'PU Compra Manha' price keyed by the yf_ticker string.
     """
-    if not tickers:
+    if not yf_tickers:
         return {}
-    
+
     df = _get_td_dataframe()
     if df.empty:
         return {}
 
     results = {}
-    for ticker in tickers:
+    for yf_ticker in yf_tickers:
         try:
-            # We assume the user creates the Asset ticker identical to the exact TD name (e.g. "Tesouro IPCA+ com Juros Semestrais 2032")
-            # If there are slight variations, some fuzzy matching might be needed in the future.
-            if ticker in df.index:
-                price = df.loc[ticker, 'PU Compra Manha']
-                
-                # If there are multiple entries for the same title (not common but possible), pick the first/max
-                if isinstance(price, pd.Series):
-                    price = price.iloc[0]
+            if ';' not in yf_ticker:
+                logger.warning(f"Invalid TD yf_ticker format (expected 'Title;dd/mm/yyyy'): {yf_ticker}")
+                continue
 
+            title, maturity = yf_ticker.split(';', 1)
+            mask = (df['Tipo Titulo'] == title) & (df['Data Vencimento'] == maturity)
+            matched = df.loc[mask, 'PU Compra Manha']
+
+            if not matched.empty:
+                price = matched.iloc[0]
                 if pd.notna(price) and price > 0:
-                    results[ticker] = float(price)
+                    results[yf_ticker] = float(price)
         except Exception as e:
-            logger.warning(f"Error parsing TD quote for {ticker}: {e}")
-            
+            logger.warning(f"Error parsing TD quote for {yf_ticker}: {e}")
+
     return results
