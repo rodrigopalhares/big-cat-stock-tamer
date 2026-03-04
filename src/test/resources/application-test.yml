@@ -13,4 +13,4 @@ spring:
   task:
     scheduling:
       pool:
-        size: 0
+        size: 1

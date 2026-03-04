@@ -112,7 +112,7 @@
                                     </button>
                                     <form method="post" th:action="'/assets/' + ${asset.ticker} + '/delete'"
                                           class="d-inline"
-                                          th:attr="onsubmit=${'return confirm(\'Excluir ' + asset.ticker + '? As transações também serão removidas.\')'}">
+                                          th:attrappend="onsubmit=|return confirm('Excluir ${asset.ticker}? As transações também serão removidas.')|">
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
                                             <i class="bi bi-trash"></i>
                                         </button>
