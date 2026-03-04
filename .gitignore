@@ -3,15 +3,6 @@ data/stocks.db
 data/stocks.mv.db
 data/stocks.trace.db
 
-# Python (legacy)
-__pycache__/
-*.py[cod]
-*.pyo
-.venv/
-venv/
-*.egg-info/
-dist/
-
 # Kotlin / Gradle
 build/
 .gradle/
@@ -24,6 +15,10 @@ out/
 .vscode/
 .idea/
 *.iml
+
+# direnv
+.direnv/
+.envrc
 
 # OS
 .DS_Store
