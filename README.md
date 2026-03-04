@@ -27,6 +27,7 @@ Aplicação web para acompanhamento de investimentos no mercado de renda variáv
 | Scheduler    | Spring @Scheduled                       |
 | Testes       | Kotest + MockK + Spring Boot Test       |
 | Build        | Gradle (Kotlin DSL)                     |
+| Linter       | ktlint (via jlleitschuh plugin)          |
 
 ## Pré-requisitos
 
@@ -70,7 +71,7 @@ stocks/
 │   │   ├── kotlin/com/stocks/
 │   │   │   ├── StocksApplication.kt          # Entrypoint Spring Boot
 │   │   │   ├── config/
-│   │   │   │   ├── DatabaseConfig.kt         # Conexão Exposed + H2
+│   │   │   │   ├── HttpClientConfig.kt       # Bean HttpClient (Ktor CIO)
 │   │   │   │   ├── SchedulerConfig.kt        # Jobs agendados (backfill, update)
 │   │   │   │   └── WebConfig.kt              # Redirect / → /portfolio/
 │   │   │   ├── model/
@@ -163,3 +164,15 @@ stocks/
 # Verbose
 ./gradlew test --info
 ```
+
+## Linting
+
+```bash
+# Verificar estilo (falha se houver violações)
+./gradlew ktlintCheck
+
+# Auto-formatar todos os arquivos Kotlin
+./gradlew ktlintFormat
+```
+
+O `ktlintCheck` roda automaticamente como parte de `./gradlew build`. As regras de estilo estão configuradas no `.editorconfig`.

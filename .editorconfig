@@ -14,5 +14,14 @@ indent_size = 4
 indent_style = space
 indent_size = 2
 
+[*.{kt,kts}]
+indent_style = space
+indent_size = 4
+max_line_length = 140
+ktlint_code_style = ktlint_official
+ktlint_standard_trailing-comma-on-call-site = disabled
+ktlint_standard_trailing-comma-on-declaration-site = disabled
+ktlint_standard_no-wildcard-imports = disabled
+
 [*.md]
 trim_trailing_whitespace = false

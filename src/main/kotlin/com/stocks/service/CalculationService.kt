@@ -14,7 +14,6 @@ data class PositionCalcResult(
 
 @Service
 class CalculationService {
-
     fun calculatePosition(transactions: List<TransactionData>): PositionCalcResult {
         var quantity = 0.0
         var accumulatedCost = 0.0
@@ -50,7 +49,10 @@ class CalculationService {
         )
     }
 
-    fun calculateIrr(cashFlows: List<Pair<LocalDate, Double>>, currentValue: Double? = null): Double? {
+    fun calculateIrr(
+        cashFlows: List<Pair<LocalDate, Double>>,
+        currentValue: Double? = null
+    ): Double? {
         if (cashFlows.isEmpty()) return null
 
         val values = cashFlows.map { it.second }.toMutableList()
@@ -68,11 +70,16 @@ class CalculationService {
         }
     }
 
-    fun calculateUnrealizedPnl(quantity: Double, avgPrice: Double, currentPrice: Double): Double {
-        return (currentPrice - avgPrice) * quantity
-    }
+    fun calculateUnrealizedPnl(
+        quantity: Double,
+        avgPrice: Double,
+        currentPrice: Double
+    ): Double = (currentPrice - avgPrice) * quantity
 
-    fun calculateXirr(cashFlows: List<Pair<LocalDate, Double>>, currentValue: Double? = null): Double? {
+    fun calculateXirr(
+        cashFlows: List<Pair<LocalDate, Double>>,
+        currentValue: Double? = null
+    ): Double? {
         if (cashFlows.isEmpty()) return null
 
         val flows = cashFlows.toMutableList()
@@ -95,7 +102,12 @@ class CalculationService {
     }
 
     // Newton-Raphson IRR computation
-    private fun computeIrr(values: List<Double>, guess: Double = 0.1, maxIterations: Int = 200, tolerance: Double = 1e-7): Double {
+    private fun computeIrr(
+        values: List<Double>,
+        guess: Double = 0.1,
+        maxIterations: Int = 200,
+        tolerance: Double = 1e-7
+    ): Double {
         var rate = guess
         for (i in 0 until maxIterations) {
             var npv = 0.0
@@ -116,12 +128,11 @@ class CalculationService {
     private fun xirr(flows: List<Pair<LocalDate, Double>>): Double? {
         val ref = flows[0].first
 
-        fun npv(rate: Double): Double {
-            return flows.sumOf { (date, value) ->
+        fun npv(rate: Double): Double =
+            flows.sumOf { (date, value) ->
                 val days = ChronoUnit.DAYS.between(ref, date).toDouble()
                 value / Math.pow(1 + rate, days / 365.0)
             }
-        }
 
         var lo = -0.9999
         var hi = 100.0

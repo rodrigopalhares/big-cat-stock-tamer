@@ -20,6 +20,7 @@
 | Scheduler | Spring @Scheduled |
 | Testes | Kotest + MockK + Spring Boot Test |
 | Build | Gradle (Kotlin DSL) |
+| Linter | ktlint (via jlleitschuh plugin) |
 
 ## Estrutura
 
@@ -34,7 +35,7 @@ stocks/
 │   │   ├── kotlin/com/stocks/
 │   │   │   ├── StocksApplication.kt
 │   │   │   ├── config/
-│   │   │   │   ├── DatabaseConfig.kt
+│   │   │   │   ├── HttpClientConfig.kt
 │   │   │   │   ├── SchedulerConfig.kt
 │   │   │   │   └── WebConfig.kt
 │   │   │   ├── model/
@@ -156,3 +157,14 @@ sdk install java 25-open
 ./gradlew test
 ./gradlew test --info  # verbose
 ```
+
+## Linting
+
+```bash
+./gradlew ktlintCheck   # verifica estilo (falha se houver violações)
+./gradlew ktlintFormat  # auto-formata todos os arquivos Kotlin
+```
+
+- Configurado via `.editorconfig` (seção `[*.{kt,kts}]`)
+- `ktlintCheck` roda automaticamente como parte de `./gradlew build`
+- Hooks do Claude Code (`.claude/settings.json`) rodam `ktlintFormat` e `test` após cada edição de arquivos `.kt`/`.kts`

@@ -13,8 +13,8 @@ class PriceHistoryService(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    fun getLatestPrice(assetTicker: String): Double? {
-        return transaction {
+    fun getLatestPrice(assetTicker: String): Double? =
+        transaction {
             PriceHistories
                 .select(PriceHistories.close)
                 .where { PriceHistories.assetId eq assetTicker }
@@ -23,10 +23,9 @@ class PriceHistoryService(
                 .firstOrNull()
                 ?.get(PriceHistories.close)
         }
-    }
 
-    fun getLastStoredDate(assetTicker: String): LocalDate? {
-        return transaction {
+    fun getLastStoredDate(assetTicker: String): LocalDate? =
+        transaction {
             PriceHistories
                 .select(PriceHistories.date)
                 .where { PriceHistories.assetId eq assetTicker }
@@ -35,24 +34,23 @@ class PriceHistoryService(
                 .firstOrNull()
                 ?.get(PriceHistories.date)
         }
-    }
 
     fun upsertPrices(records: List<PriceRecord>) {
         if (records.isEmpty()) return
         transaction {
             for (record in records) {
-                val existing = PriceHistories
-                    .selectAll()
-                    .where {
-                        (PriceHistories.assetId eq record.assetId) and
-                        (PriceHistories.date eq record.date)
-                    }
-                    .firstOrNull()
+                val existing =
+                    PriceHistories
+                        .selectAll()
+                        .where {
+                            (PriceHistories.assetId eq record.assetId) and
+                                (PriceHistories.date eq record.date)
+                        }.firstOrNull()
 
                 if (existing != null) {
                     PriceHistories.update({
                         (PriceHistories.assetId eq record.assetId) and
-                        (PriceHistories.date eq record.date)
+                            (PriceHistories.date eq record.date)
                     }) {
                         it[close] = record.close
                     }
@@ -70,15 +68,18 @@ class PriceHistoryService(
     fun runBackfill() {
         transaction {
             val assets = AssetEntity.all().toList()
-            val assetData = assets.map { asset ->
-                AssetBackfillData(
-                    ticker = asset.ticker.value,
-                    yfTicker = asset.yfTicker,
-                    type = asset.type,
-                    firstTransactionDate = asset.transactions.toList()
-                        .minOfOrNull { it.date },
-                )
-            }
+            val assetData =
+                assets.map { asset ->
+                    AssetBackfillData(
+                        ticker = asset.ticker.value,
+                        yfTicker = asset.yfTicker,
+                        type = asset.type,
+                        firstTransactionDate =
+                            asset.transactions
+                                .toList()
+                                .minOfOrNull { it.date },
+                    )
+                }
 
             val today = LocalDate.now()
             val yfTickerMap = mutableMapOf<String, String>()
@@ -98,8 +99,9 @@ class PriceHistoryService(
                         tdTickerMap[data.yfTicker] = data.ticker
                     }
                 } else {
-                    val yfTicker = data.yfTicker
-                        ?: if ("." !in data.ticker) "${data.ticker}.SA" else data.ticker
+                    val yfTicker =
+                        data.yfTicker
+                            ?: if ("." !in data.ticker) "${data.ticker}.SA" else data.ticker
                     yfTickerMap[yfTicker] = data.ticker
                 }
             }
@@ -107,9 +109,10 @@ class PriceHistoryService(
             // yfinance batch
             if (yfTickerMap.isNotEmpty()) {
                 try {
-                    val earliest = yfTickerMap.values
-                        .mapNotNull { startDates[it] }
-                        .minOrNull() ?: today
+                    val earliest =
+                        yfTickerMap.values
+                            .mapNotNull { startDates[it] }
+                            .minOrNull() ?: today
 
                     val batch = quoteService.fetchHistoricalQuotesBatch(yfTickerMap, earliest)
                     val records = mutableListOf<PriceRecord>()
@@ -168,8 +171,9 @@ class PriceHistoryService(
                         tdTickerMap[asset.yfTicker!!] = ticker
                     }
                 } else {
-                    val yfTicker = asset.yfTicker
-                        ?: if ("." !in ticker) "${ticker}.SA" else ticker
+                    val yfTicker =
+                        asset.yfTicker
+                            ?: if ("." !in ticker) "$ticker.SA" else ticker
                     yfTickerMap[yfTicker] = ticker
                 }
             }
@@ -177,10 +181,12 @@ class PriceHistoryService(
             if (yfTickerMap.isNotEmpty()) {
                 try {
                     val batch = quoteService.fetchHistoricalQuotesBatch(yfTickerMap, today)
-                    val records = batch.flatMap { (assetTicker, prices) ->
-                        prices.filter { it.first == today }
-                            .map { PriceRecord(assetTicker, it.first, it.second) }
-                    }
+                    val records =
+                        batch.flatMap { (assetTicker, prices) ->
+                            prices
+                                .filter { it.first == today }
+                                .map { PriceRecord(assetTicker, it.first, it.second) }
+                        }
                     upsertPrices(records)
                     logger.info("Daily update: stored ${records.size} yfinance prices")
                 } catch (e: Exception) {

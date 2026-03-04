@@ -3,7 +3,6 @@ package com.stocks.service
 import com.stocks.dto.AssetPosition
 import com.stocks.dto.PortfolioSummary
 import com.stocks.model.AssetEntity
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.springframework.stereotype.Service
 
 @Service
@@ -12,7 +11,6 @@ class PortfolioService(
     private val quoteService: QuoteService,
     private val priceHistoryService: PriceHistoryService,
 ) {
-
     fun buildPositions(
         assets: List<AssetEntity>,
         fetchQuotes: Boolean = false,
@@ -31,8 +29,9 @@ class PortfolioService(
                 if (asset.type == "TESOURO_DIRETO") {
                     if (asset.yfTicker != null) tdTickers.add(asset.yfTicker!!)
                 } else {
-                    val yfTicker = asset.yfTicker
-                        ?: if ("." !in ticker) "${ticker}.SA" else ticker
+                    val yfTicker =
+                        asset.yfTicker
+                            ?: if ("." !in ticker) "$ticker.SA" else ticker
                     yfTickers.add(yfTicker)
                 }
             }
@@ -50,15 +49,16 @@ class PortfolioService(
             val txList = asset.transactions.toList()
             if (txList.isEmpty()) continue
 
-            val transactionData = txList.map {
-                TransactionData(
-                    type = it.type,
-                    quantity = it.quantity,
-                    price = it.price,
-                    fees = it.fees,
-                    date = it.date,
-                )
-            }
+            val transactionData =
+                txList.map {
+                    TransactionData(
+                        type = it.type,
+                        quantity = it.quantity,
+                        price = it.price,
+                        fees = it.fees,
+                        date = it.date,
+                    )
+                }
 
             val calc = calculationService.calculatePosition(transactionData)
             if (calc.quantity <= 0 && calc.realizedPnl == 0.0) continue
@@ -67,22 +67,30 @@ class PortfolioService(
             var currentPrice: Double? = priceHistoryService.getLatestPrice(ticker)
 
             if (currentPrice == null && fetchQuotes) {
-                currentPrice = if (asset.type == "TESOURO_DIRETO") {
-                    asset.yfTicker?.let { liveQuotes[it] }
-                } else {
-                    val yfTicker = asset.yfTicker
-                        ?: if ("." !in ticker) "${ticker}.SA" else ticker
-                    liveQuotes[yfTicker]
-                }
+                currentPrice =
+                    if (asset.type == "TESOURO_DIRETO") {
+                        asset.yfTicker?.let { liveQuotes[it] }
+                    } else {
+                        val yfTicker =
+                            asset.yfTicker
+                                ?: if ("." !in ticker) "$ticker.SA" else ticker
+                        liveQuotes[yfTicker]
+                    }
             }
 
-            val unrealizedPnl = if (currentPrice != null && calc.quantity > 0) {
-                calculationService.calculateUnrealizedPnl(calc.quantity, calc.avgPrice, currentPrice)
-            } else null
+            val unrealizedPnl =
+                if (currentPrice != null && calc.quantity > 0) {
+                    calculationService.calculateUnrealizedPnl(calc.quantity, calc.avgPrice, currentPrice)
+                } else {
+                    null
+                }
 
-            val currentValue = if (currentPrice != null && calc.quantity > 0) {
-                currentPrice * calc.quantity
-            } else null
+            val currentValue =
+                if (currentPrice != null && calc.quantity > 0) {
+                    currentPrice * calc.quantity
+                } else {
+                    null
+                }
 
             val irr = calculationService.calculateIrr(calc.cashFlows, currentValue)
             val irrAnnual = calculationService.calculateXirr(calc.cashFlows, currentValue)
@@ -90,12 +98,18 @@ class PortfolioService(
 
             val currency = asset.currency
             val exchangeRate = if (currency != "BRL") quoteService.fetchExchangeRate(currency) else null
-            val currentValueBrl = if (exchangeRate != null && currentValue != null) {
-                currentValue * exchangeRate
-            } else currentValue
-            val unrealizedPnlBrl = if (exchangeRate != null && unrealizedPnl != null) {
-                unrealizedPnl * exchangeRate
-            } else unrealizedPnl
+            val currentValueBrl =
+                if (exchangeRate != null && currentValue != null) {
+                    currentValue * exchangeRate
+                } else {
+                    currentValue
+                }
+            val unrealizedPnlBrl =
+                if (exchangeRate != null && unrealizedPnl != null) {
+                    unrealizedPnl * exchangeRate
+                } else {
+                    unrealizedPnl
+                }
 
             positions.add(
                 AssetPosition(
@@ -124,12 +138,14 @@ class PortfolioService(
     }
 
     fun aggregatePositions(positions: List<AssetPosition>): PortfolioSummary {
-        val totalInvested = positions.sumOf { p ->
-            if (p.exchangeRate != null) p.totalCost * p.exchangeRate else p.totalCost
-        }
-        val realizedPnl = positions.sumOf { p ->
-            if (p.exchangeRate != null) p.realizedPnl * p.exchangeRate else p.realizedPnl
-        }
+        val totalInvested =
+            positions.sumOf { p ->
+                if (p.exchangeRate != null) p.totalCost * p.exchangeRate else p.totalCost
+            }
+        val realizedPnl =
+            positions.sumOf { p ->
+                if (p.exchangeRate != null) p.realizedPnl * p.exchangeRate else p.realizedPnl
+            }
         val valuesBrl = positions.mapNotNull { it.currentValueBrl }
         val currentValue = if (valuesBrl.isNotEmpty()) valuesBrl.sum() else null
         val unrealizedBrl = positions.mapNotNull { it.unrealizedPnlBrl }

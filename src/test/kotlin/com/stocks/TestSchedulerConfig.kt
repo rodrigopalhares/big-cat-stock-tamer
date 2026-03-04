@@ -10,7 +10,6 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 @TestConfiguration
 @Profile("test")
 class TestSchedulerConfig {
-
     @Bean
     @Primary
     fun taskScheduler(): TaskScheduler {

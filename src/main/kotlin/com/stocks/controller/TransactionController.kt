@@ -4,9 +4,7 @@ import com.stocks.dto.TransactionRequest
 import com.stocks.dto.TransactionResponse
 import com.stocks.model.AssetEntity
 import com.stocks.model.TransactionEntity
-import com.stocks.model.Transactions
 import com.stocks.service.QuoteService
-import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -22,12 +20,13 @@ import java.time.format.DateTimeFormatter
 class TransactionController(
     private val quoteService: QuoteService,
 ) {
-
     // --- HTML Routes ---
 
     @GetMapping("/ticker-info")
     @ResponseBody
-    fun tickerInfo(@RequestParam ticker: String): String {
+    fun tickerInfo(
+        @RequestParam ticker: String
+    ): String {
         val normalized = ticker.uppercase().trim()
         if (normalized.length < 3) return ""
 
@@ -37,8 +36,8 @@ class TransactionController(
             val type = transaction { existing.type ?: "STOCK" }
             return """<div class="alert alert-success small p-2 mb-0">
                 <i class="bi bi-check-circle-fill me-1"></i>
-                <strong>${normalized}</strong>${if (name != null) " — $name" else ""}
-                <span class="badge bg-secondary">${type}</span>
+                <strong>$normalized</strong>${if (name != null) " — $name" else ""}
+                <span class="badge bg-secondary">$type</span>
                 <span class="text-muted ms-2">já cadastrado</span>
                 </div>"""
         }
@@ -48,14 +47,14 @@ class TransactionController(
         return if (found) {
             """<div class="alert alert-info small p-2 mb-0">
                 <i class="bi bi-cloud-download me-1"></i>
-                <strong>${normalized}</strong> — ${info.name}
+                <strong>$normalized</strong> — ${info.name}
                 <span class="badge bg-secondary">${info.type}</span>
                 <span class="text-muted ms-2">será cadastrado automaticamente</span>
                 </div>"""
         } else {
             """<div class="alert alert-warning small p-2 mb-0">
                 <i class="bi bi-question-circle me-1"></i>
-                <strong>${normalized}</strong>
+                <strong>$normalized</strong>
                 <span class="text-muted ms-2">não encontrado na internet — será criado mesmo assim</span>
                 </div>"""
         }
@@ -68,22 +67,26 @@ class TransactionController(
     ): String {
         val selectedTicker = ticker?.uppercase()
 
-        val transactions = transaction {
-            var query = TransactionEntity.all()
-                .sortedWith(compareByDescending<TransactionEntity> { it.date }.thenByDescending { it.id.value })
+        val transactions =
+            transaction {
+                var query =
+                    TransactionEntity
+                        .all()
+                        .sortedWith(compareByDescending<TransactionEntity> { it.date }.thenByDescending { it.id.value })
 
-            if (selectedTicker != null) {
-                query = query.filter { it.assetId == selectedTicker }
+                if (selectedTicker != null) {
+                    query = query.filter { it.assetId == selectedTicker }
+                }
+
+                query.map { it.toTemplateData() }
             }
 
-            query.map { it.toTemplateData() }
-        }
-
-        val assets = transaction {
-            AssetEntity.all().sortedBy { it.ticker.value }.map {
-                mapOf("ticker" to it.ticker.value, "name" to (it.name ?: ""))
+        val assets =
+            transaction {
+                AssetEntity.all().sortedBy { it.ticker.value }.map {
+                    mapOf("ticker" to it.ticker.value, "name" to (it.name ?: ""))
+                }
             }
-        }
 
         model.addAttribute("transactions", transactions)
         model.addAttribute("assets", assets)
@@ -127,12 +130,13 @@ class TransactionController(
             var asset = AssetEntity.findById(normalizedTicker)
             if (asset == null) {
                 val info = quoteService.fetchAssetInfo(normalizedTicker)
-                asset = AssetEntity.new(normalizedTicker) {
-                    yfTicker = info.yfTicker
-                    name = if (info.name != normalizedTicker) info.name else null
-                    this.type = info.type
-                    currency = info.currency
-                }
+                asset =
+                    AssetEntity.new(normalizedTicker) {
+                        yfTicker = info.yfTicker
+                        name = if (info.name != normalizedTicker) info.name else null
+                        this.type = info.type
+                        currency = info.currency
+                    }
             }
 
             TransactionEntity.new {
@@ -151,10 +155,13 @@ class TransactionController(
     }
 
     @PostMapping("/{transactionId}/delete")
-    fun deleteTransaction(@PathVariable transactionId: Int): String {
+    fun deleteTransaction(
+        @PathVariable transactionId: Int
+    ): String {
         transaction {
-            val tx = TransactionEntity.findById(transactionId)
-                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found")
+            val tx =
+                TransactionEntity.findById(transactionId)
+                    ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found")
             tx.delete()
         }
         return "redirect:/transactions/"
@@ -164,37 +171,44 @@ class TransactionController(
 
     @GetMapping("/api")
     @ResponseBody
-    fun listTransactionsApi(@RequestParam(required = false) ticker: String?): List<TransactionResponse> {
-        return transaction {
-            var query = TransactionEntity.all()
-                .sortedByDescending { it.date }
+    fun listTransactionsApi(
+        @RequestParam(required = false) ticker: String?
+    ): List<TransactionResponse> =
+        transaction {
+            var query =
+                TransactionEntity
+                    .all()
+                    .sortedByDescending { it.date }
             if (ticker != null) {
                 query = query.filter { it.assetId == ticker.uppercase() }
             }
             query.map { it.toResponse() }
         }
-    }
 
     @PostMapping("/api")
     @ResponseBody
-    fun createTransactionApi(@RequestBody request: TransactionRequest): ResponseEntity<TransactionResponse> {
+    fun createTransactionApi(
+        @RequestBody request: TransactionRequest
+    ): ResponseEntity<TransactionResponse> {
         request.validate()
 
-        val tx = transaction {
-            val asset = AssetEntity.findById(request.assetId.uppercase())
-                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found")
+        val tx =
+            transaction {
+                val asset =
+                    AssetEntity.findById(request.assetId.uppercase())
+                        ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found")
 
-            TransactionEntity.new {
-                assetId = asset.ticker.value
-                type = request.type.uppercase().trim()
-                quantity = request.quantity
-                price = request.price
-                fees = request.fees
-                date = request.date
-                broker = request.broker
-                notes = request.notes
+                TransactionEntity.new {
+                    assetId = asset.ticker.value
+                    type = request.type.uppercase().trim()
+                    quantity = request.quantity
+                    price = request.price
+                    fees = request.fees
+                    date = request.date
+                    broker = request.broker
+                    notes = request.notes
+                }
             }
-        }
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
             transaction { tx.toResponse() }
@@ -203,27 +217,31 @@ class TransactionController(
 
     @DeleteMapping("/api/{transactionId}")
     @ResponseBody
-    fun deleteTransactionApi(@PathVariable transactionId: Int): ResponseEntity<Unit> {
+    fun deleteTransactionApi(
+        @PathVariable transactionId: Int
+    ): ResponseEntity<Unit> {
         transaction {
-            val tx = TransactionEntity.findById(transactionId)
-                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found")
+            val tx =
+                TransactionEntity.findById(transactionId)
+                    ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found")
             tx.delete()
         }
         return ResponseEntity.noContent().build()
     }
 
-    private fun TransactionEntity.toResponse() = TransactionResponse(
-        id = id.value,
-        assetId = assetId,
-        type = type,
-        quantity = quantity,
-        price = price,
-        fees = fees,
-        date = date,
-        broker = broker,
-        notes = notes,
-        createdAt = createdAt,
-    )
+    private fun TransactionEntity.toResponse() =
+        TransactionResponse(
+            id = id.value,
+            assetId = assetId,
+            type = type,
+            quantity = quantity,
+            price = price,
+            fees = fees,
+            date = date,
+            broker = broker,
+            notes = notes,
+            createdAt = createdAt,
+        )
 
     // Template data class for Thymeleaf
     data class TransactionTemplateData(
@@ -239,16 +257,17 @@ class TransactionController(
         val total: Double,
     )
 
-    private fun TransactionEntity.toTemplateData() = TransactionTemplateData(
-        id = id.value,
-        assetTicker = assetId,
-        type = type,
-        quantity = quantity,
-        price = price,
-        fees = fees,
-        date = date,
-        broker = broker,
-        notes = notes,
-        total = if (type == "BUY") quantity * price + fees else quantity * price - fees,
-    )
+    private fun TransactionEntity.toTemplateData() =
+        TransactionTemplateData(
+            id = id.value,
+            assetTicker = assetId,
+            type = type,
+            quantity = quantity,
+            price = price,
+            fees = fees,
+            date = date,
+            broker = broker,
+            notes = notes,
+            total = if (type == "BUY") quantity * price + fees else quantity * price - fees,
+        )
 }

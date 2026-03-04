@@ -19,7 +19,9 @@ object Assets : IdTable<String>("assets") {
     override val primaryKey = PrimaryKey(id)
 }
 
-class AssetEntity(id: EntityID<String>) : Entity<String>(id) {
+class AssetEntity(
+    id: EntityID<String>
+) : Entity<String>(id) {
     companion object : EntityClass<String, AssetEntity>(Assets)
 
     var ticker by Assets.id
