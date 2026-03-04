@@ -18,7 +18,7 @@
 | HTTP Client | Ktor Client (CIO) |
 | JSON | kotlinx.serialization + Jackson |
 | Scheduler | Spring @Scheduled |
-| Testes | Kotest + MockK + Spring Boot Test |
+| Testes | Kotest + MockK + SpringMockK + Spring Boot Test |
 | Build | Gradle (Kotlin DSL) |
 | Linter | ktlint (via jlleitschuh plugin) |
 
@@ -41,21 +41,25 @@ stocks/
 │   │   │   ├── model/
 │   │   │   │   ├── Asset.kt
 │   │   │   │   ├── Transaction.kt
-│   │   │   │   └── PriceHistory.kt
+│   │   │   │   ├── PriceHistory.kt
+│   │   │   │   └── MonthlySnapshot.kt
 │   │   │   ├── dto/
 │   │   │   │   ├── Constants.kt
 │   │   │   │   ├── AssetDtos.kt
 │   │   │   │   ├── TransactionDtos.kt
-│   │   │   │   └── PortfolioDtos.kt
+│   │   │   │   ├── PortfolioDtos.kt
+│   │   │   │   └── MonthlyEvolutionDtos.kt
 │   │   │   ├── service/
 │   │   │   │   ├── CalculationService.kt
 │   │   │   │   ├── QuoteService.kt
 │   │   │   │   ├── PriceHistoryService.kt
-│   │   │   │   └── PortfolioService.kt
+│   │   │   │   ├── PortfolioService.kt
+│   │   │   │   └── MonthlyEvolutionService.kt
 │   │   │   └── controller/
 │   │   │       ├── AssetController.kt
 │   │   │       ├── TransactionController.kt
-│   │   │       └── PortfolioController.kt
+│   │   │       ├── PortfolioController.kt
+│   │   │       └── MonthlyEvolutionController.kt
 │   │   └── resources/
 │   │       ├── application.yml
 │   │       ├── templates/
@@ -63,6 +67,7 @@ stocks/
 │   │       │   ├── dashboard.html
 │   │       │   ├── assets.html
 │   │       │   ├── transactions.html
+│   │       │   ├── evolution.html
 │   │       │   └── fragments/badge.html
 │   │       ├── static/
 │   │       │   ├── css/custom.css
@@ -70,17 +75,21 @@ stocks/
 │   │       └── db/migration/
 │   │           ├── V1__create_assets.sql
 │   │           ├── V2__create_transactions.sql
-│   │           └── V3__create_price_history.sql
+│   │           ├── V3__create_price_history.sql
+│   │           └── V4__create_monthly_snapshots.sql
 │   └── test/
 │       ├── kotlin/com/stocks/
 │       │   ├── TestSchedulerConfig.kt
 │       │   ├── service/
 │       │   │   ├── CalculationServiceTest.kt
-│       │   │   └── QuoteServiceTest.kt
+│       │   │   ├── QuoteServiceTest.kt
+│       │   │   ├── PriceHistoryServiceTest.kt
+│       │   │   └── MonthlyEvolutionServiceTest.kt
 │       │   └── controller/
 │       │       ├── AssetControllerTest.kt
 │       │       ├── TransactionControllerTest.kt
-│       │       └── PortfolioControllerTest.kt
+│       │       ├── PortfolioControllerTest.kt
+│       │       └── MonthlyEvolutionControllerTest.kt
 │       └── resources/
 │           └── application-test.yml
 └── data/
@@ -100,6 +109,10 @@ stocks/
 - Unique constraint on `(assetId, date)`
 - Upsert via manual SELECT + INSERT/UPDATE
 
+### MonthlySnapshots (Table) / MonthlySnapshotEntity (DAO)
+- `id` (PK, Int), `assetId` (FK → Assets), `month`, `quantity`, `avgPrice`, `marketPrice`, `totalCost`, `marketValue`, `createdAt`
+- Unique constraint on `(assetId, month)`
+
 ## Serviços
 
 ### QuoteService
@@ -116,6 +129,20 @@ stocks/
 - `upsertPrices(records)` — insere ou atualiza registros
 - `runBackfill()` — backfill de todos os ativos em batch
 - `runDailyUpdate()` — atualiza preço do dia para todos os ativos
+
+#### Funções puras (top-level em PriceHistoryService.kt)
+- `resolveYfTicker(ticker, yfTicker)` — resolve yfTicker; usada também por `PortfolioService`
+- `categorizeAssets(assets)` → `TickerMaps` — separa ativos em maps Yahoo Finance vs Tesouro Direto
+- `filterBatchToRecords(batch, tickerResolver, datePredicate)` — filtra batch API em `List<PriceRecord>`
+- Data classes: `AssetTickerInfo`, `TickerMaps`, `PriceRecord`
+
+### MonthlyEvolutionService
+- `findFirstTransactionMonth()` — mês da primeira transação
+- `generateMonthRange(start, end)` — gera range de YearMonth
+- `computePositionAtDate(transactions, date)` — posição em uma data
+- `getMonthEndPrice(assetId, month)` — preço no fim do mês via PriceHistories
+- `recalculate()` — recalcula snapshots mensais de todos os ativos
+- `getEvolution()` → `MonthlyEvolutionSummary` — retorna evolução mensal
 
 ### PortfolioService
 - `buildPositions(assets, fetchQuotes)` — constrói posições; usa preço do banco com fallback para API live
