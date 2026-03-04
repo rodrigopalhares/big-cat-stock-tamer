@@ -1,17 +1,17 @@
 <!DOCTYPE html>
 <html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
-<head>
+<head th:fragment="head(title)">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title th:block="title">Carteira de Ações</title>
+    <title th:text="${title}">Carteira de Ações</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="/static/css/custom.css">
+    <link rel="stylesheet" href="/css/custom.css">
     <script src="https://unpkg.com/htmx.org@2.0.3" defer></script>
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<nav th:fragment="navbar" class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
         <a class="navbar-brand fw-bold" href="/portfolio/">
             <i class="bi bi-graph-up-arrow"></i> Carteira
@@ -22,19 +22,19 @@
         <div class="collapse navbar-collapse" id="navMenu">
             <ul class="navbar-nav me-auto">
                 <li class="nav-item">
-                    <a class="nav-link" th:classappend="${#strings.startsWith(#httpServletRequest.requestURI, '/portfolio')} ? 'active'"
+                    <a class="nav-link" th:classappend="${#strings.startsWith(requestURI, '/portfolio')} ? 'active'"
                        href="/portfolio/">
                         <i class="bi bi-speedometer2"></i> Dashboard
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" th:classappend="${#strings.startsWith(#httpServletRequest.requestURI, '/assets')} ? 'active'"
+                    <a class="nav-link" th:classappend="${#strings.startsWith(requestURI, '/assets')} ? 'active'"
                        href="/assets/">
                         <i class="bi bi-building"></i> Ativos
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" th:classappend="${#strings.startsWith(#httpServletRequest.requestURI, '/transactions')} ? 'active'"
+                    <a class="nav-link" th:classappend="${#strings.startsWith(requestURI, '/transactions')} ? 'active'"
                        href="/transactions/">
                         <i class="bi bi-arrow-left-right"></i> Transações
                     </a>
@@ -48,11 +48,9 @@
     </div>
 </nav>
 
-<div class="container-fluid py-4 px-4" th:fragment="content">
-    <div layout:fragment="content"></div>
-</div>
-
+<th:block th:fragment="scripts">
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<th:block th:fragment="scripts"></th:block>
+</th:block>
+
 </body>
 </html>

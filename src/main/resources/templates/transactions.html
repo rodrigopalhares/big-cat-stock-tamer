@@ -1,173 +1,166 @@
 <!DOCTYPE html>
 <html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
-<head><title>Transações</title></head>
+<head th:replace="~{base :: head('Transações')}"></head>
 <body>
-<div th:replace="~{base :: body}">
-</div>
+<nav th:replace="~{base :: navbar}"></nav>
 
-<div th:fragment="content" class="container-fluid py-4 px-4">
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2 class="mb-0"><i class="bi bi-arrow-left-right"></i> Transações</h2>
-</div>
-
-<div class="row g-4">
-    <!-- New transaction form -->
-    <div class="col-lg-4">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white fw-semibold">
-                <i class="bi bi-plus-circle"></i> Nova Transação
-            </div>
-            <div class="card-body">
-                <form method="post" action="/transactions/new">
-                    <div class="mb-3">
-                        <label class="form-label">Ticker <span class="text-danger">*</span></label>
-                        <input type="text" name="ticker" id="tickerInput"
-                               class="form-control"
-                               th:unless="${selectedTicker != null}"
-                               list="ticker-list"
-                               placeholder="Ex: PETR4, MXRF11, BOVA11"
-                               autocomplete="off" required
-                               oninput="this.value = this.value.toUpperCase()"
-                               hx-get="/transactions/ticker-info"
-                               hx-trigger="change, keyup changed delay:600ms"
-                               hx-target="#ticker-preview"
-                               hx-include="this">
-                        <input type="text" name="ticker" id="tickerInput"
-                               class="form-control"
-                               th:if="${selectedTicker != null}"
-                               th:value="${selectedTicker}"
-                               readonly
-                               required>
-                        <datalist id="ticker-list">
-                            <option th:each="a : ${assets}" th:value="${a['ticker']}" th:text="${a['name']}"></option>
-                        </datalist>
-                        <div id="ticker-preview" class="mt-2"></div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Tipo <span class="text-danger">*</span></label>
-                        <div class="btn-group w-100" role="group">
-                            <input type="radio" class="btn-check" name="type" id="typeBuy" value="BUY" checked>
-                            <label class="btn btn-outline-success" for="typeBuy">
-                                <i class="bi bi-arrow-down-circle"></i> Compra
-                            </label>
-                            <input type="radio" class="btn-check" name="type" id="typeSell" value="SELL">
-                            <label class="btn btn-outline-danger" for="typeSell">
-                                <i class="bi bi-arrow-up-circle"></i> Venda
-                            </label>
-                        </div>
-                    </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <label class="form-label">Quantidade <span class="text-danger">*</span></label>
-                            <input type="number" id="txQty" name="quantity" class="form-control"
-                                   step="0.0001" min="0.0001" required oninput="txOnQtyInput()">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Preço Unit. (R$)</label>
-                            <input type="number" id="txPrice" name="price" class="form-control"
-                                   step="0.0001" min="0" placeholder="ou informe o total"
-                                   oninput="txOnPriceInput()">
-                        </div>
-                    </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <label class="form-label">Valor Total (R$)</label>
-                            <input type="number" id="txTotal" name="total_price" class="form-control"
-                                   step="0.01" min="0" placeholder="opcional"
-                                   oninput="txOnTotalInput()">
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Taxas (R$)</label>
-                            <input type="number" id="txFees" name="fees" class="form-control"
-                                   step="0.01" min="0" value="0" oninput="txOnFeesInput()">
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Data <span class="text-danger">*</span></label>
-                        <input type="date" name="date" class="form-control" th:value="${today}" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Corretora</label>
-                        <input type="text" name="broker" class="form-control" placeholder="Ex: Clear, XP">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Notas</label>
-                        <textarea name="notes" class="form-control" rows="2" placeholder="Opcional"></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-check-lg"></i> Registrar
-                    </button>
-                </form>
-            </div>
-        </div>
+<div class="container-fluid py-4 px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0"><i class="bi bi-arrow-left-right"></i> Transações</h2>
     </div>
 
-    <!-- Transaction history -->
-    <div class="col-lg-8">
-        <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <span class="fw-semibold">
-                    Histórico
-                    <span class="badge bg-secondary ms-1" th:text="${#lists.size(transactions)}"></span>
-                </span>
-                <a th:if="${selectedTicker != null}" href="/transactions/" class="btn btn-sm btn-outline-secondary">
-                    <i class="bi bi-x-lg"></i> Limpar filtro
-                </a>
-            </div>
-            <div class="card-body p-0">
-                <div th:if="${!transactions.isEmpty()}" class="table-responsive">
-                    <table class="table table-hover mb-0 align-middle small">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Data</th>
-                                <th>Ativo</th>
-                                <th>Tipo</th>
-                                <th class="text-end">Qtd</th>
-                                <th class="text-end">Preço</th>
-                                <th class="text-end">Taxas</th>
-                                <th class="text-end">Total</th>
-                                <th>Corretora</th>
-                                <th class="text-center">Del.</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr th:each="t : ${transactions}">
-                                <td th:text="${#temporals.format(t.date, 'dd/MM/yyyy')}"></td>
-                                <td class="fw-bold" th:text="${t.assetTicker}"></td>
-                                <td>
-                                    <span class="badge" th:classappend="${t.type == 'BUY'} ? 'bg-success' : 'bg-danger'"
-                                          th:text="${t.type == 'BUY'} ? 'Compra' : 'Venda'"></span>
-                                </td>
-                                <td class="text-end" th:text="${#numbers.formatDecimal(t.quantity, 1, 4)}"></td>
-                                <td class="text-end">R$ <span th:text="${#numbers.formatDecimal(t.price, 1, 2)}"></span></td>
-                                <td class="text-end text-muted">R$ <span th:text="${#numbers.formatDecimal(t.fees, 1, 2)}"></span></td>
-                                <td class="text-end fw-semibold">
-                                    R$ <span th:text="${#numbers.formatDecimal(t.total, 1, 2)}"></span>
-                                </td>
-                                <td class="text-muted" th:text="${t.broker != null ? t.broker : '—'}"></td>
-                                <td class="text-center">
-                                    <form method="post" th:action="'/transactions/' + ${t.id} + '/delete'"
-                                          class="d-inline"
-                                          onsubmit="return confirm('Excluir esta transação?')">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger border-0">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+    <div class="row g-4">
+        <!-- New transaction form -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-semibold">
+                    <i class="bi bi-plus-circle"></i> Nova Transação
                 </div>
-                <div th:if="${transactions.isEmpty()}" class="text-center py-5 text-muted">
-                    <i class="bi bi-inbox fs-1"></i>
-                    <p class="mt-2">Nenhuma transação registrada.</p>
+                <div class="card-body">
+                    <form method="post" action="/transactions/new">
+                        <div class="mb-3">
+                            <label class="form-label">Ticker <span class="text-danger">*</span></label>
+                            <input type="text" name="ticker" id="tickerInput" class="form-control"
+                                th:unless="${selectedTicker != null}" list="ticker-list"
+                                placeholder="Ex: PETR4, MXRF11, BOVA11" autocomplete="off" required
+                                oninput="this.value = this.value.toUpperCase()" hx-get="/transactions/ticker-info"
+                                hx-trigger="change, keyup changed delay:600ms" hx-target="#ticker-preview"
+                                hx-include="this">
+                            <input type="text" name="ticker" id="tickerInput" class="form-control"
+                                th:if="${selectedTicker != null}" th:value="${selectedTicker}" readonly required>
+                            <datalist id="ticker-list">
+                                <option th:each="a : ${assets}" th:value="${a['ticker']}" th:text="${a['name']}">
+                                </option>
+                            </datalist>
+                            <div id="ticker-preview" class="mt-2"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Tipo <span class="text-danger">*</span></label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="type" id="typeBuy" value="BUY" checked>
+                                <label class="btn btn-outline-success" for="typeBuy">
+                                    <i class="bi bi-arrow-down-circle"></i> Compra
+                                </label>
+                                <input type="radio" class="btn-check" name="type" id="typeSell" value="SELL">
+                                <label class="btn btn-outline-danger" for="typeSell">
+                                    <i class="bi bi-arrow-up-circle"></i> Venda
+                                </label>
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Quantidade <span class="text-danger">*</span></label>
+                                <input type="number" id="txQty" name="quantity" class="form-control" step="0.0001"
+                                    min="0.0001" required oninput="txOnQtyInput()">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Preço Unit. (R$)</label>
+                                <input type="number" id="txPrice" name="price" class="form-control" step="0.0001"
+                                    min="0" placeholder="ou informe o total" oninput="txOnPriceInput()">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Valor Total (R$)</label>
+                                <input type="number" id="txTotal" name="total_price" class="form-control"
+                                    step="0.01" min="0" placeholder="opcional" oninput="txOnTotalInput()">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Taxas (R$)</label>
+                                <input type="number" id="txFees" name="fees" class="form-control" step="0.01"
+                                    min="0" value="0" oninput="txOnFeesInput()">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Data <span class="text-danger">*</span></label>
+                            <input type="date" name="date" class="form-control" th:value="${today}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Corretora</label>
+                            <input type="text" name="broker" class="form-control" placeholder="Ex: Clear, XP">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notas</label>
+                            <textarea name="notes" class="form-control" rows="2" placeholder="Opcional"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-check-lg"></i> Registrar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transaction history -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">
+                        Histórico
+                        <span class="badge bg-secondary ms-1" th:text="${#lists.size(transactions)}"></span>
+                    </span>
+                    <a th:if="${selectedTicker != null}" href="/transactions/"
+                        class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-x-lg"></i> Limpar filtro
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div th:if="${!transactions.isEmpty()}" class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Ativo</th>
+                                    <th>Tipo</th>
+                                    <th class="text-end">Qtd</th>
+                                    <th class="text-end">Preço</th>
+                                    <th class="text-end">Taxas</th>
+                                    <th class="text-end">Total</th>
+                                    <th>Corretora</th>
+                                    <th class="text-center">Del.</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="t : ${transactions}">
+                                    <td th:text="${#temporals.format(t.date, 'dd/MM/yyyy')}"></td>
+                                    <td class="fw-bold" th:text="${t.assetTicker}"></td>
+                                    <td>
+                                        <span class="badge"
+                                            th:classappend="${t.type == 'BUY'} ? 'bg-success' : 'bg-danger'"
+                                            th:text="${t.type == 'BUY'} ? 'Compra' : 'Venda'"></span>
+                                    </td>
+                                    <td class="text-end" th:text="${#numbers.formatDecimal(t.quantity, 1, 4)}"></td>
+                                    <td class="text-end">R$ <span
+                                            th:text="${#numbers.formatDecimal(t.price, 1, 2)}"></span></td>
+                                    <td class="text-end text-muted">R$ <span
+                                            th:text="${#numbers.formatDecimal(t.fees, 1, 2)}"></span></td>
+                                    <td class="text-end fw-semibold">
+                                        R$ <span th:text="${#numbers.formatDecimal(t.total, 1, 2)}"></span>
+                                    </td>
+                                    <td class="text-muted" th:text="${t.broker != null ? t.broker : '—'}"></td>
+                                    <td class="text-center">
+                                        <form method="post" th:action="'/transactions/' + ${t.id} + '/delete'"
+                                            class="d-inline" onsubmit="return confirm('Excluir esta transação?')">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger border-0">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div th:if="${transactions.isEmpty()}" class="text-center py-5 text-muted">
+                        <i class="bi bi-inbox fs-1"></i>
+                        <p class="mt-2">Nenhuma transação registrada.</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<script src="/static/js/transactions.js"></script>
-</div>
+<th:block th:replace="~{base :: scripts}"></th:block>
+<script src="/js/transactions.js"></script>
 </body>
 </html>

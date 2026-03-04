@@ -12,7 +12,7 @@ group = "com.stocks"
 version = "0.1.0"
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_25
+    sourceCompatibility = JavaVersion.VERSION_21
 }
 
 repositories {
@@ -62,7 +62,7 @@ dependencies {
 }
 
 kotlin {
-    jvmToolchain(25)
+    jvmToolchain(21)
 }
 
 tasks.withType<KotlinCompile> {
