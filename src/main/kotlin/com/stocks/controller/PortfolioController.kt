@@ -3,19 +3,27 @@ package com.stocks.controller
 import com.stocks.dto.AssetPosition
 import com.stocks.dto.PortfolioSummary
 import com.stocks.model.AssetEntity
+import com.stocks.model.Assets
+import com.stocks.service.MonthlyEvolutionService
 import com.stocks.service.PortfolioService
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Controller
 import org.springframework.ui.Model
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.server.ResponseStatusException
+import java.time.format.DateTimeFormatter
 
 @Controller
 @RequestMapping("/portfolio")
 class PortfolioController(
     private val portfolioService: PortfolioService,
+    private val monthlyEvolutionService: MonthlyEvolutionService,
+    private val objectMapper: ObjectMapper,
 ) {
+    private val monthFormatter = DateTimeFormatter.ofPattern("MM/yyyy")
+
     // --- HTML Routes ---
 
     @GetMapping("/")
@@ -41,6 +49,32 @@ class PortfolioController(
         val hasUsd = positions.any { it.currency == "USD" }
         model.addAttribute("hasUsd", hasUsd)
         model.addAttribute("usdRate", usdRate)
+
+        // Evolution chart data grouped by asset type
+        val evolution = monthlyEvolutionService.getEvolution()
+        val assetTypeMap = transaction {
+            AssetEntity.all().toList().associate { it.ticker.value to (it.type ?: "STOCK") }
+        }
+
+        val chartLabels = evolution.months.map { it.month.format(monthFormatter) }
+        val assetTypes = assetTypeMap.values.distinct().sorted()
+
+        val chartDatasets = assetTypes.map { type ->
+            val tickersOfType = assetTypeMap.filterValues { it == type }.keys
+            val data = evolution.months.map { row ->
+                row.snapshots
+                    .filter { it.assetId in tickersOfType }
+                    .sumOf { it.marketValue }
+            }
+            mapOf("label" to type, "data" to data)
+        }
+
+        val investedLine = evolution.months.map { it.totalInvested }
+
+        model.addAttribute("chartLabels", objectMapper.writeValueAsString(chartLabels))
+        model.addAttribute("chartDatasets", objectMapper.writeValueAsString(chartDatasets))
+        model.addAttribute("chartInvestedLine", objectMapper.writeValueAsString(investedLine))
+        model.addAttribute("hasEvolutionData", evolution.months.isNotEmpty())
 
         return "dashboard"
     }
