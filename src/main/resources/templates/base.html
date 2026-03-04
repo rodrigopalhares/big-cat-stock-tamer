@@ -39,6 +39,12 @@
                         <i class="bi bi-arrow-left-right"></i> Transações
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" th:classappend="${#strings.startsWith(requestURI, '/evolution')} ? 'active'"
+                       href="/evolution/">
+                        <i class="bi bi-graph-up"></i> Evolução
+                    </a>
+                </li>
             </ul>
             <span class="navbar-text text-secondary small">
                 <i class="bi bi-circle-fill text-success" style="font-size:0.5rem;"></i>

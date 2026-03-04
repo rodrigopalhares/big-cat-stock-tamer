@@ -33,4 +33,5 @@ class AssetEntity(
 
     val transactions by TransactionEntity referrersOn Transactions.assetId
     val priceHistory by PriceHistoryEntity referrersOn PriceHistories.assetId
+    val monthlySnapshots by MonthlySnapshotEntity referrersOn MonthlySnapshots.assetId
 }
