@@ -12,6 +12,7 @@ Aplicação web para acompanhamento de investimentos no mercado de renda variáv
 - Cotações em tempo real integradas ao Yahoo Finance
 - Suporte a ativos em USD com conversão automática para BRL
 - Histórico de preços com backfill automático e atualização diária
+- Evolução mensal da carteira com snapshots por ativo
 - Dashboard consolidado da carteira
 
 ## Stack
@@ -25,7 +26,7 @@ Aplicação web para acompanhamento de investimentos no mercado de renda variáv
 | Frontend     | Thymeleaf + HTMX + Bootstrap 5          |
 | HTTP Client  | Ktor Client (CIO)                       |
 | Scheduler    | Spring @Scheduled                       |
-| Testes       | Kotest + MockK + Spring Boot Test       |
+| Testes       | Kotest + MockK + SpringMockK + Spring Boot Test |
 | Build        | Gradle (Kotlin DSL)                     |
 | Linter       | ktlint (via jlleitschuh plugin)          |
 
@@ -77,30 +78,34 @@ stocks/
 │   │   │   ├── model/
 │   │   │   │   ├── Asset.kt                  # Tabela + Entidade Exposed
 │   │   │   │   ├── Transaction.kt
-│   │   │   │   └── PriceHistory.kt
+│   │   │   │   ├── PriceHistory.kt
+│   │   │   │   └── MonthlySnapshot.kt
 │   │   │   ├── dto/
 │   │   │   │   ├── Constants.kt              # ASSET_TYPES, VALID_CURRENCIES
 │   │   │   │   ├── AssetDtos.kt              # Request/Response data classes
 │   │   │   │   ├── TransactionDtos.kt
-│   │   │   │   └── PortfolioDtos.kt
+│   │   │   │   ├── PortfolioDtos.kt
+│   │   │   │   └── MonthlyEvolutionDtos.kt
 │   │   │   ├── service/
 │   │   │   │   ├── CalculationService.kt     # Posição, IRR, XIRR, PnL
 │   │   │   │   ├── QuoteService.kt           # Yahoo Finance + Tesouro Direto
-│   │   │   │   ├── PriceHistoryService.kt    # Backfill e update diário
-│   │   │   │   └── PortfolioService.kt       # Posições consolidadas
+│   │   │   │   ├── PriceHistoryService.kt    # Backfill, update diário + funções puras
+│   │   │   │   ├── PortfolioService.kt       # Posições consolidadas
+│   │   │   │   └── MonthlyEvolutionService.kt # Evolução mensal da carteira
 │   │   │   └── controller/
 │   │   │       ├── AssetController.kt        # CRUD ativos (HTML + JSON API)
 │   │   │       ├── TransactionController.kt  # CRUD transações
-│   │   │       └── PortfolioController.kt    # Dashboard e posições
+│   │   │       ├── PortfolioController.kt    # Dashboard e posições
+│   │   │       └── MonthlyEvolutionController.kt # Evolução mensal
 │   │   └── resources/
 │   │       ├── application.yml               # Config (H2, Flyway, porta)
-│   │       ├── templates/                    # Templates Thymeleaf
+│   │       ├── templates/                    # Templates Thymeleaf (inclui evolution.html)
 │   │       ├── static/                       # CSS, JS
-│   │       └── db/migration/                 # Flyway SQL migrations
+│   │       └── db/migration/                 # Flyway SQL migrations (V1-V4)
 │   └── test/
 │       ├── kotlin/com/stocks/
-│       │   ├── service/                      # Testes unitários
-│       │   └── controller/                   # Testes de integração
+│       │   ├── service/                      # Testes unitários e de integração
+│       │   └── controller/                   # Testes de integração (MockMvc)
 │       └── resources/
 │           └── application-test.yml          # Config H2 in-memory para testes
 └── data/
@@ -139,6 +144,18 @@ stocks/
 | date     | LocalDate  | Data                              |
 | close    | Double     | Preço de fechamento               |
 
+### MonthlySnapshot (Snapshot Mensal)
+| Campo       | Tipo       | Descrição                        |
+|-------------|------------|----------------------------------|
+| id          | Int        | Identificador (PK)               |
+| assetId     | String     | Ticker do ativo (FK)             |
+| month       | LocalDate  | Mês de referência                |
+| quantity    | Double     | Quantidade no fim do mês         |
+| avgPrice    | Double     | Preço médio                      |
+| marketPrice | Double     | Preço de mercado no fim do mês   |
+| totalCost   | Double     | Custo total acumulado            |
+| marketValue | Double     | Valor de mercado                 |
+
 ## Rotas da API
 
 | Método | Rota                        | Descrição                       |
@@ -154,6 +171,10 @@ stocks/
 | GET    | `/transactions/api`         | Lista de transações (JSON)      |
 | POST   | `/transactions/api`         | Criar transação (JSON)          |
 | DELETE | `/transactions/api/{id}`    | Excluir transação (JSON)        |
+| GET    | `/evolution/`               | Evolução mensal (HTML)          |
+| GET    | `/evolution/api`            | Evolução mensal (JSON)          |
+| POST   | `/evolution/recalculate`    | Recalcular snapshots (HTML)     |
+| POST   | `/evolution/api/recalculate`| Recalcular snapshots (JSON)     |
 
 ## Testes
 
