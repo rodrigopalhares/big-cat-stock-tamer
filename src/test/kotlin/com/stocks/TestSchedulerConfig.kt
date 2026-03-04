@@ -16,7 +16,7 @@ class TestSchedulerConfig {
     fun taskScheduler(): TaskScheduler {
         // No-op scheduler that prevents background jobs from running during tests
         return ThreadPoolTaskScheduler().apply {
-            poolSize = 0
+            poolSize = 1
             initialize()
         }
     }

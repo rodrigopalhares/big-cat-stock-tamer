@@ -6,7 +6,6 @@ import com.stocks.service.QuoteService
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.extensions.spring.SpringExtension
 import io.mockk.every
-import io.mockk.mockkBean
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
