@@ -15,10 +15,9 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 @Service
-class QuoteService {
+class QuoteService(private val client: HttpClient = HttpClient(CIO)) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
-    private val client = HttpClient(CIO)
     private val json = Json { ignoreUnknownKeys = true }
 
     // Rate cache: key -> (rate, timestamp_seconds)

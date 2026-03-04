@@ -1,0 +1,23 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "BRL",
+          "symbol": "PETR3.SA",
+          "instrumentType": "EQUITY",
+          "regularMarketPrice": 38.45
+        },
+        "timestamp": [1709510400, 1709596800, 1709683200, 1709769600, 1709856000],
+        "indicators": {
+          "quote": [
+            {
+              "close": [37.80, null, 38.40, -1.0, 38.45]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

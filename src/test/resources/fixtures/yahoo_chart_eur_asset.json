@@ -1,0 +1,26 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "EUR",
+          "symbol": "SAP.DE",
+          "exchangeName": "GER",
+          "instrumentType": "EQUITY",
+          "regularMarketPrice": 200.00,
+          "longName": "SAP SE",
+          "shortName": "SAP"
+        },
+        "timestamp": [1709856000],
+        "indicators": {
+          "quote": [
+            {
+              "close": [200.00]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

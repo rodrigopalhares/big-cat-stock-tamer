@@ -1,0 +1,26 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "AAPL",
+          "exchangeName": "NMS",
+          "instrumentType": "EQUITY",
+          "regularMarketPrice": 178.50,
+          "longName": "Apple Inc.",
+          "shortName": "APPLE INC"
+        },
+        "timestamp": [1709856000],
+        "indicators": {
+          "quote": [
+            {
+              "close": [178.50]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}
