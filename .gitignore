@@ -1,7 +1,5 @@
 # Database
-data/stocks.db
-data/stocks.mv.db
-data/stocks.trace.db
+/data
 
 # Kotlin / Gradle
 build/
@@ -24,3 +22,6 @@ out/
 .DS_Store
 Thumbs.db
 .coverage
+
+# claude
+.claude/*.local.*
