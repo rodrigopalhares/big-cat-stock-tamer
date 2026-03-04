@@ -14,13 +14,13 @@
       {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            jdk25
+            jdk21
             gradle
             kotlin
           ];
 
           shellHook = ''
-            export JAVA_HOME=${pkgs.jdk25}
+            export JAVA_HOME=${pkgs.jdk21}
             echo "Java: $(java --version 2>&1 | head -1)"
             echo "Gradle: $(gradle --version 2>&1 | grep '^Gradle' || echo 'available')"
           '';

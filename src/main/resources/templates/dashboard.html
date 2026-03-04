@@ -1,12 +1,10 @@
 <!DOCTYPE html>
 <html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
-<head><title>Dashboard — Carteira</title></head>
+<head th:replace="~{base :: head('Dashboard — Carteira')}"></head>
 <body>
-<div th:replace="~{base :: body}">
-</div>
+<nav th:replace="~{base :: navbar}"></nav>
 
-<!-- Actual page content inserted by Thymeleaf -->
-<div th:fragment="content" class="container-fluid py-4 px-4">
+<div class="container-fluid py-4 px-4">
 <h2 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard</h2>
 
 <div th:if="${hasUsd}" class="alert alert-info alert-sm py-2 px-3 mb-3 small">
@@ -103,7 +101,7 @@
                         <td>
                             <span class="badge bg-light text-dark border" th:text="${p.currency}"></span>
                         </td>
-                        <td class="text-end" th:text="${p.quantity == T(Math).floor(p.quantity)} ? ${#numbers.formatDecimal(p.quantity, 1, 0)} : ${#numbers.formatDecimal(p.quantity, 1, 4)}"></td>
+                        <td class="text-end" th:text="${p.quantity == T(java.lang.Math).floor(p.quantity)} ? ${#numbers.formatDecimal(p.quantity, 1, 0)} : ${#numbers.formatDecimal(p.quantity, 1, 4)}"></td>
                         <td class="text-end"><span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.avgPrice, 1, 2)}"></span></td>
                         <td class="text-end">
                             <span th:if="${p.currentPrice != null}"><span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.currentPrice, 1, 2)}"></span></span>
@@ -162,5 +160,7 @@
     </div>
 </div>
 </div>
+
+<th:block th:replace="~{base :: scripts}"></th:block>
 </body>
 </html>
