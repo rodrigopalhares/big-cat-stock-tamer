@@ -7,6 +7,60 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 
+// Resolves Yahoo Finance ticker from asset ticker
+fun resolveYfTicker(ticker: String, yfTicker: String?): String =
+    yfTicker ?: if ("." !in ticker) "$ticker.SA" else ticker
+
+// Data class for asset categorization input
+data class AssetTickerInfo(
+    val ticker: String,
+    val yfTicker: String?,
+    val type: String?,
+)
+
+// Result of categorization
+data class TickerMaps(
+    val yfTickerMap: Map<String, String>, // yfTicker -> assetTicker
+    val tdTickerMap: Map<String, String>, // yfTicker -> assetTicker
+)
+
+// Categorizes assets into Yahoo Finance vs Tesouro Direto maps
+fun categorizeAssets(assets: List<AssetTickerInfo>): TickerMaps {
+    val yfTickerMap = mutableMapOf<String, String>()
+    val tdTickerMap = mutableMapOf<String, String>()
+
+    for (asset in assets) {
+        if (asset.type == "TESOURO_DIRETO") {
+            if (asset.yfTicker != null) {
+                tdTickerMap[asset.yfTicker] = asset.ticker
+            }
+        } else {
+            val resolved = resolveYfTicker(asset.ticker, asset.yfTicker)
+            yfTickerMap[resolved] = asset.ticker
+        }
+    }
+
+    return TickerMaps(yfTickerMap, tdTickerMap)
+}
+
+// Filters batch API results into PriceRecords
+fun filterBatchToRecords(
+    batch: Map<String, List<Pair<LocalDate, Double>>>,
+    tickerResolver: (String) -> String? = { it },
+    datePredicate: (String, LocalDate) -> Boolean,
+): List<PriceRecord> {
+    val records = mutableListOf<PriceRecord>()
+    for ((key, prices) in batch) {
+        val assetTicker = tickerResolver(key) ?: continue
+        for ((date, close) in prices) {
+            if (datePredicate(assetTicker, date)) {
+                records.add(PriceRecord(assetTicker, date, close))
+            }
+        }
+    }
+    return records
+}
+
 @Service
 class PriceHistoryService(
     private val quoteService: QuoteService,
@@ -68,85 +122,48 @@ class PriceHistoryService(
     fun runBackfill() {
         transaction {
             val assets = AssetEntity.all().toList()
-            val assetData =
-                assets.map { asset ->
-                    AssetBackfillData(
-                        ticker = asset.ticker.value,
-                        yfTicker = asset.yfTicker,
-                        type = asset.type,
-                        firstTransactionDate =
-                            asset.transactions
-                                .toList()
-                                .minOfOrNull { it.date },
-                    )
-                }
-
             val today = LocalDate.now()
-            val yfTickerMap = mutableMapOf<String, String>()
-            val tdTickerMap = mutableMapOf<String, String>()
             val startDates = mutableMapOf<String, LocalDate>()
 
-            for (data in assetData) {
-                val firstTx = data.firstTransactionDate ?: continue
-                val lastStored = getLastStoredDate(data.ticker)
-                val start = if (lastStored != null) lastStored.plusDays(1) else firstTx
-                if (start > today) continue
-
-                startDates[data.ticker] = start
-
-                if (data.type == "TESOURO_DIRETO") {
-                    if (data.yfTicker != null) {
-                        tdTickerMap[data.yfTicker] = data.ticker
-                    }
-                } else {
-                    val yfTicker =
-                        data.yfTicker
-                            ?: if ("." !in data.ticker) "${data.ticker}.SA" else data.ticker
-                    yfTickerMap[yfTicker] = data.ticker
+            val assetInfoList =
+                assets.mapNotNull { asset ->
+                    val ticker = asset.ticker.value
+                    val firstTx = asset.transactions.toList().minOfOrNull { it.date } ?: return@mapNotNull null
+                    val lastStored = getLastStoredDate(ticker)
+                    val start = if (lastStored != null) lastStored.plusDays(1) else firstTx
+                    if (start > today) return@mapNotNull null
+                    startDates[ticker] = start
+                    AssetTickerInfo(ticker, asset.yfTicker, asset.type)
                 }
-            }
+
+            val maps = categorizeAssets(assetInfoList)
 
             // yfinance batch
-            if (yfTickerMap.isNotEmpty()) {
+            if (maps.yfTickerMap.isNotEmpty()) {
                 try {
-                    val earliest =
-                        yfTickerMap.values
-                            .mapNotNull { startDates[it] }
-                            .minOrNull() ?: today
-
-                    val batch = quoteService.fetchHistoricalQuotesBatch(yfTickerMap, earliest)
-                    val records = mutableListOf<PriceRecord>()
-                    for ((assetTicker, prices) in batch) {
-                        val cutoff = startDates[assetTicker] ?: earliest
-                        for ((date, close) in prices) {
-                            if (date >= cutoff) {
-                                records.add(PriceRecord(assetTicker, date, close))
-                            }
+                    val earliest = maps.yfTickerMap.values.mapNotNull { startDates[it] }.minOrNull() ?: today
+                    val batch = quoteService.fetchHistoricalQuotesBatch(maps.yfTickerMap, earliest)
+                    val records =
+                        filterBatchToRecords(batch) { ticker, date ->
+                            date >= (startDates[ticker] ?: earliest)
                         }
-                    }
                     upsertPrices(records)
-                    logger.info("Backfilled ${records.size} yfinance records for ${yfTickerMap.size} assets")
+                    logger.info("Backfilled ${records.size} yfinance records for ${maps.yfTickerMap.size} assets")
                 } catch (e: Exception) {
                     logger.error("Error in yfinance backfill batch: ${e.message}")
                 }
             }
 
             // Tesouro Direto batch
-            if (tdTickerMap.isNotEmpty()) {
+            if (maps.tdTickerMap.isNotEmpty()) {
                 try {
-                    val batch = quoteService.fetchTdHistoricalQuotesBatch(tdTickerMap.keys.toList())
-                    val records = mutableListOf<PriceRecord>()
-                    for ((yfTicker, prices) in batch) {
-                        val assetTicker = tdTickerMap[yfTicker] ?: continue
-                        val cutoff = startDates[assetTicker] ?: LocalDate.MIN
-                        for ((date, close) in prices) {
-                            if (date >= cutoff) {
-                                records.add(PriceRecord(assetTicker, date, close))
-                            }
+                    val batch = quoteService.fetchTdHistoricalQuotesBatch(maps.tdTickerMap.keys.toList())
+                    val records =
+                        filterBatchToRecords(batch, { maps.tdTickerMap[it] }) { ticker, date ->
+                            date >= (startDates[ticker] ?: LocalDate.MIN)
                         }
-                    }
                     upsertPrices(records)
-                    logger.info("Backfilled ${records.size} TD records for ${tdTickerMap.size} assets")
+                    logger.info("Backfilled ${records.size} TD records for ${maps.tdTickerMap.size} assets")
                 } catch (e: Exception) {
                     logger.error("Error in TD backfill batch: ${e.message}")
                 }
@@ -159,34 +176,18 @@ class PriceHistoryService(
             val assets = AssetEntity.all().toList()
             val today = LocalDate.now()
 
-            val yfTickerMap = mutableMapOf<String, String>()
-            val tdTickerMap = mutableMapOf<String, String>()
+            val assetInfoList =
+                assets
+                    .filter { !it.transactions.empty() }
+                    .map { AssetTickerInfo(it.ticker.value, it.yfTicker, it.type) }
 
-            for (asset in assets) {
-                if (asset.transactions.empty()) continue
-                val ticker = asset.ticker.value
+            val maps = categorizeAssets(assetInfoList)
 
-                if (asset.type == "TESOURO_DIRETO") {
-                    if (asset.yfTicker != null) {
-                        tdTickerMap[asset.yfTicker!!] = ticker
-                    }
-                } else {
-                    val yfTicker =
-                        asset.yfTicker
-                            ?: if ("." !in ticker) "$ticker.SA" else ticker
-                    yfTickerMap[yfTicker] = ticker
-                }
-            }
-
-            if (yfTickerMap.isNotEmpty()) {
+            if (maps.yfTickerMap.isNotEmpty()) {
                 try {
-                    val batch = quoteService.fetchHistoricalQuotesBatch(yfTickerMap, today)
+                    val batch = quoteService.fetchHistoricalQuotesBatch(maps.yfTickerMap, today)
                     val records =
-                        batch.flatMap { (assetTicker, prices) ->
-                            prices
-                                .filter { it.first == today }
-                                .map { PriceRecord(assetTicker, it.first, it.second) }
-                        }
+                        filterBatchToRecords(batch) { _, date -> date == today }
                     upsertPrices(records)
                     logger.info("Daily update: stored ${records.size} yfinance prices")
                 } catch (e: Exception) {
@@ -194,18 +195,11 @@ class PriceHistoryService(
                 }
             }
 
-            if (tdTickerMap.isNotEmpty()) {
+            if (maps.tdTickerMap.isNotEmpty()) {
                 try {
-                    val batch = quoteService.fetchTdHistoricalQuotesBatch(tdTickerMap.keys.toList())
-                    val records = mutableListOf<PriceRecord>()
-                    for ((yfTicker, prices) in batch) {
-                        val assetTicker = tdTickerMap[yfTicker] ?: continue
-                        for ((date, close) in prices) {
-                            if (date == today) {
-                                records.add(PriceRecord(assetTicker, date, close))
-                            }
-                        }
-                    }
+                    val batch = quoteService.fetchTdHistoricalQuotesBatch(maps.tdTickerMap.keys.toList())
+                    val records =
+                        filterBatchToRecords(batch, { maps.tdTickerMap[it] }) { _, date -> date == today }
                     upsertPrices(records)
                     logger.info("Daily update: stored ${records.size} TD prices")
                 } catch (e: Exception) {
@@ -214,13 +208,6 @@ class PriceHistoryService(
             }
         }
     }
-
-    private data class AssetBackfillData(
-        val ticker: String,
-        val yfTicker: String?,
-        val type: String?,
-        val firstTransactionDate: LocalDate?,
-    )
 }
 
 data class PriceRecord(

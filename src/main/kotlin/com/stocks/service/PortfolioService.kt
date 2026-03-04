@@ -29,10 +29,7 @@ class PortfolioService(
                 if (asset.type == "TESOURO_DIRETO") {
                     if (asset.yfTicker != null) tdTickers.add(asset.yfTicker!!)
                 } else {
-                    val yfTicker =
-                        asset.yfTicker
-                            ?: if ("." !in ticker) "$ticker.SA" else ticker
-                    yfTickers.add(yfTicker)
+                    yfTickers.add(resolveYfTicker(ticker, asset.yfTicker))
                 }
             }
 
@@ -71,10 +68,7 @@ class PortfolioService(
                     if (asset.type == "TESOURO_DIRETO") {
                         asset.yfTicker?.let { liveQuotes[it] }
                     } else {
-                        val yfTicker =
-                            asset.yfTicker
-                                ?: if ("." !in ticker) "$ticker.SA" else ticker
-                        liveQuotes[yfTicker]
+                        liveQuotes[resolveYfTicker(ticker, asset.yfTicker)]
                     }
             }
 
