@@ -2,7 +2,6 @@ package com.stocks.service
 
 import com.stocks.dto.AssetInfo
 import io.ktor.client.*
-import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.coroutines.runBlocking
@@ -15,7 +14,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 @Service
-class QuoteService(private val client: HttpClient = HttpClient(CIO)) {
+class QuoteService(private val client: HttpClient) {
 
     private val logger = LoggerFactory.getLogger(javaClass)
     private val json = Json { ignoreUnknownKeys = true }
