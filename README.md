@@ -17,22 +17,22 @@ Aplicação web para acompanhamento de investimentos no mercado de renda variáv
 
 ## Stack
 
-| Camada       | Tecnologia                              |
-|--------------|-----------------------------------------|
-| Linguagem    | Kotlin (JDK 25)                         |
-| Backend      | Spring Boot 3                           |
-| ORM / DB     | Exposed (DAO + DSL) + H2                |
-| Migrations   | Flyway                                  |
-| Frontend     | Thymeleaf + HTMX + Bootstrap 5          |
-| HTTP Client  | Ktor Client (CIO)                       |
-| Scheduler    | Spring @Scheduled                       |
+| Camada       | Tecnologia                                      |
+|--------------|-------------------------------------------------|
+| Linguagem    | Kotlin (JDK 21+)                                |
+| Backend      | Spring Boot 3                                   |
+| ORM / DB     | Exposed (DAO + DSL) + H2                        |
+| Migrations   | Flyway                                          |
+| Frontend     | Thymeleaf + HTMX + Bootstrap 5                  |
+| HTTP Client  | Ktor Client (CIO)                               |
+| Scheduler    | Spring @Scheduled                               |
 | Testes       | Kotest + MockK + SpringMockK + Spring Boot Test |
-| Build        | Gradle (Kotlin DSL)                     |
-| Linter       | ktlint (via jlleitschuh plugin)          |
+| Build        | Gradle (Kotlin DSL)                             |
+| Linter       | ktlint (via jlleitschuh plugin)                 |
 
 ## Pré-requisitos
 
-- JDK 25
+- JDK 21+
 
 ## Ambiente de Desenvolvimento
 
@@ -41,10 +41,10 @@ Aplicação web para acompanhamento de investimentos no mercado de renda variáv
 nix develop
 
 # Opção 2: SDKMAN!
-sdk install java 25-open
+sdk install java 21-open
 
 # Opção 3: apt
-sudo apt install openjdk-25-jdk-headless
+sudo apt install openjdk-21-jdk-headless
 ```
 
 ## Como Executar

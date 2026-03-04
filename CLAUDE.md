@@ -163,11 +163,11 @@ stocks/
 ## Ambiente de Desenvolvimento
 
 ```bash
-# Via Nix (flake.nix inclui JDK 25, Gradle, Kotlin):
+# Via Nix (flake.nix inclui JDK 21+, Gradle, Kotlin):
 nix develop
 
 # Via SDKMAN!:
-sdk install java 25-open
+sdk install java 21-open
 ```
 
 ## Como Rodar
