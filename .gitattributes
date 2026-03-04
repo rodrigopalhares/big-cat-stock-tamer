@@ -1,46 +1,53 @@
-* text=auto
+* text=auto eol=lf
 
-# Keep source files LF across platforms
-*.py text eol=lf
-*.toml text eol=lf
-*.md text eol=lf
-*.html text eol=lf
-*.css text eol=lf
-*.js text eol=lf
-*.json text eol=lf
-*.yml text eol=lf
-*.yaml text eol=lf
-*.txt text eol=lf
+# Source files
+*.kt            text eol=lf diff=kotlin
+*.kts           text eol=lf diff=kotlin
+*.java          text eol=lf diff=java
+*.groovy        text eol=lf diff=java
+*.scala         text eol=lf diff=java
+*.gradle        text eol=lf diff=java
+*.gradle.kts    text eol=lf diff=kotlin
 
-# Java sources
-*.java          text diff=java
-*.kt            text diff=kotlin
-*.groovy        text diff=java
-*.scala         text diff=java
-*.gradle        text diff=java
-*.gradle.kts    text diff=kotlin
+# Web / frontend
+*.html          text eol=lf diff=html
+*.htm           text eol=lf diff=html
+*.css           text eol=lf diff=css
+*.scss          text eol=lf diff=css
+*.sass          text eol=lf
+*.js            text eol=lf
+*.mjs           text eol=lf
+*.cjs           text eol=lf
+*.json          text eol=lf
+*.jsp           text eol=lf
+*.jspf          text eol=lf
+*.jspx          text eol=lf
 
-# These files are text and should be normalized (Convert crlf => lf)
-*.css           text diff=css
-*.scss          text diff=css
-*.sass          text
-*.df            text
-*.htm           text diff=html
-*.html          text diff=html
-*.js            text
-*.mjs           text
-*.cjs           text
-*.jsp           text
-*.jspf          text
-*.jspx          text
-*.properties    text
-*.tld           text
-*.tag           text
-*.tagx          text
-*.xml           text
+# Config / docs
+*.md            text eol=lf
+*.txt           text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.toml          text eol=lf
+*.xml           text eol=lf
+*.properties    text eol=lf
+*.sql           text eol=lf
+*.py            text eol=lf
+*.df            text eol=lf
+*.tld           text eol=lf
+*.tag           text eol=lf
+*.tagx          text eol=lf
+*.editorconfig  text eol=lf
 
-# These files are binary and should be left untouched
-# (binary is a macro for -text -diff)
+# Build-tool wrappers
+mvnw            text eol=lf
+gradlew         text eol=lf
+
+# Windows-specific
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+
+# Binary files (no text conversion, no diff)
 *.class         binary
 *.dll           binary
 *.ear           binary
@@ -48,10 +55,3 @@
 *.so            binary
 *.war           binary
 *.jks           binary
-
-# Common build-tool wrapper scripts ('.cmd' versions are handled by 'Common.gitattributes')
-mvnw            text eol=lf
-gradlew         text eol=lf
-
-# These are explicitly windows files and should use crlf
-*.bat           text eol=crlf
