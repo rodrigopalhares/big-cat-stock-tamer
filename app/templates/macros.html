@@ -1,8 +1,0 @@
-{% macro asset_badge(type) %}
-<span class="badge
-    {%- if type == 'STOCK' %} bg-primary
-    {%- elif type == 'REIT' %} bg-success
-    {%- elif type == 'ETF' %} bg-info
-    {%- elif type == 'TESOURO_DIRETO' %} bg-warning text-dark
-    {%- else %} bg-secondary{%- endif %}">{{ type }}</span>
-{% endmacro %}

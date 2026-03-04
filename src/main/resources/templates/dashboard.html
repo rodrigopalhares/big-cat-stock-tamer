@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head><title>Dashboard — Carteira</title></head>
+<body>
+<div th:replace="~{base :: body}">
+</div>
+
+<!-- Actual page content inserted by Thymeleaf -->
+<div th:fragment="content" class="container-fluid py-4 px-4">
+<h2 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard</h2>
+
+<div th:if="${hasUsd}" class="alert alert-info alert-sm py-2 px-3 mb-3 small">
+    <i class="bi bi-currency-exchange me-1"></i>
+    Totais em <strong>BRL</strong>. Ativos em USD convertidos pela cotação do dia.
+    <span th:if="${usdRate != null}" class="ms-2 text-muted">
+        USD/BRL: R$ <span th:text="${#numbers.formatDecimal(usdRate, 1, 4)}"></span>
+    </span>
+</div>
+
+<!-- Summary cards -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small mb-1">Total Investido<span th:if="${hasUsd}" class="text-info"> (BRL)</span></div>
+                <div class="fs-4 fw-bold">R$ <span th:text="${#numbers.formatDecimal(totalInvested, 1, 2)}"></span></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small mb-1">Lucro Realizado<span th:if="${hasUsd}" class="text-info"> (BRL)</span></div>
+                <div class="fs-4 fw-bold" th:classappend="${realizedPnl >= 0} ? 'text-success' : 'text-danger'">
+                    R$ <span th:text="${#numbers.formatDecimal(realizedPnl, 1, 2)}"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small mb-1">Valor de Mercado<span th:if="${hasUsd}" class="text-info"> (BRL)</span></div>
+                <div th:if="${currentValue != null}" class="fs-4 fw-bold">
+                    R$ <span th:text="${#numbers.formatDecimal(currentValue, 1, 2)}"></span>
+                </div>
+                <div th:unless="${currentValue != null}" class="fs-4 fw-bold text-muted">—</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small mb-1">Lucro Não Realizado<span th:if="${hasUsd}" class="text-info"> (BRL)</span></div>
+                <div th:if="${unrealizedPnl != null}" class="fs-4 fw-bold"
+                     th:classappend="${unrealizedPnl >= 0} ? 'text-success' : 'text-danger'">
+                    R$ <span th:text="${#numbers.formatDecimal(unrealizedPnl, 1, 2)}"></span>
+                </div>
+                <div th:unless="${unrealizedPnl != null}" class="fs-4 fw-bold text-muted">—</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Positions table -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Posições</span>
+        <a href="/transactions/" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg"></i> Nova Transação
+        </a>
+    </div>
+    <div class="card-body p-0">
+        <div th:if="${!positions.isEmpty()}" class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Ticker</th>
+                        <th>Tipo</th>
+                        <th>Moeda</th>
+                        <th class="text-end">Qtd</th>
+                        <th class="text-end">Preço Médio</th>
+                        <th class="text-end">Cotação</th>
+                        <th class="text-end">Valor Atual</th>
+                        <th class="text-end">Lucro Não Real.</th>
+                        <th class="text-end">Custo Total</th>
+                        <th class="text-end">Lucro Realizado</th>
+                        <th class="text-end">TIR/mês</th>
+                        <th class="text-end">TIR/ano</th>
+                        <th class="text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="p : ${positions}">
+                        <th:block th:with="sym=${p.currency == 'USD' ? 'US$' : 'R$'}">
+                        <td>
+                            <span class="fw-bold" th:text="${p.ticker}"></span>
+                            <br th:if="${p.name != null}"><small th:if="${p.name != null}" class="text-muted" th:text="${p.name}"></small>
+                        </td>
+                        <td>
+                            <span th:if="${p.type != null}" th:replace="~{fragments/badge :: assetBadge(${p.type})}"></span>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border" th:text="${p.currency}"></span>
+                        </td>
+                        <td class="text-end" th:text="${p.quantity == T(Math).floor(p.quantity)} ? ${#numbers.formatDecimal(p.quantity, 1, 0)} : ${#numbers.formatDecimal(p.quantity, 1, 4)}"></td>
+                        <td class="text-end"><span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.avgPrice, 1, 2)}"></span></td>
+                        <td class="text-end">
+                            <span th:if="${p.currentPrice != null}"><span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.currentPrice, 1, 2)}"></span></span>
+                            <span th:unless="${p.currentPrice != null}">—</span>
+                        </td>
+                        <td class="text-end">
+                            <span th:if="${p.currentValue != null}">
+                                <span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.currentValue, 1, 2)}"></span>
+                                <br th:if="${p.exchangeRate != null and p.currentValueBrl != null}">
+                                <small th:if="${p.exchangeRate != null and p.currentValueBrl != null}" class="text-muted">
+                                    ≈ R$ <span th:text="${#numbers.formatDecimal(p.currentValueBrl, 1, 2)}"></span>
+                                </small>
+                            </span>
+                            <span th:unless="${p.currentValue != null}">—</span>
+                        </td>
+                        <td class="text-end"
+                            th:classappend="${p.unrealizedPnl != null} ? (${p.unrealizedPnl >= 0} ? 'text-success' : 'text-danger') : ''">
+                            <span th:if="${p.unrealizedPnl != null}">
+                                <span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.unrealizedPnl, 1, 2)}"></span>
+                                <br th:if="${p.exchangeRate != null and p.unrealizedPnlBrl != null}">
+                                <small th:if="${p.exchangeRate != null and p.unrealizedPnlBrl != null}" class="text-muted">
+                                    ≈ R$ <span th:text="${#numbers.formatDecimal(p.unrealizedPnlBrl, 1, 2)}"></span>
+                                </small>
+                            </span>
+                            <span th:unless="${p.unrealizedPnl != null}">—</span>
+                        </td>
+                        <td class="text-end"><span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.totalCost, 1, 2)}"></span></td>
+                        <td class="text-end" th:classappend="${p.realizedPnl >= 0} ? 'text-success' : 'text-danger'">
+                            <span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.realizedPnl, 1, 2)}"></span>
+                        </td>
+                        <td class="text-end"
+                            th:classappend="${p.irrMonthly != null} ? (${p.irrMonthly >= 0} ? 'text-success' : 'text-danger') : ''">
+                            <span th:if="${p.irrMonthly != null}" th:text="${#numbers.formatDecimal(p.irrMonthly * 100, 1, 2) + '%'}"></span>
+                            <span th:unless="${p.irrMonthly != null}">—</span>
+                        </td>
+                        <td class="text-end"
+                            th:classappend="${p.irrAnnual != null} ? (${p.irrAnnual >= 0} ? 'text-success' : 'text-danger') : ''">
+                            <span th:if="${p.irrAnnual != null}" th:text="${#numbers.formatDecimal(p.irrAnnual * 100, 1, 2) + '%'}"></span>
+                            <span th:unless="${p.irrAnnual != null}">—</span>
+                        </td>
+                        <td class="text-center">
+                            <a th:href="'/transactions/?ticker=' + ${#uris.escapeQueryParam(p.ticker)}" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-list-ul"></i>
+                            </a>
+                        </td>
+                        </th:block>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div th:if="${positions.isEmpty()}" class="text-center py-5 text-muted">
+            <i class="bi bi-inbox fs-1"></i>
+            <p class="mt-2">Nenhuma posição encontrada.</p>
+            <a href="/assets/" class="btn btn-primary">Cadastrar Ativo</a>
+        </div>
+    </div>
+</div>
+</div>
+</body>
+</html>

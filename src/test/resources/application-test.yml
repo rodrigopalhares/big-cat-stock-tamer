@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  # Disable scheduling during tests
+  task:
+    scheduling:
+      pool:
+        size: 0

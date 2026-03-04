@@ -4,124 +4,162 @@ Aplicação web para acompanhamento de investimentos no mercado de renda variáv
 
 ## Funcionalidades
 
-- Cadastro de ativos: ações (STOCK), FIIs (REIT), ETFs e BDRs
+- Cadastro de ativos: ações (STOCK), FIIs (REIT), ETFs, BDRs e Tesouro Direto
 - Registro de transações de compra e venda com corretagem
 - Cálculo automático de preço médio e posição atual
 - Cálculo de lucro/prejuízo realizado e não realizado
-- Cálculo de TIR (Taxa Interna de Retorno) da carteira
+- Cálculo de TIR (Taxa Interna de Retorno) mensal e anual (XIRR)
 - Cotações em tempo real integradas ao Yahoo Finance
+- Suporte a ativos em USD com conversão automática para BRL
+- Histórico de preços com backfill automático e atualização diária
 - Dashboard consolidado da carteira
 
 ## Stack
 
-| Camada       | Tecnologia                        |
-|--------------|-----------------------------------|
-| Backend      | FastAPI + Uvicorn                 |
-| Banco        | SQLAlchemy + SQLite               |
-| Frontend     | Jinja2 + HTMX + Bootstrap 5       |
-| Cálculos     | numpy-financial + pandas          |
-| Cotações     | yfinance                          |
-| Testes       | pytest + httpx + pytest-cov       |
+| Camada       | Tecnologia                              |
+|--------------|-----------------------------------------|
+| Linguagem    | Kotlin (JDK 25)                         |
+| Backend      | Spring Boot 3                           |
+| ORM / DB     | Exposed (DAO + DSL) + H2                |
+| Migrations   | Flyway                                  |
+| Frontend     | Thymeleaf + HTMX + Bootstrap 5          |
+| HTTP Client  | Ktor Client (CIO)                       |
+| Scheduler    | Spring @Scheduled                       |
+| Testes       | Kotest + MockK + Spring Boot Test       |
+| Build        | Gradle (Kotlin DSL)                     |
 
 ## Pré-requisitos
 
-- Python 3.11 ou superior
+- JDK 25
 
-## Instalação
+## Ambiente de Desenvolvimento
 
 ```bash
-# Clone o repositório
-git clone <url-do-repo>
-cd stocks
+# Opção 1: Nix (recomendado — instala tudo automaticamente)
+nix develop
 
-# Instale as dependências
-pip install -r requirements.txt
+# Opção 2: SDKMAN!
+sdk install java 25-open
+
+# Opção 3: apt
+sudo apt install openjdk-25-jdk-headless
 ```
 
 ## Como Executar
 
 ```bash
-python run.py
+./gradlew bootRun
 ```
 
 A aplicação estará disponível em:
 
 - **Interface web:** http://localhost:8000
-- **Documentação da API (Swagger):** http://localhost:8000/docs
+- **H2 Console:** http://localhost:8000/h2-console
 
-O banco de dados SQLite é criado automaticamente em `data/stocks.db` na primeira execução.
+O banco de dados H2 é criado automaticamente em `data/stocks.mv.db` na primeira execução.
 
 ## Estrutura do Projeto
 
 ```
 stocks/
-├── run.py                        # Entrypoint da aplicação
-├── requirements.txt
-├── pyproject.toml
-├── app/
-│   ├── main.py                   # Instância FastAPI e registro de routers
-│   ├── database.py               # Engine SQLite e sessão
-│   ├── models.py                 # Modelos ORM (Asset, Transaction)
-│   ├── schemas.py                # Schemas Pydantic
-│   ├── routers/
-│   │   ├── assets.py             # CRUD de ativos
-│   │   ├── transactions.py       # CRUD de transações
-│   │   └── portfolio.py          # Dashboard e posições
-│   ├── services/
-│   │   ├── calculations.py       # Cálculo de posição, TIR, PnL
-│   │   └── quotes.py             # Integração com Yahoo Finance
-│   └── templates/                # Templates Jinja2
-├── tests/
-│   ├── conftest.py
-│   ├── test_calculations.py
-│   ├── test_schemas.py
-│   ├── test_quotes.py
-│   └── test_routers.py
+├── build.gradle.kts                          # Build Gradle (dependências, plugins)
+├── settings.gradle.kts
+├── flake.nix                                 # Dev environment (Nix)
+├── src/
+│   ├── main/
+│   │   ├── kotlin/com/stocks/
+│   │   │   ├── StocksApplication.kt          # Entrypoint Spring Boot
+│   │   │   ├── config/
+│   │   │   │   ├── DatabaseConfig.kt         # Conexão Exposed + H2
+│   │   │   │   ├── SchedulerConfig.kt        # Jobs agendados (backfill, update)
+│   │   │   │   └── WebConfig.kt              # Redirect / → /portfolio/
+│   │   │   ├── model/
+│   │   │   │   ├── Asset.kt                  # Tabela + Entidade Exposed
+│   │   │   │   ├── Transaction.kt
+│   │   │   │   └── PriceHistory.kt
+│   │   │   ├── dto/
+│   │   │   │   ├── Constants.kt              # ASSET_TYPES, VALID_CURRENCIES
+│   │   │   │   ├── AssetDtos.kt              # Request/Response data classes
+│   │   │   │   ├── TransactionDtos.kt
+│   │   │   │   └── PortfolioDtos.kt
+│   │   │   ├── service/
+│   │   │   │   ├── CalculationService.kt     # Posição, IRR, XIRR, PnL
+│   │   │   │   ├── QuoteService.kt           # Yahoo Finance + Tesouro Direto
+│   │   │   │   ├── PriceHistoryService.kt    # Backfill e update diário
+│   │   │   │   └── PortfolioService.kt       # Posições consolidadas
+│   │   │   └── controller/
+│   │   │       ├── AssetController.kt        # CRUD ativos (HTML + JSON API)
+│   │   │       ├── TransactionController.kt  # CRUD transações
+│   │   │       └── PortfolioController.kt    # Dashboard e posições
+│   │   └── resources/
+│   │       ├── application.yml               # Config (H2, Flyway, porta)
+│   │       ├── templates/                    # Templates Thymeleaf
+│   │       ├── static/                       # CSS, JS
+│   │       └── db/migration/                 # Flyway SQL migrations
+│   └── test/
+│       ├── kotlin/com/stocks/
+│       │   ├── service/                      # Testes unitários
+│       │   └── controller/                   # Testes de integração
+│       └── resources/
+│           └── application-test.yml          # Config H2 in-memory para testes
 └── data/
-    └── stocks.db                 # Banco gerado automaticamente
+    └── stocks.mv.db                          # Banco gerado automaticamente
 ```
 
 ## Modelos de Dados
 
 ### Asset (Ativo)
-| Campo      | Tipo   | Descrição                              |
-|------------|--------|----------------------------------------|
-| ticker     | string | Código do ativo (PK, ex: PETR4)        |
-| yf_ticker  | string | Símbolo no Yahoo Finance (ex: PETR4.SA)|
-| name       | string | Nome do ativo                          |
-| type       | string | STOCK, REIT, ETF ou BDR                |
-| currency   | string | BRL ou USD                             |
+| Campo      | Tipo   | Descrição                                     |
+|------------|--------|-----------------------------------------------|
+| ticker     | String | Código do ativo (PK, ex: PETR4)               |
+| yfTicker   | String | Símbolo no Yahoo Finance (ex: PETR4.SA)       |
+| name       | String | Nome do ativo                                 |
+| type       | String | STOCK, REIT, ETF, BDR ou TESOURO_DIRETO       |
+| currency   | String | BRL ou USD                                    |
 
 ### Transaction (Transação)
-| Campo    | Tipo   | Descrição                         |
-|----------|--------|-----------------------------------|
-| id       | int    | Identificador (PK)                |
-| asset_id | string | Ticker do ativo (FK)              |
-| type     | string | BUY ou SELL                       |
-| quantity | float  | Quantidade de cotas/ações         |
-| price    | float  | Preço unitário                    |
-| fees     | float  | Custos de corretagem              |
-| date     | date   | Data da operação                  |
-| broker   | string | Corretora                         |
-| notes    | text   | Observações                       |
+| Campo    | Tipo       | Descrição                         |
+|----------|------------|-----------------------------------|
+| id       | Int        | Identificador (PK)                |
+| assetId  | String     | Ticker do ativo (FK)              |
+| type     | String     | BUY ou SELL                       |
+| quantity | Double     | Quantidade de cotas/ações         |
+| price    | Double     | Preço unitário                    |
+| fees     | Double     | Custos de corretagem              |
+| date     | LocalDate  | Data da operação                  |
+| broker   | String     | Corretora                         |
+| notes    | String     | Observações                       |
+
+### PriceHistory (Histórico de Preços)
+| Campo    | Tipo       | Descrição                         |
+|----------|------------|-----------------------------------|
+| id       | Int        | Identificador (PK)                |
+| assetId  | String     | Ticker do ativo (FK, CASCADE)     |
+| date     | LocalDate  | Data                              |
+| close    | Double     | Preço de fechamento               |
 
 ## Rotas da API
 
-| Método | Rota                  | Descrição                       |
-|--------|-----------------------|---------------------------------|
-| GET    | `/portfolio/`         | Dashboard (HTML)                |
-| GET    | `/portfolio/api`      | Posições da carteira (JSON)     |
-| GET    | `/assets/`            | Lista de ativos (HTML)          |
-| GET    | `/assets/api`         | Lista de ativos (JSON)          |
-| GET    | `/transactions/`      | Lista de transações (HTML)      |
-| GET    | `/transactions/api`   | Lista de transações (JSON)      |
+| Método | Rota                        | Descrição                       |
+|--------|-----------------------------|---------------------------------|
+| GET    | `/portfolio/`               | Dashboard (HTML)                |
+| GET    | `/portfolio/api`            | Posições da carteira (JSON)     |
+| GET    | `/portfolio/api/{ticker}`   | Posição de um ativo (JSON)      |
+| GET    | `/assets/`                  | Lista de ativos (HTML)          |
+| GET    | `/assets/api`               | Lista de ativos (JSON)          |
+| POST   | `/assets/api`               | Criar ativo (JSON)              |
+| GET    | `/assets/api/{ticker}`      | Detalhes do ativo (JSON)        |
+| GET    | `/transactions/`            | Lista de transações (HTML)      |
+| GET    | `/transactions/api`         | Lista de transações (JSON)      |
+| POST   | `/transactions/api`         | Criar transação (JSON)          |
+| DELETE | `/transactions/api/{id}`    | Excluir transação (JSON)        |
 
 ## Testes
 
 ```bash
 # Rodar todos os testes
-pytest tests/ -v
+./gradlew test
 
-# Rodar com relatório de cobertura
-pytest tests/ --cov=app --cov-report=term-missing
+# Verbose
+./gradlew test --info
 ```
