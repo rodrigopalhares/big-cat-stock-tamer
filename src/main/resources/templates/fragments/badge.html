@@ -1,0 +1,8 @@
+<span th:fragment="assetBadge(type)"
+      th:class="${'badge ' +
+        (type == 'STOCK' ? 'bg-primary' :
+         type == 'REIT' ? 'bg-success' :
+         type == 'ETF' ? 'bg-info' :
+         type == 'TESOURO_DIRETO' ? 'bg-warning text-dark' :
+         'bg-secondary')}"
+      th:text="${type}">TYPE</span>

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head><title>Ativos</title></head>
+<body>
+<div th:replace="~{base :: body}">
+</div>
+
+<div th:fragment="content" class="container-fluid py-4 px-4">
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0"><i class="bi bi-building"></i> Ativos</h2>
+</div>
+
+<div th:if="${error != null}" class="alert alert-danger alert-dismissible fade show" role="alert">
+    <span th:text="${error}"></span>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+
+<div class="row g-4">
+    <!-- Create form -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-semibold">
+                <i class="bi bi-plus-circle"></i> Novo Ativo
+            </div>
+            <div class="card-body">
+                <form method="post" action="/assets/new">
+                    <div class="mb-3">
+                        <label class="form-label">Ticker <span class="text-danger">*</span></label>
+                        <input type="text" name="ticker" id="assetTicker"
+                               class="form-control"
+                               placeholder="Ex: PETR4" required maxlength="10"
+                               oninput="this.value = this.value.toUpperCase()"
+                               hx-get="/assets/ticker-info"
+                               hx-trigger="change, keyup changed delay:600ms"
+                               hx-target="#asset-ticker-preview"
+                               hx-include="this">
+                        <div id="asset-ticker-preview" class="mt-2"></div>
+                        <input type="hidden" id="assetYfTicker" name="yf_ticker" value="">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nome</label>
+                        <input type="text" id="assetName" name="name" class="form-control"
+                               placeholder="preenchido automaticamente">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo</label>
+                        <select id="assetType" name="type" class="form-select">
+                            <option th:each="t : ${assetTypes}" th:value="${t}" th:text="${t}"></option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Moeda</label>
+                        <select id="assetCurrency" name="currency" class="form-select">
+                            <option value="BRL" selected>BRL — Real</option>
+                            <option value="USD">USD — Dólar</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-lg"></i> Cadastrar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Asset list -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-semibold">
+                Ativos Cadastrados
+                <span class="badge bg-secondary ms-1" th:text="${#lists.size(assets)}"></span>
+            </div>
+            <div class="card-body p-0">
+                <div th:if="${!assets.isEmpty()}" class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Ticker</th>
+                                <th>Nome</th>
+                                <th>Tipo</th>
+                                <th>Moeda</th>
+                                <th>YF Ticker</th>
+                                <th class="text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="asset : ${assets}">
+                                <td class="fw-bold" th:text="${asset.ticker}"></td>
+                                <td class="text-muted" th:text="${asset.name != null ? asset.name : '—'}"></td>
+                                <td>
+                                    <span th:if="${asset.type != null}" th:replace="~{fragments/badge :: assetBadge(${asset.type})}"></span>
+                                    <span th:unless="${asset.type != null}">—</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border" th:text="${asset.currency != null ? asset.currency : 'BRL'}"></span>
+                                </td>
+                                <td class="text-muted small" th:text="${asset.yfTicker != null ? asset.yfTicker : '—'}"></td>
+                                <td class="text-center">
+                                    <a th:href="'/transactions/?ticker=' + ${#uris.escapeQueryParam(asset.ticker)}"
+                                       class="btn btn-sm btn-outline-secondary" title="Ver transações">
+                                        <i class="bi bi-list-ul"></i>
+                                    </a>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-primary"
+                                            title="Editar"
+                                            th:attr="data-asset-ticker=${asset.ticker},
+                                                     data-asset-name=${asset.name != null ? asset.name : ''},
+                                                     data-asset-type=${asset.type != null ? asset.type : 'STOCK'},
+                                                     data-asset-yf-ticker=${asset.yfTicker != null ? asset.yfTicker : ''},
+                                                     data-asset-currency=${asset.currency != null ? asset.currency : 'BRL'}"
+                                            onclick="openEditModal(this)">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <form method="post" th:action="'/assets/' + ${asset.ticker} + '/delete'"
+                                          class="d-inline"
+                                          th:attr="onsubmit=${'return confirm(\'Excluir ' + asset.ticker + '? As transações também serão removidas.\')'}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div th:if="${assets.isEmpty()}" class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox fs-1"></i>
+                    <p class="mt-2">Nenhum ativo cadastrado ainda.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit modal -->
+<div class="modal fade" id="editAssetModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> Editar Ativo — <span id="editModalTicker"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editAssetForm" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nome</label>
+                        <input type="text" id="editName" name="name" class="form-control" placeholder="Ex: Petrobras PN">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo</label>
+                        <select id="editType" name="type" class="form-select">
+                            <option th:each="t : ${assetTypes}" th:value="${t}" th:text="${t}"></option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">YF Ticker <span class="text-muted small">(Yahoo Finance)</span></label>
+                        <input type="text" id="editYfTicker" name="yf_ticker" class="form-control" placeholder="Ex: PETR4.SA">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Moeda</label>
+                        <select id="editCurrency" name="currency" class="form-select">
+                            <option value="BRL">BRL — Real</option>
+                            <option value="USD">USD — Dólar</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openEditModal(btn) {
+    const ticker   = btn.dataset.assetTicker;
+    const name     = btn.dataset.assetName;
+    const type     = btn.dataset.assetType || 'STOCK';
+    const yfTicker = btn.dataset.assetYfTicker || '';
+    const currency = btn.dataset.assetCurrency || 'BRL';
+    document.getElementById('editModalTicker').textContent = ticker;
+    document.getElementById('editAssetForm').action = '/assets/' + ticker + '/edit';
+    document.getElementById('editName').value = name;
+    document.getElementById('editYfTicker').value = yfTicker;
+    for (let opt of document.getElementById('editType').options)
+        opt.selected = opt.value === type;
+    for (let opt of document.getElementById('editCurrency').options)
+        opt.selected = opt.value === currency;
+    new bootstrap.Modal(document.getElementById('editAssetModal')).show();
+}
+</script>
+</div>
+</body>
+</html>

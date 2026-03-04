@@ -9,107 +9,150 @@
 
 | Camada | Tecnologia |
 |--------|-----------|
-| Backend | FastAPI |
-| ORM / DB | SQLAlchemy + SQLite |
-| Templates | Jinja2 + HTMX |
+| Linguagem | Kotlin (JDK 25) |
+| Backend | Spring Boot 3 |
+| ORM / DB | Exposed (DAO + DSL) + H2 |
+| Migrations | Flyway |
+| Templates | Thymeleaf + HTMX |
 | CSS | Bootstrap 5 (CDN) |
-| Cálculos | numpy-financial + pandas |
-| Runner | Uvicorn |
-| Scheduler | APScheduler (BackgroundScheduler) |
-| Testes | pytest + httpx + pytest-cov |
+| HTTP Client | Ktor Client (CIO) |
+| JSON | kotlinx.serialization + Jackson |
+| Scheduler | Spring @Scheduled |
+| Testes | Kotest + MockK + Spring Boot Test |
+| Build | Gradle (Kotlin DSL) |
 
 ## Estrutura
 
 ```
 stocks/
 ├── CLAUDE.md
-├── pyproject.toml
-├── requirements.txt
-├── run.py
-├── app/
-│   ├── main.py
-│   ├── database.py
-│   ├── models.py
-│   ├── schemas.py
-│   ├── constants.py
-│   ├── routers/
-│   │   ├── assets.py
-│   │   ├── transactions.py
-│   │   └── portfolio.py
-│   ├── services/
-│   │   ├── calculations.py
-│   │   ├── quotes.py
-│   │   ├── portfolio_service.py
-│   │   └── price_history_service.py
-│   ├── templates/
-│   │   ├── base.html
-│   │   ├── dashboard.html
-│   │   ├── assets.html
-│   │   └── transactions.html
-│   └── static/css/custom.css
-├── tests/
-│   ├── conftest.py
-│   ├── test_calculations.py
-│   ├── test_schemas.py
-│   ├── test_quotes.py
-│   ├── test_routers.py
-│   └── test_price_history.py
+├── build.gradle.kts
+├── settings.gradle.kts
+├── flake.nix
+├── src/
+│   ├── main/
+│   │   ├── kotlin/com/stocks/
+│   │   │   ├── StocksApplication.kt
+│   │   │   ├── config/
+│   │   │   │   ├── DatabaseConfig.kt
+│   │   │   │   ├── SchedulerConfig.kt
+│   │   │   │   └── WebConfig.kt
+│   │   │   ├── model/
+│   │   │   │   ├── Asset.kt
+│   │   │   │   ├── Transaction.kt
+│   │   │   │   └── PriceHistory.kt
+│   │   │   ├── dto/
+│   │   │   │   ├── Constants.kt
+│   │   │   │   ├── AssetDtos.kt
+│   │   │   │   ├── TransactionDtos.kt
+│   │   │   │   └── PortfolioDtos.kt
+│   │   │   ├── service/
+│   │   │   │   ├── CalculationService.kt
+│   │   │   │   ├── QuoteService.kt
+│   │   │   │   ├── PriceHistoryService.kt
+│   │   │   │   └── PortfolioService.kt
+│   │   │   └── controller/
+│   │   │       ├── AssetController.kt
+│   │   │       ├── TransactionController.kt
+│   │   │       └── PortfolioController.kt
+│   │   └── resources/
+│   │       ├── application.yml
+│   │       ├── templates/
+│   │       │   ├── base.html
+│   │       │   ├── dashboard.html
+│   │       │   ├── assets.html
+│   │       │   ├── transactions.html
+│   │       │   └── fragments/badge.html
+│   │       ├── static/
+│   │       │   ├── css/custom.css
+│   │       │   └── js/transactions.js
+│   │       └── db/migration/
+│   │           ├── V1__create_assets.sql
+│   │           ├── V2__create_transactions.sql
+│   │           └── V3__create_price_history.sql
+│   └── test/
+│       ├── kotlin/com/stocks/
+│       │   ├── TestSchedulerConfig.kt
+│       │   ├── service/
+│       │   │   ├── CalculationServiceTest.kt
+│       │   │   └── QuoteServiceTest.kt
+│       │   └── controller/
+│       │       ├── AssetControllerTest.kt
+│       │       ├── TransactionControllerTest.kt
+│       │       └── PortfolioControllerTest.kt
+│       └── resources/
+│           └── application-test.yml
 └── data/
-    └── stocks.db  (gerado automaticamente)
+    └── stocks.mv.db  (gerado automaticamente pelo H2)
 ```
 
-## Modelos
+## Modelos (Exposed)
 
-### Asset
-- `ticker` (PK), `yf_ticker`, `name`, `type` (STOCK/REIT/ETF/BDR/TESOURO_DIRETO), `currency` (BRL/USD), `created_at`
+### Assets (Table) / AssetEntity (DAO)
+- `ticker` (PK, String), `yfTicker`, `name`, `type` (STOCK/REIT/ETF/BDR/TESOURO_DIRETO), `currency` (BRL/USD), `createdAt`
 
-### Transaction
-- `id`, `asset_id` (FK → Asset.ticker), `type` (BUY/SELL), `quantity`, `price`, `fees`, `date`, `broker`, `notes`, `created_at`
+### Transactions (Table) / TransactionEntity (DAO)
+- `id` (PK, Int), `assetId` (FK → Assets), `type` (BUY/SELL), `quantity`, `price`, `fees`, `date`, `broker`, `notes`, `createdAt`
 
-### PriceHistory
-- `id`, `asset_id` (FK → Asset.ticker, CASCADE), `date`, `close`, `created_at`
-- Unique constraint on `(asset_id, date)`
-- Upsert via SQLite `INSERT OR REPLACE` (`on_conflict_do_update`)
+### PriceHistories (Table) / PriceHistoryEntity (DAO)
+- `id` (PK, Int), `assetId` (FK → Assets, CASCADE), `date`, `close`, `createdAt`
+- Unique constraint on `(assetId, date)`
+- Upsert via manual SELECT + INSERT/UPDATE
 
 ## Serviços
 
-### quotes.py
-- `fetch_quotes_batch` / `fetch_td_quotes_batch` — preços atuais (live)
-- `fetch_historical_quotes_batch(yf_ticker_map, start_date)` — histórico yfinance em batch
-- `fetch_td_historical_quotes_batch(yf_tickers)` — histórico Tesouro Direto (CSV completo)
-- Tesouro Direto: `yf_ticker` no formato `"Tipo Titulo;dd/mm/yyyy"`
+### QuoteService
+- `fetchQuotesBatch(yfTickers)` / `fetchTdQuotesBatch(yfTickers)` — preços atuais (live) via Yahoo Finance v8 API
+- `fetchHistoricalQuotesBatch(yfTickerMap, startDate)` — histórico via Yahoo Finance v8 API
+- `fetchTdHistoricalQuotesBatch(yfTickers)` — histórico Tesouro Direto (CSV completo)
+- `fetchExchangeRate(from, to)` — câmbio com cache de 5 minutos
+- `fetchAssetInfo(ticker)` — informações do ativo via Yahoo Finance
+- Tesouro Direto: `yfTicker` no formato `"Tipo Titulo;dd/mm/yyyy"`
 
-### price_history_service.py
-- `get_latest_price(ticker, db)` — preço mais recente no banco
-- `get_last_stored_date(ticker, db)` — data mais recente no banco
-- `upsert_prices(records, db)` — insere ou atualiza registros
-- `backfill_asset(asset, db)` — backfill individual
-- `run_backfill(db_factory)` — backfill de todos os ativos em batch
-- `run_daily_update(db_factory)` — atualiza preço do dia para todos os ativos
+### PriceHistoryService
+- `getLatestPrice(ticker)` — preço mais recente no banco
+- `getLastStoredDate(ticker)` — data mais recente no banco
+- `upsertPrices(records)` — insere ou atualiza registros
+- `runBackfill()` — backfill de todos os ativos em batch
+- `runDailyUpdate()` — atualiza preço do dia para todos os ativos
 
-### portfolio_service.py
-- `build_positions(assets, fetch_quotes=False, db=None)`
-  - Com `db`: usa preço do banco; fallback para API live se não houver registro
-  - Sem `db`: comportamento anterior (somente API live)
+### PortfolioService
+- `buildPositions(assets, fetchQuotes)` — constrói posições; usa preço do banco com fallback para API live
+- `aggregatePositions(positions)` — agrega posições em PortfolioSummary
 
-## Scheduler (APScheduler)
-- Configurado em `app/main.py` com timezone `America/Sao_Paulo`
-- **Startup**: executa `run_backfill` uma vez
-- **Diário às 18:30**: executa `run_daily_update`
-- Desabilitado graciosamente se `apscheduler` não estiver instalado
+### CalculationService
+- `calculatePosition(transactions)` — posição, preço médio, P&L realizado, cash flows
+- `calculateIrr(cashFlows, currentValue)` — IRR via Newton-Raphson
+- `calculateXirr(cashFlows, currentValue)` — XIRR via bisection
+- `calculateUnrealizedPnl(quantity, avgPrice, currentPrice)` — P&L não realizado
+
+## Scheduler (Spring @Scheduled)
+- Configurado em `config/SchedulerConfig.kt` com timezone `America/Sao_Paulo`
+- **Startup**: executa `runBackfill()` via `@EventListener(ApplicationReadyEvent)`
+- **Diário às 18:30**: executa `runDailyUpdate()` via `@Scheduled(cron = "0 30 18 * * *")`
+- Desabilitado em testes via `application-test.yml`
+
+## Ambiente de Desenvolvimento
+
+```bash
+# Via Nix (flake.nix inclui JDK 25, Gradle, Kotlin):
+nix develop
+
+# Via SDKMAN!:
+sdk install java 25-open
+```
 
 ## Como Rodar
 
 ```bash
-pip install -r requirements.txt
-python run.py
+./gradlew bootRun
 # Acesse: http://localhost:8000
-# Docs:   http://localhost:8000/docs
+# H2 Console: http://localhost:8000/h2-console
 ```
 
 ## Testes
 
 ```bash
-venv/bin/pytest tests/ -v
-venv/bin/pytest tests/ --cov=app --cov-report=term-missing
+./gradlew test
+./gradlew test --info  # verbose
 ```

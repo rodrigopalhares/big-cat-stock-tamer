@@ -1,7 +1,9 @@
 # Database
 data/stocks.db
+data/stocks.mv.db
+data/stocks.trace.db
 
-# Python
+# Python (legacy)
 __pycache__/
 *.py[cod]
 *.pyo
@@ -9,11 +11,19 @@ __pycache__/
 venv/
 *.egg-info/
 dist/
+
+# Kotlin / Gradle
 build/
+.gradle/
+out/
+*.class
+*.jar
+*.war
 
 # IDE
 .vscode/
 .idea/
+*.iml
 
 # OS
 .DS_Store
