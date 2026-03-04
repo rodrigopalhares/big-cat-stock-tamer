@@ -20,7 +20,9 @@ object Transactions : IntIdTable("transactions") {
     val createdAt = datetime("created_at").clientDefault { LocalDateTime.now() }
 }
 
-class TransactionEntity(id: EntityID<Int>) : IntEntity(id) {
+class TransactionEntity(
+    id: EntityID<Int>
+) : IntEntity(id) {
     companion object : IntEntityClass<TransactionEntity>(Transactions)
 
     var assetId by Transactions.assetId

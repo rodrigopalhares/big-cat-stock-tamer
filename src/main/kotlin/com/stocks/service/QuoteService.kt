@@ -14,8 +14,9 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 @Service
-class QuoteService(private val client: HttpClient) {
-
+class QuoteService(
+    private val client: HttpClient
+) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -33,8 +34,8 @@ class QuoteService(private val client: HttpClient) {
     // ---------- Asset info via Yahoo Finance v8 API ----------
 
     fun fetchAssetInfo(ticker: String): AssetInfo {
-        val fallbackYf = if ("." !in ticker) "${ticker}.SA" else ticker
-        val candidates = if ("." !in ticker) listOf("${ticker}.SA", ticker) else listOf(ticker)
+        val fallbackYf = if ("." !in ticker) "$ticker.SA" else ticker
+        val candidates = if ("." !in ticker) listOf("$ticker.SA", ticker) else listOf(ticker)
 
         for (yfTicker in candidates) {
             try {
@@ -44,11 +45,12 @@ class QuoteService(private val client: HttpClient) {
                 val quoteType = (info["quoteType"] ?: "").uppercase()
                 val sector = (info["sector"] ?: "").lowercase()
 
-                val assetType = when {
-                    quoteType == "ETF" -> "ETF"
-                    quoteType == "EQUITY" && "real estate" in sector -> "REIT"
-                    else -> "STOCK"
-                }
+                val assetType =
+                    when {
+                        quoteType == "ETF" -> "ETF"
+                        quoteType == "EQUITY" && "real estate" in sector -> "REIT"
+                        else -> "STOCK"
+                    }
 
                 var currency = (info["currency"] ?: "BRL").uppercase()
                 if (currency !in listOf("BRL", "USD")) currency = "BRL"
@@ -82,10 +84,13 @@ class QuoteService(private val client: HttpClient) {
         return results
     }
 
-    fun fetchExchangeRate(fromCurrency: String, toCurrency: String = "BRL"): Double {
+    fun fetchExchangeRate(
+        fromCurrency: String,
+        toCurrency: String = "BRL"
+    ): Double {
         if (fromCurrency == toCurrency) return 1.0
 
-        val key = "${fromCurrency}_${toCurrency}"
+        val key = "${fromCurrency}_$toCurrency"
         val now = Instant.now().epochSecond
 
         val cached = rateCache[key]
@@ -94,7 +99,7 @@ class QuoteService(private val client: HttpClient) {
         }
 
         try {
-            val yfPair = "${fromCurrency}${toCurrency}=X"
+            val yfPair = "${fromCurrency}$toCurrency=X"
             val price = fetchSingleQuote(yfPair)
             if (price != null && price > 0) {
                 rateCache[key] = price to now
@@ -172,11 +177,15 @@ class QuoteService(private val client: HttpClient) {
                 }
                 val (title, maturity) = yfTicker.split(";", limit = 2)
                 val matched = rows.filter { it.tipoTitulo == title && it.dataVencimento == maturity }
-                val records = matched.mapNotNull { row ->
-                    if (row.puCompraManha != null && row.puCompraManha > 0 && row.dataBase != null) {
-                        row.dataBase to row.puCompraManha
-                    } else null
-                }.sortedBy { it.first }
+                val records =
+                    matched
+                        .mapNotNull { row ->
+                            if (row.puCompraManha != null && row.puCompraManha > 0 && row.dataBase != null) {
+                                row.dataBase to row.puCompraManha
+                            } else {
+                                null
+                            }
+                        }.sortedBy { it.first }
                 if (records.isNotEmpty()) {
                     results[yfTicker] = records
                 }
@@ -196,9 +205,14 @@ class QuoteService(private val client: HttpClient) {
                 val response: HttpResponse = client.get(url)
                 val body = response.bodyAsText()
                 val jsonObj = json.parseToJsonElement(body).jsonObject
-                val result = jsonObj["chart"]?.jsonObject
-                    ?.get("result")?.jsonArray?.firstOrNull()?.jsonObject
-                    ?: return@runBlocking null
+                val result =
+                    jsonObj["chart"]
+                        ?.jsonObject
+                        ?.get("result")
+                        ?.jsonArray
+                        ?.firstOrNull()
+                        ?.jsonObject
+                        ?: return@runBlocking null
 
                 val meta = result["meta"]?.jsonObject ?: return@runBlocking null
                 val longName = meta["longName"]?.jsonPrimitive?.contentOrNull
@@ -229,12 +243,21 @@ class QuoteService(private val client: HttpClient) {
                 val response: HttpResponse = client.get(url)
                 val body = response.bodyAsText()
                 val jsonObj = json.parseToJsonElement(body).jsonObject
-                val result = jsonObj["chart"]?.jsonObject
-                    ?.get("result")?.jsonArray?.firstOrNull()?.jsonObject
-                    ?: return@runBlocking null
+                val result =
+                    jsonObj["chart"]
+                        ?.jsonObject
+                        ?.get("result")
+                        ?.jsonArray
+                        ?.firstOrNull()
+                        ?.jsonObject
+                        ?: return@runBlocking null
 
-                val price = result["meta"]?.jsonObject
-                    ?.get("regularMarketPrice")?.jsonPrimitive?.doubleOrNull
+                val price =
+                    result["meta"]
+                        ?.jsonObject
+                        ?.get("regularMarketPrice")
+                        ?.jsonPrimitive
+                        ?.doubleOrNull
 
                 if (price != null && price > 0) price else null
             } catch (e: Exception) {
@@ -244,28 +267,44 @@ class QuoteService(private val client: HttpClient) {
         }
     }
 
-    private fun fetchYahooHistorical(yfTicker: String, startDate: LocalDate): List<Pair<LocalDate, Double>> {
+    private fun fetchYahooHistorical(
+        yfTicker: String,
+        startDate: LocalDate
+    ): List<Pair<LocalDate, Double>> {
         return runBlocking {
             try {
                 val period1 = startDate.atStartOfDay().toEpochSecond(java.time.ZoneOffset.UTC)
                 val period2 = Instant.now().epochSecond
-                val url = "https://query1.finance.yahoo.com/v8/finance/chart/$yfTicker" +
-                    "?period1=$period1&period2=$period2&interval=1d"
+                val url =
+                    "https://query1.finance.yahoo.com/v8/finance/chart/$yfTicker" +
+                        "?period1=$period1&period2=$period2&interval=1d"
                 val response: HttpResponse = client.get(url)
                 val body = response.bodyAsText()
                 val jsonObj = json.parseToJsonElement(body).jsonObject
-                val result = jsonObj["chart"]?.jsonObject
-                    ?.get("result")?.jsonArray?.firstOrNull()?.jsonObject
-                    ?: return@runBlocking emptyList()
+                val result =
+                    jsonObj["chart"]
+                        ?.jsonObject
+                        ?.get("result")
+                        ?.jsonArray
+                        ?.firstOrNull()
+                        ?.jsonObject
+                        ?: return@runBlocking emptyList()
 
-                val timestamps = result["timestamp"]?.jsonArray?.map {
-                    it.jsonPrimitive.long
-                } ?: return@runBlocking emptyList()
+                val timestamps =
+                    result["timestamp"]?.jsonArray?.map {
+                        it.jsonPrimitive.long
+                    } ?: return@runBlocking emptyList()
 
-                val closes = result["indicators"]?.jsonObject
-                    ?.get("quote")?.jsonArray?.firstOrNull()?.jsonObject
-                    ?.get("close")?.jsonArray
-                    ?: return@runBlocking emptyList()
+                val closes =
+                    result["indicators"]
+                        ?.jsonObject
+                        ?.get("quote")
+                        ?.jsonArray
+                        ?.firstOrNull()
+                        ?.jsonObject
+                        ?.get("close")
+                        ?.jsonArray
+                        ?: return@runBlocking emptyList()
 
                 val records = mutableListOf<Pair<LocalDate, Double>>()
                 for (i in timestamps.indices) {
@@ -310,19 +349,24 @@ class QuoteService(private val client: HttpClient) {
                 val cols = lines[i].split(";")
                 if (cols.size <= maxOf(tipoIdx, vencIdx, baseIdx, puIdx)) continue
 
-                val dataBase = try {
-                    LocalDate.parse(cols[baseIdx], tdDateFormatter)
-                } catch (e: Exception) { null }
+                val dataBase =
+                    try {
+                        LocalDate.parse(cols[baseIdx], tdDateFormatter)
+                    } catch (e: Exception) {
+                        null
+                    }
 
                 val puStr = cols[puIdx].replace(",", ".")
                 val pu = puStr.toDoubleOrNull()
 
-                rows.add(TdCsvRow(
-                    tipoTitulo = cols[tipoIdx],
-                    dataVencimento = cols[vencIdx],
-                    dataBase = dataBase,
-                    puCompraManha = pu,
-                ))
+                rows.add(
+                    TdCsvRow(
+                        tipoTitulo = cols[tipoIdx],
+                        dataVencimento = cols[vencIdx],
+                        dataBase = dataBase,
+                        puCompraManha = pu,
+                    )
+                )
             } catch (e: Exception) {
                 continue
             }
@@ -336,9 +380,10 @@ class QuoteService(private val client: HttpClient) {
             return tdFullCsvCache!!
         }
 
-        val url = "https://www.tesourotransparente.gov.br/ckan/dataset/" +
-            "df56aa42-484a-4a59-8184-7676580c81e3/resource/" +
-            "796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv"
+        val url =
+            "https://www.tesourotransparente.gov.br/ckan/dataset/" +
+                "df56aa42-484a-4a59-8184-7676580c81e3/resource/" +
+                "796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv"
 
         return try {
             val csvText = runBlocking { client.get(url).bodyAsText() }

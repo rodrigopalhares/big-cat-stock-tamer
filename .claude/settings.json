@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file_path=$(cat - | jq -r '.tool_input.file_path // empty') && if [[ \"$file_path\" == *.kt || \"$file_path\" == *.kts ]]; then cd /c/ws/stocks && ./gradlew ktlintFormat --quiet 2>&1; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file_path=$(cat - | jq -r '.tool_input.file_path // empty') && if [[ \"$file_path\" == *.kt || \"$file_path\" == *.kts ]]; then cd /c/ws/stocks && ./gradlew test --quiet 2>&1; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

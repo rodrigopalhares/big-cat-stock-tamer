@@ -9,7 +9,6 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 
 @Configuration
 class WebConfig : WebMvcConfigurer {
-
     override fun addViewControllers(registry: ViewControllerRegistry) {
         registry.addRedirectViewController("/", "/portfolio/")
     }
@@ -17,7 +16,6 @@ class WebConfig : WebMvcConfigurer {
 
 @ControllerAdvice
 class GlobalModelAttributes {
-
     @ModelAttribute("requestURI")
     fun requestURI(request: HttpServletRequest): String = request.requestURI
 }

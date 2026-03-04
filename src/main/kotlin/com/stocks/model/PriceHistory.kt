@@ -19,7 +19,9 @@ object PriceHistories : IntIdTable("price_history") {
     }
 }
 
-class PriceHistoryEntity(id: EntityID<Int>) : IntEntity(id) {
+class PriceHistoryEntity(
+    id: EntityID<Int>
+) : IntEntity(id) {
     companion object : IntEntityClass<PriceHistoryEntity>(PriceHistories)
 
     var assetId by PriceHistories.assetId

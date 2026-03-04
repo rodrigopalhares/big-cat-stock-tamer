@@ -3,8 +3,6 @@ package com.stocks.controller
 import com.stocks.dto.AssetPosition
 import com.stocks.dto.PortfolioSummary
 import com.stocks.model.AssetEntity
-import com.stocks.model.Assets
-import com.stocks.model.Transactions
 import com.stocks.service.PortfolioService
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.springframework.http.HttpStatus
@@ -18,20 +16,20 @@ import org.springframework.web.server.ResponseStatusException
 class PortfolioController(
     private val portfolioService: PortfolioService,
 ) {
-
     // --- HTML Routes ---
 
     @GetMapping("/")
     fun dashboard(model: Model): String {
-        val (positions, summary) = transaction {
-            val assets = AssetEntity.all().toList()
-            // Eagerly load transactions
-            assets.forEach { it.transactions.toList() }
+        val (positions, summary) =
+            transaction {
+                val assets = AssetEntity.all().toList()
+                // Eagerly load transactions
+                assets.forEach { it.transactions.toList() }
 
-            val positions = portfolioService.buildPositions(assets, fetchQuotes = true)
-            val summary = portfolioService.aggregatePositions(positions)
-            positions to summary
-        }
+                val positions = portfolioService.buildPositions(assets, fetchQuotes = true)
+                val summary = portfolioService.aggregatePositions(positions)
+                positions to summary
+            }
 
         model.addAttribute("positions", positions)
         model.addAttribute("totalInvested", summary.totalInvested)
@@ -51,22 +49,24 @@ class PortfolioController(
 
     @GetMapping("/api")
     @ResponseBody
-    fun portfolioSummary(): PortfolioSummary {
-        return transaction {
+    fun portfolioSummary(): PortfolioSummary =
+        transaction {
             val assets = AssetEntity.all().toList()
             assets.forEach { it.transactions.toList() }
 
             val positions = portfolioService.buildPositions(assets, fetchQuotes = true)
             portfolioService.aggregatePositions(positions)
         }
-    }
 
     @GetMapping("/api/{ticker}")
     @ResponseBody
-    fun assetPosition(@PathVariable ticker: String): AssetPosition {
-        return transaction {
-            val asset = AssetEntity.findById(ticker.uppercase())
-                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found")
+    fun assetPosition(
+        @PathVariable ticker: String
+    ): AssetPosition =
+        transaction {
+            val asset =
+                AssetEntity.findById(ticker.uppercase())
+                    ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found")
             asset.transactions.toList()
 
             val positions = portfolioService.buildPositions(listOf(asset), fetchQuotes = true)
@@ -75,5 +75,4 @@ class PortfolioController(
             }
             positions[0]
         }
-    }
 }
