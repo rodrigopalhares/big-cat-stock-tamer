@@ -1,0 +1,29 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "BRL",
+          "symbol": "ZERO3.SA",
+          "exchangeName": "SAO",
+          "instrumentType": "EQUITY",
+          "regularMarketPrice": 0.0,
+          "shortName": "ZERO CORP"
+        },
+        "timestamp": [1709856000],
+        "indicators": {
+          "quote": [
+            {
+              "open": [0.0],
+              "high": [0.0],
+              "low": [0.0],
+              "close": [0.0],
+              "volume": [0]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

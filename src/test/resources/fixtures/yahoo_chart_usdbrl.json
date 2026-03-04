@@ -1,0 +1,30 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "BRL",
+          "symbol": "USDBRL=X",
+          "exchangeName": "CCY",
+          "fullExchangeName": "CCY",
+          "instrumentType": "CURRENCY",
+          "regularMarketPrice": 5.85,
+          "shortName": "USD/BRL"
+        },
+        "timestamp": [1709856000],
+        "indicators": {
+          "quote": [
+            {
+              "open": [5.80],
+              "high": [5.90],
+              "low": [5.78],
+              "close": [5.85],
+              "volume": [0]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

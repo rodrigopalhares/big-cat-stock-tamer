@@ -1,0 +1,26 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "BRL",
+          "symbol": "HGLG11.SA",
+          "exchangeName": "SAO",
+          "instrumentType": "EQUITY",
+          "regularMarketPrice": 160.00,
+          "longName": "CSHG Logística FII",
+          "shortName": "FII CSHG LOG CI ER"
+        },
+        "timestamp": [1709856000],
+        "indicators": {
+          "quote": [
+            {
+              "close": [160.00]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}

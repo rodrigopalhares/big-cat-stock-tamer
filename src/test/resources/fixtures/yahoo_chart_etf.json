@@ -1,0 +1,31 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "BRL",
+          "symbol": "BOVA11.SA",
+          "exchangeName": "SAO",
+          "fullExchangeName": "São Paulo",
+          "instrumentType": "ETF",
+          "regularMarketPrice": 128.50,
+          "longName": "iShares Ibovespa Fundo de Índice",
+          "shortName": "ISHARES BOVA CI"
+        },
+        "timestamp": [1709856000],
+        "indicators": {
+          "quote": [
+            {
+              "open": [127.80],
+              "high": [129.00],
+              "low": [127.50],
+              "close": [128.50],
+              "volume": [5000000]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}
