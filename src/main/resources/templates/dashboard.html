@@ -173,81 +173,9 @@
 
 <th:block th:replace="~{base :: scripts}"></th:block>
 
-<script th:if="${hasEvolutionData}" th:inline="javascript">
-document.addEventListener('DOMContentLoaded', function() {
-    const labels = /*[[${chartLabels}]]*/ '[]';
-    const datasets = /*[[${chartDatasets}]]*/ '[]';
-    const investedLine = /*[[${chartInvestedLine}]]*/ '[]';
-
-    const chartLabels = JSON.parse(labels);
-    const rawDatasets = JSON.parse(datasets);
-    const investedData = JSON.parse(investedLine);
-
-    const typeColors = {
-        'BDR':            { bg: 'rgba(255, 159, 64, 0.6)',  border: 'rgb(255, 159, 64)' },
-        'ETF':            { bg: 'rgba(75, 192, 192, 0.6)',  border: 'rgb(75, 192, 192)' },
-        'REIT':           { bg: 'rgba(153, 102, 255, 0.6)', border: 'rgb(153, 102, 255)' },
-        'STOCK':          { bg: 'rgba(54, 162, 235, 0.6)',  border: 'rgb(54, 162, 235)' },
-        'TESOURO_DIRETO': { bg: 'rgba(255, 205, 86, 0.6)',  border: 'rgb(255, 205, 86)' },
-    };
-
-    const areaDatasets = rawDatasets.map(function(ds) {
-        const colors = typeColors[ds.label] || { bg: 'rgba(201, 203, 207, 0.6)', border: 'rgb(201, 203, 207)' };
-        return {
-            label: ds.label,
-            data: ds.data,
-            fill: true,
-            backgroundColor: colors.bg,
-            borderColor: colors.border,
-            borderWidth: 1,
-            pointRadius: 0,
-            pointHitRadius: 10,
-            order: 2,
-        };
-    });
-
-    areaDatasets.push({
-        label: 'Total Investido',
-        data: investedData,
-        fill: false,
-        backgroundColor: 'transparent',
-        borderColor: 'rgb(220, 53, 69)',
-        borderWidth: 2,
-        borderDash: [6, 3],
-        pointRadius: 0,
-        pointHitRadius: 10,
-        order: 1,
-    });
-
-    new Chart(document.getElementById('evolutionChart'), {
-        type: 'line',
-        data: { labels: chartLabels, datasets: areaDatasets },
-        options: {
-            responsive: true,
-            interaction: { mode: 'index', intersect: false },
-            scales: {
-                x: { grid: { display: false } },
-                y: {
-                    stacked: true,
-                    ticks: {
-                        callback: function(v) { return 'R$ ' + v.toLocaleString('pt-BR'); }
-                    }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(ctx) {
-                            return ctx.dataset.label + ': R$ ' + ctx.parsed.y.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
-                        }
-                    }
-                },
-                legend: { position: 'bottom' }
-            }
-        }
-    });
-});
-</script>
+<div th:if="${hasEvolutionData}" id="evolution-data" hidden
+     th:attr="data-labels=${chartLabels},data-datasets=${chartDatasets},data-invested=${chartInvestedLine}"></div>
+<script th:if="${hasEvolutionData}" src="/js/dashboard.js"></script>
 
 </body>
 </html>
