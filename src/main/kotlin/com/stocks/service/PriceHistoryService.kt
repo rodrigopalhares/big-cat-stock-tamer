@@ -8,8 +8,10 @@ import org.springframework.stereotype.Service
 import java.time.LocalDate
 
 // Resolves Yahoo Finance ticker from asset ticker
-fun resolveYfTicker(ticker: String, yfTicker: String?): String =
-    yfTicker ?: if ("." !in ticker) "$ticker.SA" else ticker
+fun resolveYfTicker(
+    ticker: String,
+    yfTicker: String?
+): String = yfTicker ?: if ("." !in ticker) "$ticker.SA" else ticker
 
 // Data class for asset categorization input
 data class AssetTickerInfo(
@@ -141,7 +143,10 @@ class PriceHistoryService(
             // yfinance batch
             if (maps.yfTickerMap.isNotEmpty()) {
                 try {
-                    val earliest = maps.yfTickerMap.values.mapNotNull { startDates[it] }.minOrNull() ?: today
+                    val earliest =
+                        maps.yfTickerMap.values
+                            .mapNotNull { startDates[it] }
+                            .minOrNull() ?: today
                     val batch = quoteService.fetchHistoricalQuotesBatch(maps.yfTickerMap, earliest)
                     val records =
                         filterBatchToRecords(batch) { ticker, date ->

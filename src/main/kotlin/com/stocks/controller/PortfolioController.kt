@@ -1,13 +1,12 @@
 package com.stocks.controller
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.stocks.dto.AssetPosition
 import com.stocks.dto.PortfolioSummary
 import com.stocks.model.AssetEntity
-import com.stocks.model.Assets
 import com.stocks.service.MonthlyEvolutionService
 import com.stocks.service.PortfolioService
 import com.stocks.service.PriceHistoryService
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Controller
@@ -54,22 +53,25 @@ class PortfolioController(
 
         // Evolution chart data grouped by asset type
         val evolution = monthlyEvolutionService.getEvolution()
-        val assetTypeMap = transaction {
-            AssetEntity.all().toList().associate { it.ticker.value to (it.type ?: "STOCK") }
-        }
+        val assetTypeMap =
+            transaction {
+                AssetEntity.all().toList().associate { it.ticker.value to (it.type ?: "STOCK") }
+            }
 
         val chartLabels = evolution.months.map { it.month.format(monthFormatter) }
         val assetTypes = assetTypeMap.values.distinct().sorted()
 
-        val chartDatasets = assetTypes.map { type ->
-            val tickersOfType = assetTypeMap.filterValues { it == type }.keys
-            val data = evolution.months.map { row ->
-                row.snapshots
-                    .filter { it.assetId in tickersOfType }
-                    .sumOf { it.marketValue }
+        val chartDatasets =
+            assetTypes.map { type ->
+                val tickersOfType = assetTypeMap.filterValues { it == type }.keys
+                val data =
+                    evolution.months.map { row ->
+                        row.snapshots
+                            .filter { it.assetId in tickersOfType }
+                            .sumOf { it.marketValue }
+                    }
+                mapOf("label" to type, "data" to data)
             }
-            mapOf("label" to type, "data" to data)
-        }
 
         val investedLine = evolution.months.map { it.totalInvested }
 

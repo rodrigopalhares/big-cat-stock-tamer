@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="csvPreview">
+    <div th:if="${rows.isEmpty()}" class="alert alert-warning">
+        Nenhuma linha válida encontrada no CSV.
+    </div>
+
+    <div th:if="${!rows.isEmpty()}">
+        <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
+            <table class="table table-sm table-bordered align-middle small" id="csvPreviewTable">
+                <thead class="table-light sticky-top">
+                    <tr>
+                        <th>#</th>
+                        <th>Ticker</th>
+                        <th>Data</th>
+                        <th>Tipo</th>
+                        <th class="text-end">Qtd</th>
+                        <th class="text-end">Preço</th>
+                        <th class="text-end">Taxas</th>
+                        <th>Corretora</th>
+                        <th>Notas</th>
+                        <th>Moeda</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="row : ${rows}"
+                        th:classappend="${row.error != null} ? 'table-danger' : ''">
+                        <td>
+                            <span th:text="${row.rowIndex + 1}"></span>
+                            <span th:if="${row.error != null}" class="badge bg-danger ms-1"
+                                  th:title="${row.error}">Erro</span>
+                        </td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm csv-field"
+                                   data-field="ticker" th:value="${row.ticker}"
+                                   th:disabled="${row.error != null}" style="width:80px">
+                        </td>
+                        <td>
+                            <input type="date" class="form-control form-control-sm csv-field"
+                                   data-field="date" th:value="${row.date}"
+                                   th:disabled="${row.error != null}" style="width:140px">
+                        </td>
+                        <td>
+                            <select class="form-select form-select-sm csv-field"
+                                    data-field="type" th:disabled="${row.error != null}" style="width:90px">
+                                <option value="BUY" th:selected="${row.type == 'BUY'}">Compra</option>
+                                <option value="SELL" th:selected="${row.type == 'SELL'}">Venda</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm csv-field text-end"
+                                   data-field="quantity" th:value="${row.quantity}" step="0.0001"
+                                   th:disabled="${row.error != null}" style="width:100px">
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm csv-field text-end"
+                                   data-field="price" th:value="${row.price}" step="0.0001"
+                                   th:disabled="${row.error != null}" style="width:100px">
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm csv-field text-end"
+                                   data-field="fees" th:value="${row.fees}" step="0.01"
+                                   th:disabled="${row.error != null}" style="width:80px">
+                        </td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm csv-field"
+                                   data-field="broker" th:value="${row.broker}"
+                                   th:disabled="${row.error != null}" style="width:80px">
+                        </td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm csv-field"
+                                   data-field="notes" th:value="${row.notes}"
+                                   th:disabled="${row.error != null}" style="width:120px">
+                        </td>
+                        <td>
+                            <select class="form-select form-select-sm csv-field"
+                                    data-field="currency" th:disabled="${row.error != null}" style="width:70px">
+                                <option value="BRL" th:selected="${row.currency == 'BRL'}">BRL</option>
+                                <option value="USD" th:selected="${row.currency == 'USD'}">USD</option>
+                            </select>
+                        </td>
+                        <td>
+                            <span th:if="${row.error != null}" class="badge bg-danger" th:text="${row.error}"></span>
+                            <span th:if="${row.error == null && row.assetStatus.name() == 'EXISTS'}"
+                                  class="badge bg-success">Existente</span>
+                            <span th:if="${row.error == null && row.assetStatus.name() == 'WILL_CREATE'}"
+                                  class="badge bg-info">Novo</span>
+                            <span th:if="${row.error == null && row.assetStatus.name() == 'UNKNOWN'}"
+                                  class="badge bg-warning text-dark">Desconhecido</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <span class="text-muted small">
+                <span th:text="${rows.size()}"></span> linhas processadas
+                <span th:if="${rows.?[error != null].size() > 0}" class="text-danger ms-2">
+                    (<span th:text="${rows.?[error != null].size()}"></span> com erro)
+                </span>
+            </span>
+            <button type="button" class="btn btn-primary" onclick="batchSubmit()"
+                    th:disabled="${rows.?[error == null].isEmpty()}">
+                <i class="bi bi-check-lg"></i> Confirmar Importação
+                (<span th:text="${rows.?[error == null].size()}"></span> transações)
+            </button>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -7,6 +7,44 @@
 <div class="container-fluid py-4 px-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0"><i class="bi bi-arrow-left-right"></i> Transações</h2>
+        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#csvImportModal">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Importar CSV
+        </button>
+    </div>
+
+    <!-- CSV Import Modal -->
+    <div class="modal fade" id="csvImportModal" tabindex="-1" aria-labelledby="csvImportModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="csvImportModalLabel">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> Importar Transações via CSV
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Cole os dados do CSV (separado por tab):</label>
+                        <textarea id="csvTextarea" name="csv" class="form-control font-monospace" rows="6"
+                            placeholder="PETR4&#9;01/01/2024&#9;C&#9;100&#9;25,50&#9;10,00&#9;XP&#9;0&#9;BRL&#9;"></textarea>
+                        <div class="form-text">
+                            Formato: ticker &lt;tab&gt; data &lt;tab&gt; C/V &lt;tab&gt; qtd &lt;tab&gt; preço &lt;tab&gt; taxas &lt;tab&gt; corretora &lt;tab&gt; irrf &lt;tab&gt; moeda &lt;tab&gt; notas
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary mb-3"
+                        hx-post="/transactions/parse-csv"
+                        hx-include="#csvTextarea"
+                        hx-target="#csv-preview-area"
+                        hx-indicator="#csv-spinner">
+                        <i class="bi bi-arrow-repeat"></i> Processar
+                    </button>
+                    <span id="csv-spinner" class="htmx-indicator">
+                        <span class="spinner-border spinner-border-sm" role="status"></span> Processando...
+                    </span>
+                    <div id="csv-preview-area"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="row g-4">

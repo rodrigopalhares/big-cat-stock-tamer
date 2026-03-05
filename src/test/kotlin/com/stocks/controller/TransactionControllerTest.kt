@@ -126,4 +126,73 @@ class TransactionControllerTest(
                 .perform(delete("/transactions/api/9999"))
                 .andExpect(status().isNotFound)
         }
+
+        // --- CSV Batch Import Tests ---
+
+        test("parse csv returns html fragment with preview table") {
+            transaction {
+                AssetEntity.new("PETR4") {
+                    name = "Petrobras"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+            }
+
+            mockMvc
+                .perform(
+                    post("/transactions/parse-csv")
+                        .param("csv", "PETR4\t01/06/2024\tC\t100\t25,50\t10,00\tXP\t0\tBRL\t")
+                ).andExpect(status().isOk)
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("csvPreviewTable")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("PETR4")))
+        }
+
+        test("parse csv with invalid date returns error indicator") {
+            mockMvc
+                .perform(
+                    post("/transactions/parse-csv")
+                        .param("csv", "PETR4\t2024-06-01\tC\t100\t25,50\t0\tXP\t0\tBRL\t")
+                ).andExpect(status().isOk)
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("table-danger")))
+        }
+
+        test("batch insert creates transactions") {
+            transaction {
+                AssetEntity.new("PETR4") {
+                    name = "Petrobras"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+            }
+
+            val body =
+                """
+                {
+                    "rows": [
+                        {
+                            "ticker": "PETR4",
+                            "date": "2024-06-01",
+                            "type": "BUY",
+                            "quantity": 100.0,
+                            "price": 25.50,
+                            "fees": 10.0,
+                            "broker": "XP",
+                            "notes": "",
+                            "currency": "BRL"
+                        }
+                    ]
+                }
+                """.trimIndent()
+
+            mockMvc
+                .perform(
+                    post("/transactions/batch")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                ).andExpect(status().isOk)
+                .andExpect(jsonPath("$.inserted").value(1))
+
+            val count = transaction { TransactionEntity.all().count() }
+            assert(count == 1L) { "Expected 1 transaction, got $count" }
+        }
     })
