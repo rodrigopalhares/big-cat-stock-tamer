@@ -1,7 +1,10 @@
 package com.stocks.controller
 
+import com.stocks.dto.AssetStatus
+import com.stocks.dto.BatchRequest
 import com.stocks.dto.TransactionRequest
 import com.stocks.dto.TransactionResponse
+import com.stocks.dto.parseCsvRows
 import com.stocks.model.AssetEntity
 import com.stocks.model.TransactionEntity
 import com.stocks.service.QuoteService
@@ -165,6 +168,64 @@ class TransactionController(
             tx.delete()
         }
         return "redirect:/transactions/"
+    }
+
+    // --- CSV Batch Import Routes ---
+
+    @PostMapping("/parse-csv")
+    fun parseCsv(
+        @RequestParam csv: String,
+        model: Model,
+    ): String {
+        val existingTickers = transaction { AssetEntity.all().map { it.ticker.value }.toSet() }
+
+        val rows =
+            parseCsvRows(csv, existingTickers) { ticker ->
+                val info = quoteService.fetchAssetInfo(ticker)
+                if (info.name != ticker) AssetStatus.WILL_CREATE else AssetStatus.UNKNOWN
+            }
+
+        model.addAttribute("rows", rows)
+        return "fragments/csv-preview :: csvPreview"
+    }
+
+    @PostMapping("/batch")
+    @ResponseBody
+    fun batchImport(
+        @RequestBody request: BatchRequest,
+    ): ResponseEntity<Map<String, Int>> {
+        var inserted = 0
+        transaction {
+            for (row in request.rows) {
+                val normalizedTicker = row.ticker.uppercase().trim()
+
+                // Look up or auto-create asset
+                var asset = AssetEntity.findById(normalizedTicker)
+                if (asset == null) {
+                    val info = quoteService.fetchAssetInfo(normalizedTicker)
+                    asset =
+                        AssetEntity.new(normalizedTicker) {
+                            yfTicker = info.yfTicker
+                            name = if (info.name != normalizedTicker) info.name else null
+                            this.type = info.type
+                            currency = info.currency
+                        }
+                }
+
+                TransactionEntity.new {
+                    assetId = normalizedTicker
+                    type = row.type.uppercase()
+                    quantity = row.quantity
+                    price = row.price
+                    fees = row.fees
+                    date = LocalDate.parse(row.date)
+                    broker = row.broker.ifBlank { null }
+                    notes = row.notes.ifBlank { null }
+                }
+                inserted++
+            }
+        }
+        return ResponseEntity.ok(mapOf("inserted" to inserted))
     }
 
     // --- JSON API Routes ---
