@@ -6,6 +6,7 @@ import com.stocks.model.AssetEntity
 import com.stocks.model.Assets
 import com.stocks.service.MonthlyEvolutionService
 import com.stocks.service.PortfolioService
+import com.stocks.service.PriceHistoryService
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.springframework.http.HttpStatus
@@ -20,6 +21,7 @@ import java.time.format.DateTimeFormatter
 class PortfolioController(
     private val portfolioService: PortfolioService,
     private val monthlyEvolutionService: MonthlyEvolutionService,
+    private val priceHistoryService: PriceHistoryService,
     private val objectMapper: ObjectMapper,
 ) {
     private val monthFormatter = DateTimeFormatter.ofPattern("MM/yyyy")
@@ -77,6 +79,13 @@ class PortfolioController(
         model.addAttribute("hasEvolutionData", evolution.months.isNotEmpty())
 
         return "dashboard"
+    }
+
+    @PostMapping("/update-prices")
+    @ResponseBody
+    fun updatePrices(): String {
+        priceHistoryService.runDailyUpdate()
+        return ""
     }
 
     // --- JSON API Routes ---
