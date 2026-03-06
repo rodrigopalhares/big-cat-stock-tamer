@@ -107,6 +107,17 @@ class QuoteServiceTest :
             info.yfTicker shouldBe "BOVA11.SA"
         }
 
+        test("fetchAssetInfo - Brazilian REIT (FII ending in 11) returns type=REIT") {
+            mockServer
+                .expect(requestTo(containsString("HGLG11.SA")))
+                .andRespond(withSuccess(loadFixture("yahoo_chart_reit.json"), MediaType.APPLICATION_JSON))
+
+            val info = service.fetchAssetInfo("HGLG11")
+            info.type shouldBe "REIT"
+            info.yfTicker shouldBe "HGLG11.SA"
+            info.name shouldBe "CSHG Logística FII"
+        }
+
         test("fetchAssetInfo - unknown ticker returns fallback AssetInfo") {
             mockServer
                 .expect(requestTo(containsString("XYZW99.SA")))

@@ -11,6 +11,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class QuoteService(
@@ -18,15 +19,18 @@ class QuoteService(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    // Rate cache: key -> (rate, timestamp_seconds)
-    private val rateCache = mutableMapOf<String, Pair<Double, Long>>()
+    private val rateCache = ConcurrentHashMap<String, Pair<Double, Long>>()
 
-    // Tesouro Direto full CSV cache
+    @Volatile
     private var tdFullCsvCache: List<TdCsvRow>? = null
+
+    @Volatile
     private var tdFullCsvTimestamp: Long = 0
 
-    // Tesouro Direto latest CSV cache
+    @Volatile
     private var tdLatestCsvCache: List<TdCsvRow>? = null
+
+    @Volatile
     private var tdLatestCsvTimestamp: Long = 0
 
     // ---------- Asset info via Yahoo Finance v8 API ----------
@@ -43,13 +47,12 @@ class QuoteService(
 
                 val name = meta.longName ?: meta.shortName ?: continue
                 val quoteType = (meta.instrumentType ?: "").uppercase()
+                val symbol = meta.symbol ?: yfTicker
 
-                // Note: Yahoo Finance v8 chart API doesn't provide sector directly in meta.
-                // We'll use quoteType and simple heuristics.
                 val assetType =
-                    when (quoteType) {
-                        "ETF" -> "ETF"
-                        "EQUITY" -> "STOCK" // Heuristic, REITs are often EQUITY here too
+                    when {
+                        quoteType == "ETF" -> "ETF"
+                        quoteType == "EQUITY" && isBrazilianReit(symbol, name) -> "REIT"
                         else -> "STOCK"
                     }
 
@@ -199,6 +202,20 @@ class QuoteService(
 
     // ---------- Private helpers ----------
 
+    private val reitNameKeywords = listOf("fii", "fundo de investimento imobili", "fdo inv imob")
+
+    private fun isBrazilianReit(
+        symbol: String,
+        name: String
+    ): Boolean {
+        val baseTicker = symbol.removeSuffix(".SA")
+        if (baseTicker.length >= 5 && baseTicker.endsWith("11") && baseTicker.dropLast(2).all { it.isLetter() }) {
+            return true
+        }
+        val lowerName = name.lowercase()
+        return reitNameKeywords.any { it in lowerName }
+    }
+
     private fun fetchYahooChart(
         yfTicker: String,
         range: String,
@@ -302,10 +319,11 @@ class QuoteService(
             emptyList()
         }
 
+    @Synchronized
     private fun getTdFullCsv(): List<TdCsvRow> {
         val now = Instant.now().epochSecond
-        if (tdFullCsvCache != null && now - tdFullCsvTimestamp < 3600) {
-            return tdFullCsvCache!!
+        tdFullCsvCache?.let { cache ->
+            if (now - tdFullCsvTimestamp < 3600) return cache
         }
 
         val url =
@@ -330,10 +348,11 @@ class QuoteService(
         }
     }
 
+    @Synchronized
     private fun getTdLatestCsv(): List<TdCsvRow> {
         val now = Instant.now().epochSecond
-        if (tdLatestCsvCache != null && now - tdLatestCsvTimestamp < 3600) {
-            return tdLatestCsvCache!!
+        tdLatestCsvCache?.let { cache ->
+            if (now - tdLatestCsvTimestamp < 3600) return cache
         }
 
         val allRows = getTdFullCsv()
