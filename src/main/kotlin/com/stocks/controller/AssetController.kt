@@ -3,9 +3,8 @@ package com.stocks.controller
 import com.stocks.dto.ASSET_TYPES
 import com.stocks.dto.AssetRequest
 import com.stocks.dto.AssetResponse
-import com.stocks.model.AssetEntity
+import com.stocks.service.AssetService
 import com.stocks.service.QuoteService
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Controller
@@ -17,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException
 @RequestMapping("/assets")
 class AssetController(
     private val quoteService: QuoteService,
+    private val assetService: AssetService,
 ) {
     // --- HTML Routes ---
 
@@ -28,8 +28,7 @@ class AssetController(
         val normalized = ticker.uppercase().trim()
         if (normalized.length < 3) return ""
 
-        val existing = transaction { AssetEntity.findById(normalized) }
-        if (existing != null) {
+        if (assetService.exists(normalized)) {
             return """<div class="alert alert-warning small p-2 mb-0">
                 <i class="bi bi-exclamation-circle me-1"></i>
                 <strong>$normalized</strong> já cadastrado
@@ -79,11 +78,7 @@ class AssetController(
 
     @GetMapping("/")
     fun listAssets(model: Model): String {
-        val assets =
-            transaction {
-                AssetEntity.all().sortedBy { it.ticker.value }.map { it.toResponse() }
-            }
-        model.addAttribute("assets", assets)
+        model.addAttribute("assets", assetService.findAll())
         model.addAttribute("assetTypes", ASSET_TYPES)
         return "assets"
     }
@@ -99,13 +94,8 @@ class AssetController(
     ): String {
         val normalizedTicker = ticker.uppercase().trim()
 
-        val existing = transaction { AssetEntity.findById(normalizedTicker) }
-        if (existing != null) {
-            val assets =
-                transaction {
-                    AssetEntity.all().sortedBy { it.ticker.value }.map { it.toResponse() }
-                }
-            model.addAttribute("assets", assets)
+        if (assetService.exists(normalizedTicker)) {
+            model.addAttribute("assets", assetService.findAll())
             model.addAttribute("assetTypes", ASSET_TYPES)
             model.addAttribute("error", "Ativo '$normalizedTicker' já cadastrado.")
             return "assets"
@@ -124,14 +114,15 @@ class AssetController(
             if (resolvedCurrency.isBlank()) resolvedCurrency = info.currency
         }
 
-        transaction {
-            AssetEntity.new(normalizedTicker) {
-                this.yfTicker = resolvedYfTicker.ifBlank { null }
-                this.name = resolvedName.ifBlank { null }
-                this.type = resolvedType.ifBlank { "STOCK" }
-                this.currency = resolvedCurrency.ifBlank { "BRL" }
-            }
-        }
+        assetService.create(
+            AssetRequest(
+                ticker = normalizedTicker,
+                yfTicker = resolvedYfTicker.ifBlank { null },
+                name = resolvedName.ifBlank { null },
+                type = resolvedType.ifBlank { "STOCK" },
+                currency = resolvedCurrency.ifBlank { "BRL" }
+            )
+        )
 
         return "redirect:/assets/"
     }
@@ -144,16 +135,7 @@ class AssetController(
         @RequestParam(name = "yf_ticker", defaultValue = "") yfTicker: String,
         @RequestParam(defaultValue = "BRL") currency: String,
     ): String {
-        val normalizedTicker = ticker.uppercase()
-        transaction {
-            val asset =
-                AssetEntity.findById(normalizedTicker)
-                    ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found")
-            asset.name = name.ifBlank { null }
-            asset.type = type.ifBlank { "STOCK" }
-            asset.yfTicker = yfTicker.ifBlank { null }
-            asset.currency = currency.ifBlank { "BRL" }
-        }
+        assetService.update(ticker, name, type, yfTicker, currency)
         return "redirect:/assets/"
     }
 
@@ -161,13 +143,7 @@ class AssetController(
     fun deleteAsset(
         @PathVariable ticker: String
     ): String {
-        val normalizedTicker = ticker.uppercase()
-        transaction {
-            val asset =
-                AssetEntity.findById(normalizedTicker)
-                    ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found")
-            asset.delete()
-        }
+        assetService.delete(ticker)
         return "redirect:/assets/"
     }
 
@@ -175,58 +151,20 @@ class AssetController(
 
     @GetMapping("/api")
     @ResponseBody
-    fun listAssetsApi(): List<AssetResponse> =
-        transaction {
-            AssetEntity.all().sortedBy { it.ticker.value }.map { it.toResponse() }
-        }
+    fun listAssetsApi(): List<AssetResponse> = assetService.findAll()
 
     @PostMapping("/api")
     @ResponseBody
     fun createAssetApi(
         @RequestBody request: AssetRequest
     ): ResponseEntity<AssetResponse> {
-        request.validate()
-        val normalizedTicker = request.normalizedTicker()
-
-        val existing = transaction { AssetEntity.findById(normalizedTicker) }
-        if (existing != null) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "Ticker already registered")
-        }
-
-        val asset =
-            transaction {
-                AssetEntity.new(normalizedTicker) {
-                    yfTicker = request.yfTicker
-                    name = request.name
-                    type = request.type ?: "STOCK"
-                    currency = request.currency
-                }
-            }
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(
-            transaction { asset.toResponse() }
-        )
+        val asset = assetService.create(request)
+        return ResponseEntity.status(HttpStatus.CREATED).body(asset)
     }
 
     @GetMapping("/api/{ticker}")
     @ResponseBody
     fun getAssetApi(
         @PathVariable ticker: String
-    ): AssetResponse =
-        transaction {
-            val asset =
-                AssetEntity.findById(ticker.uppercase())
-                    ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found")
-            asset.toResponse()
-        }
-
-    private fun AssetEntity.toResponse() =
-        AssetResponse(
-            ticker = ticker.value,
-            yfTicker = yfTicker,
-            name = name,
-            type = type,
-            currency = currency,
-            createdAt = createdAt,
-        )
+    ): AssetResponse = assetService.findById(ticker) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found")
 }

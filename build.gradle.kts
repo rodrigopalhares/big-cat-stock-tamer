@@ -5,7 +5,6 @@ plugins {
     id("io.spring.dependency-management") version "1.1.7"
     kotlin("jvm") version "2.1.10"
     kotlin("plugin.spring") version "2.1.10"
-    kotlin("plugin.serialization") version "2.1.10"
     jacoco
     id("org.jlleitschuh.gradle.ktlint") version "14.0.1"
 }
@@ -30,7 +29,6 @@ dependencies {
     // Kotlin
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
     // Exposed ORM
     implementation("org.jetbrains.exposed:exposed-core:0.57.0")
@@ -45,12 +43,6 @@ dependencies {
     // Flyway
     implementation("org.flywaydb:flyway-core")
 
-    // Ktor Client (for HTTP calls to Yahoo Finance / Tesouro Direto)
-    implementation("io.ktor:ktor-client-core:3.0.3")
-    implementation("io.ktor:ktor-client-cio:3.0.3")
-    implementation("io.ktor:ktor-client-content-negotiation:3.0.3")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
-
     // CSV parsing
     implementation("com.github.doyaaaaaken:kotlin-csv-jvm:1.10.0")
 
@@ -64,7 +56,6 @@ dependencies {
     testImplementation("io.kotest.extensions:kotest-extensions-spring:1.3.0")
     testImplementation("io.mockk:mockk:1.13.13")
     testImplementation("com.ninja-squad:springmockk:4.0.2")
-    testImplementation("io.ktor:ktor-client-mock:3.0.3")
 }
 
 kotlin {

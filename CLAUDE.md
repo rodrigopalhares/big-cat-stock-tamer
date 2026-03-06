@@ -1,197 +1,50 @@
-# Projeto: Gestão de Carteira de Ações Brasileiras
+# Stocks Application
 
-## Convenções de Código
+A personal stock portfolio tracking application built with Kotlin and Spring Boot.
 
-- **Todo o código deve ser escrito em inglês**: nomes de variáveis, funções, classes, comentários, docstrings e mensagens de log.
-- A interface do usuário (templates HTML, labels, mensagens de erro exibidas ao usuário) pode permanecer em português.
+## Development Commands
 
-## Stack
+- **Build**: `./gradlew build`
+- **Run**: `./gradlew bootRun`
+- **Test**: `./gradlew test`
+- **Linter**: `./gradlew ktlintCheck`
+- **Linter Fix**: `./gradlew ktlintFormat`
 
-| Camada | Tecnologia |
-|--------|-----------|
-| Linguagem | Kotlin (JDK 25) |
-| Backend | Spring Boot 3 |
+## Core Guidelines
+
+- **Kotlin First**: Use Kotlin-idiomatic patterns (extension functions, data classes, null safety).
+- **Simplicity**: Prefer simple solutions over complex abstractions.
+- **English Code**: All code (variables, functions, classes, comments) must be in English.
+- **Portuguese UI**: User interface (templates, labels, error messages) can remain in Portuguese.
+- **Surgical Changes**: Make focused changes and ensure verification with tests.
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Language | Kotlin (JDK 21+) |
+| Backend | Spring Boot 3.4 |
 | ORM / DB | Exposed (DAO + DSL) + H2 |
 | Migrations | Flyway |
 | Templates | Thymeleaf + HTMX |
-| CSS | Bootstrap 5 (CDN) |
-| HTTP Client | Ktor Client (CIO) |
-| JSON | kotlinx.serialization + Jackson |
+| CSS | Bootstrap 5 |
+| HTTP Client | RestClient (Spring) |
+| JSON | Jackson |
+| CSV | kotlin-csv-jvm |
 | Scheduler | Spring @Scheduled |
-| Testes | Kotest + MockK + SpringMockK + Spring Boot Test |
+| Tests | Kotest + MockK + SpringMockK + MockRestServiceServer |
 | Build | Gradle (Kotlin DSL) |
-| Linter | ktlint (via jlleitschuh plugin) |
+| Linter | ktlint |
 
-## Estrutura
+## Architecture
 
-```
-stocks/
-├── CLAUDE.md
-├── build.gradle.kts
-├── settings.gradle.kts
-├── flake.nix
-├── src/
-│   ├── main/
-│   │   ├── kotlin/com/stocks/
-│   │   │   ├── StocksApplication.kt
-│   │   │   ├── config/
-│   │   │   │   ├── HttpClientConfig.kt
-│   │   │   │   ├── SchedulerConfig.kt
-│   │   │   │   └── WebConfig.kt
-│   │   │   ├── model/
-│   │   │   │   ├── Asset.kt
-│   │   │   │   ├── Transaction.kt
-│   │   │   │   ├── PriceHistory.kt
-│   │   │   │   └── MonthlySnapshot.kt
-│   │   │   ├── dto/
-│   │   │   │   ├── Constants.kt
-│   │   │   │   ├── AssetDtos.kt
-│   │   │   │   ├── TransactionDtos.kt
-│   │   │   │   ├── PortfolioDtos.kt
-│   │   │   │   └── MonthlyEvolutionDtos.kt
-│   │   │   ├── service/
-│   │   │   │   ├── CalculationService.kt
-│   │   │   │   ├── QuoteService.kt
-│   │   │   │   ├── PriceHistoryService.kt
-│   │   │   │   ├── PortfolioService.kt
-│   │   │   │   └── MonthlyEvolutionService.kt
-│   │   │   └── controller/
-│   │   │       ├── AssetController.kt
-│   │   │       ├── TransactionController.kt
-│   │   │       ├── PortfolioController.kt
-│   │   │       └── MonthlyEvolutionController.kt
-│   │   └── resources/
-│   │       ├── application.yml
-│   │       ├── templates/
-│   │       │   ├── base.html
-│   │       │   ├── dashboard.html
-│   │       │   ├── assets.html
-│   │       │   ├── transactions.html
-│   │       │   ├── evolution.html
-│   │       │   └── fragments/badge.html
-│   │       ├── static/
-│   │       │   ├── css/custom.css
-│   │       │   └── js/transactions.js
-│   │       └── db/migration/
-│   │           ├── V1__create_assets.sql
-│   │           ├── V2__create_transactions.sql
-│   │           ├── V3__create_price_history.sql
-│   │           └── V4__create_monthly_snapshots.sql
-│   └── test/
-│       ├── kotlin/com/stocks/
-│       │   ├── TestSchedulerConfig.kt
-│       │   ├── service/
-│       │   │   ├── CalculationServiceTest.kt
-│       │   │   ├── QuoteServiceTest.kt
-│       │   │   ├── PriceHistoryServiceTest.kt
-│       │   │   └── MonthlyEvolutionServiceTest.kt
-│       │   └── controller/
-│       │       ├── AssetControllerTest.kt
-│       │       ├── TransactionControllerTest.kt
-│       │       ├── PortfolioControllerTest.kt
-│       │       └── MonthlyEvolutionControllerTest.kt
-│       └── resources/
-│           └── application-test.yml
-└── data/
-    └── stocks.mv.db  (gerado automaticamente pelo H2)
-```
+- **Controller**: Handles web requests and HTMX partials.
+- **Service**: Contains business logic and transaction boundaries.
+- **DTO**: Data Transfer Objects for API and internal data movement.
+- **Model**: Exposed DAO entities and table definitions.
+- **Config**: Application configuration (Security, HTTP, etc.).
 
-## Modelos (Exposed)
+## Database
 
-### Assets (Table) / AssetEntity (DAO)
-- `ticker` (PK, String), `yfTicker`, `name`, `type` (STOCK/REIT/ETF/BDR/TESOURO_DIRETO), `currency` (BRL/USD), `createdAt`
-
-### Transactions (Table) / TransactionEntity (DAO)
-- `id` (PK, Int), `assetId` (FK → Assets), `type` (BUY/SELL), `quantity`, `price`, `fees`, `date`, `broker`, `notes`, `createdAt`
-
-### PriceHistories (Table) / PriceHistoryEntity (DAO)
-- `id` (PK, Int), `assetId` (FK → Assets, CASCADE), `date`, `close`, `createdAt`
-- Unique constraint on `(assetId, date)`
-- Upsert via manual SELECT + INSERT/UPDATE
-
-### MonthlySnapshots (Table) / MonthlySnapshotEntity (DAO)
-- `id` (PK, Int), `assetId` (FK → Assets), `month`, `quantity`, `avgPrice`, `marketPrice`, `totalCost`, `marketValue`, `createdAt`
-- Unique constraint on `(assetId, month)`
-
-## Serviços
-
-### QuoteService
-- `fetchQuotesBatch(yfTickers)` / `fetchTdQuotesBatch(yfTickers)` — preços atuais (live) via Yahoo Finance v8 API
-- `fetchHistoricalQuotesBatch(yfTickerMap, startDate)` — histórico via Yahoo Finance v8 API
-- `fetchTdHistoricalQuotesBatch(yfTickers)` — histórico Tesouro Direto (CSV completo)
-- `fetchExchangeRate(from, to)` — câmbio com cache de 5 minutos
-- `fetchAssetInfo(ticker)` — informações do ativo via Yahoo Finance
-- Tesouro Direto: `yfTicker` no formato `"Tipo Titulo;dd/mm/yyyy"`
-
-### PriceHistoryService
-- `getLatestPrice(ticker)` — preço mais recente no banco
-- `getLastStoredDate(ticker)` — data mais recente no banco
-- `upsertPrices(records)` — insere ou atualiza registros
-- `runBackfill()` — backfill de todos os ativos em batch
-- `runDailyUpdate()` — atualiza preço do dia para todos os ativos
-
-#### Funções puras (top-level em PriceHistoryService.kt)
-- `resolveYfTicker(ticker, yfTicker)` — resolve yfTicker; usada também por `PortfolioService`
-- `categorizeAssets(assets)` → `TickerMaps` — separa ativos em maps Yahoo Finance vs Tesouro Direto
-- `filterBatchToRecords(batch, tickerResolver, datePredicate)` — filtra batch API em `List<PriceRecord>`
-- Data classes: `AssetTickerInfo`, `TickerMaps`, `PriceRecord`
-
-### MonthlyEvolutionService
-- `findFirstTransactionMonth()` — mês da primeira transação
-- `generateMonthRange(start, end)` — gera range de YearMonth
-- `computePositionAtDate(transactions, date)` — posição em uma data
-- `getMonthEndPrice(assetId, month)` — preço no fim do mês via PriceHistories
-- `recalculate()` — recalcula snapshots mensais de todos os ativos
-- `getEvolution()` → `MonthlyEvolutionSummary` — retorna evolução mensal
-
-### PortfolioService
-- `buildPositions(assets, fetchQuotes)` — constrói posições; usa preço do banco com fallback para API live
-- `aggregatePositions(positions)` — agrega posições em PortfolioSummary
-
-### CalculationService
-- `calculatePosition(transactions)` — posição, preço médio, P&L realizado, cash flows
-- `calculateIrr(cashFlows, currentValue)` — IRR via Newton-Raphson
-- `calculateXirr(cashFlows, currentValue)` — XIRR via bisection
-- `calculateUnrealizedPnl(quantity, avgPrice, currentPrice)` — P&L não realizado
-
-## Scheduler (Spring @Scheduled)
-- Configurado em `config/SchedulerConfig.kt` com timezone `America/Sao_Paulo`
-- **Startup**: executa `runBackfill()` via `@EventListener(ApplicationReadyEvent)`
-- **Diário às 18:30**: executa `runDailyUpdate()` via `@Scheduled(cron = "0 30 18 * * *")`
-- Desabilitado em testes via `application-test.yml`
-
-## Ambiente de Desenvolvimento
-
-```bash
-# Via Nix (flake.nix inclui JDK 21+, Gradle, Kotlin):
-nix develop
-
-# Via SDKMAN!:
-sdk install java 21-open
-```
-
-## Como Rodar
-
-```bash
-./gradlew bootRun
-# Acesse: http://localhost:8000
-# H2 Console: http://localhost:8000/h2-console
-```
-
-## Testes
-
-```bash
-./gradlew test
-./gradlew test --info  # verbose
-```
-
-## Linting
-
-```bash
-./gradlew ktlintCheck   # verifica estilo (falha se houver violações)
-./gradlew ktlintFormat  # auto-formata todos os arquivos Kotlin
-```
-
-- Configurado via `.editorconfig` (seção `[*.{kt,kts}]`)
-- `ktlintCheck` roda automaticamente como parte de `./gradlew build`
-- Hooks do Claude Code (`.claude/settings.json`) rodam `ktlintFormat` e `test` após cada edição de arquivos `.kt`/`.kts`
+- Uses H2 file-based database stored in `./data/stocks.mv.db`.
+- Flyway migrations are located in `src/main/resources/db/migration`.
