@@ -222,6 +222,7 @@ class QuoteService(
         interval: String
     ): YahooChartResponse? {
         val url = "https://query1.finance.yahoo.com/v8/finance/chart/$yfTicker?range=$range&interval=$interval"
+        logger.info(url)
         return try {
             restClient
                 .get()
@@ -251,6 +252,7 @@ class QuoteService(
         val period1 = startDate.atStartOfDay().toEpochSecond(ZoneOffset.UTC)
         val period2 = Instant.now().epochSecond
         val url = "https://query1.finance.yahoo.com/v8/finance/chart/$yfTicker?period1=$period1&period2=$period2&interval=1d"
+        logger.info(url)
 
         return try {
             val response =
