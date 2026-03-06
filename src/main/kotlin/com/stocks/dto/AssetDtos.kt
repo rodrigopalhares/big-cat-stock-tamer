@@ -1,5 +1,6 @@
 package com.stocks.dto
 
+import com.stocks.model.AssetEntity
 import jakarta.validation.constraints.NotBlank
 import java.time.LocalDateTime
 
@@ -36,3 +37,13 @@ data class AssetInfo(
     val yfTicker: String,
     val currency: String = "BRL",
 )
+
+fun AssetEntity.toResponse() =
+    AssetResponse(
+        ticker = ticker.value,
+        yfTicker = yfTicker,
+        name = name,
+        type = type,
+        currency = currency,
+        createdAt = createdAt,
+    )

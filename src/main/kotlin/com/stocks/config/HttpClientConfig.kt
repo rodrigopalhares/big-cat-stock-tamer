@@ -1,12 +1,11 @@
 package com.stocks.config
 
-import io.ktor.client.*
-import io.ktor.client.engine.cio.*
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.web.client.RestClient
 
 @Configuration
 class HttpClientConfig {
     @Bean
-    fun httpClient(): HttpClient = HttpClient(CIO)
+    fun restClient(builder: RestClient.Builder): RestClient = builder.build()
 }

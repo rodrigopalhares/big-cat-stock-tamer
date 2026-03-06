@@ -1,24 +1,22 @@
 package com.stocks.service
 
+import com.github.doyaaaaaken.kotlincsv.dsl.csvReader
 import com.stocks.dto.AssetInfo
-import io.ktor.client.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.*
+import com.stocks.dto.YahooChartResponse
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import java.io.StringReader
+import org.springframework.web.client.RestClient
+import org.springframework.web.client.body
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 @Service
 class QuoteService(
-    private val client: HttpClient
+    private val restClient: RestClient
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
-    private val json = Json { ignoreUnknownKeys = true }
 
     // Rate cache: key -> (rate, timestamp_seconds)
     private val rateCache = mutableMapOf<String, Pair<Double, Long>>()
@@ -39,20 +37,23 @@ class QuoteService(
 
         for (yfTicker in candidates) {
             try {
-                val info = fetchYahooQuoteSummary(yfTicker) ?: continue
-                val name = info["longName"] ?: info["shortName"] ?: continue
+                val response = fetchYahooChart(yfTicker, "1d", "1d")
+                val result = response?.chart?.result?.firstOrNull() ?: continue
+                val meta = result.meta ?: continue
 
-                val quoteType = (info["quoteType"] ?: "").uppercase()
-                val sector = (info["sector"] ?: "").lowercase()
+                val name = meta.longName ?: meta.shortName ?: continue
+                val quoteType = (meta.instrumentType ?: "").uppercase()
 
+                // Note: Yahoo Finance v8 chart API doesn't provide sector directly in meta.
+                // We'll use quoteType and simple heuristics.
                 val assetType =
-                    when {
-                        quoteType == "ETF" -> "ETF"
-                        quoteType == "EQUITY" && "real estate" in sector -> "REIT"
+                    when (quoteType) {
+                        "ETF" -> "ETF"
+                        "EQUITY" -> "STOCK" // Heuristic, REITs are often EQUITY here too
                         else -> "STOCK"
                     }
 
-                var currency = (info["currency"] ?: "BRL").uppercase()
+                var currency = (meta.currency ?: "BRL").uppercase()
                 if (currency !in listOf("BRL", "USD")) currency = "BRL"
 
                 return AssetInfo(name = name, type = assetType, yfTicker = yfTicker, currency = currency)
@@ -198,126 +199,69 @@ class QuoteService(
 
     // ---------- Private helpers ----------
 
-    private fun fetchYahooQuoteSummary(yfTicker: String): Map<String, String>? {
-        return runBlocking {
-            try {
-                val url = "https://query1.finance.yahoo.com/v8/finance/chart/$yfTicker?range=1d&interval=1d"
-                val response: HttpResponse = client.get(url)
-                val body = response.bodyAsText()
-                val jsonObj = json.parseToJsonElement(body).jsonObject
-                val result =
-                    jsonObj["chart"]
-                        ?.jsonObject
-                        ?.get("result")
-                        ?.jsonArray
-                        ?.firstOrNull()
-                        ?.jsonObject
-                        ?: return@runBlocking null
-
-                val meta = result["meta"]?.jsonObject ?: return@runBlocking null
-                val longName = meta["longName"]?.jsonPrimitive?.contentOrNull
-                val shortName = meta["shortName"]?.jsonPrimitive?.contentOrNull
-                val currency = meta["currency"]?.jsonPrimitive?.contentOrNull
-                val quoteType = meta["instrumentType"]?.jsonPrimitive?.contentOrNull ?: ""
-
-                if (longName == null && shortName == null) return@runBlocking null
-
-                mapOf(
-                    "longName" to (longName ?: ""),
-                    "shortName" to (shortName ?: ""),
-                    "currency" to (currency ?: "BRL"),
-                    "quoteType" to quoteType,
-                    "sector" to "",
-                )
-            } catch (e: Exception) {
-                logger.debug("Yahoo quote summary error for $yfTicker: ${e.message}")
-                null
-            }
+    private fun fetchYahooChart(
+        yfTicker: String,
+        range: String,
+        interval: String
+    ): YahooChartResponse? {
+        val url = "https://query1.finance.yahoo.com/v8/finance/chart/$yfTicker?range=$range&interval=$interval"
+        return try {
+            restClient
+                .get()
+                .uri(url)
+                .retrieve()
+                .body<YahooChartResponse>()
+        } catch (e: Exception) {
+            logger.debug("Yahoo API error for $yfTicker: ${e.message}")
+            null
         }
     }
 
     private fun fetchSingleQuote(yfTicker: String): Double? {
-        return runBlocking {
-            try {
-                val url = "https://query1.finance.yahoo.com/v8/finance/chart/$yfTicker?range=1d&interval=1d"
-                val response: HttpResponse = client.get(url)
-                val body = response.bodyAsText()
-                val jsonObj = json.parseToJsonElement(body).jsonObject
-                val result =
-                    jsonObj["chart"]
-                        ?.jsonObject
-                        ?.get("result")
-                        ?.jsonArray
-                        ?.firstOrNull()
-                        ?.jsonObject
-                        ?: return@runBlocking null
-
-                val price =
-                    result["meta"]
-                        ?.jsonObject
-                        ?.get("regularMarketPrice")
-                        ?.jsonPrimitive
-                        ?.doubleOrNull
-
-                if (price != null && price > 0) price else null
-            } catch (e: Exception) {
-                logger.debug("Yahoo quote error for $yfTicker: ${e.message}")
-                null
-            }
-        }
+        val response = fetchYahooChart(yfTicker, "1d", "1d")
+        return response
+            ?.chart
+            ?.result
+            ?.firstOrNull()
+            ?.meta
+            ?.regularMarketPrice
     }
 
     private fun fetchYahooHistorical(
         yfTicker: String,
         startDate: LocalDate
     ): List<Pair<LocalDate, Double>> {
-        return runBlocking {
-            try {
-                val period1 = startDate.atStartOfDay().toEpochSecond(java.time.ZoneOffset.UTC)
-                val period2 = Instant.now().epochSecond
-                val url =
-                    "https://query1.finance.yahoo.com/v8/finance/chart/$yfTicker" +
-                        "?period1=$period1&period2=$period2&interval=1d"
-                val response: HttpResponse = client.get(url)
-                val body = response.bodyAsText()
-                val jsonObj = json.parseToJsonElement(body).jsonObject
-                val result =
-                    jsonObj["chart"]
-                        ?.jsonObject
-                        ?.get("result")
-                        ?.jsonArray
-                        ?.firstOrNull()
-                        ?.jsonObject
-                        ?: return@runBlocking emptyList()
+        val period1 = startDate.atStartOfDay().toEpochSecond(ZoneOffset.UTC)
+        val period2 = Instant.now().epochSecond
+        val url = "https://query1.finance.yahoo.com/v8/finance/chart/$yfTicker?period1=$period1&period2=$period2&interval=1d"
 
-                val timestamps =
-                    result["timestamp"]?.jsonArray?.map {
-                        it.jsonPrimitive.long
-                    } ?: return@runBlocking emptyList()
+        return try {
+            val response =
+                restClient
+                    .get()
+                    .uri(url)
+                    .retrieve()
+                    .body<YahooChartResponse>()
+            val result = response?.chart?.result?.firstOrNull() ?: return emptyList()
 
-                val closes =
-                    result["indicators"]
-                        ?.jsonObject
-                        ?.get("quote")
-                        ?.jsonArray
-                        ?.firstOrNull()
-                        ?.jsonObject
-                        ?.get("close")
-                        ?.jsonArray
-                        ?: return@runBlocking emptyList()
+            val timestamps = result.timestamp ?: return emptyList()
+            val closes =
+                result.indicators
+                    ?.quote
+                    ?.firstOrNull()
+                    ?.close ?: return emptyList()
 
-                val records = mutableListOf<Pair<LocalDate, Double>>()
-                for (i in timestamps.indices) {
-                    val close = closes.getOrNull(i)?.jsonPrimitive?.doubleOrNull ?: continue
-                    if (close <= 0) continue
-                    val date = LocalDate.ofEpochDay(timestamps[i] / 86400)
-                    records.add(date to close)
-                }
-                records.sortedBy { it.first }
-            } catch (e: Exception) {
-                logger.warn("Yahoo historical error for $yfTicker: ${e.message}")
-                emptyList()
+            val records = mutableListOf<Pair<LocalDate, Double>>()
+            for (i in timestamps.indices) {
+                val close = closes.getOrNull(i) ?: continue
+                if (close <= 0) continue
+                val date = LocalDate.ofEpochDay(timestamps[i] / 86400)
+                records.add(date to close)
             }
+            records.sortedBy { it.first }
+        } catch (e: Exception) {
+            logger.warn("Yahoo historical error for $yfTicker: ${e.message}")
+            emptyList()
         }
     }
 
@@ -330,49 +274,33 @@ class QuoteService(
 
     private val tdDateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
-    private fun parseTdCsv(csvText: String): List<TdCsvRow> {
-        val rows = mutableListOf<TdCsvRow>()
-        val reader = StringReader(csvText)
-        val lines = reader.readLines()
-        if (lines.isEmpty()) return rows
-
-        val header = lines[0].split(";")
-        val tipoIdx = header.indexOf("Tipo Titulo")
-        val vencIdx = header.indexOf("Data Vencimento")
-        val baseIdx = header.indexOf("Data Base")
-        val puIdx = header.indexOf("PU Compra Manha")
-
-        if (tipoIdx < 0 || vencIdx < 0 || baseIdx < 0 || puIdx < 0) return rows
-
-        for (i in 1 until lines.size) {
-            try {
-                val cols = lines[i].split(";")
-                if (cols.size <= maxOf(tipoIdx, vencIdx, baseIdx, puIdx)) continue
-
+    private fun parseTdCsv(csvText: String): List<TdCsvRow> =
+        try {
+            csvReader {
+                delimiter = ';'
+            }.readAllWithHeader(csvText).map { rawRow ->
+                val row = rawRow.mapKeys { it.key.lowercase().trim() }
                 val dataBase =
                     try {
-                        LocalDate.parse(cols[baseIdx], tdDateFormatter)
+                        LocalDate.parse(row["data base"], tdDateFormatter)
                     } catch (e: Exception) {
                         null
                     }
 
-                val puStr = cols[puIdx].replace(",", ".")
-                val pu = puStr.toDoubleOrNull()
+                val puStr = row["pu compra manha"]?.replace(",", ".")
+                val pu = puStr?.toDoubleOrNull()
 
-                rows.add(
-                    TdCsvRow(
-                        tipoTitulo = cols[tipoIdx],
-                        dataVencimento = cols[vencIdx],
-                        dataBase = dataBase,
-                        puCompraManha = pu,
-                    )
+                TdCsvRow(
+                    tipoTitulo = row["tipo titulo"] ?: "",
+                    dataVencimento = row["data vencimento"] ?: "",
+                    dataBase = dataBase,
+                    puCompraManha = pu
                 )
-            } catch (e: Exception) {
-                continue
             }
+        } catch (e: Exception) {
+            logger.error("Error parsing TD CSV: ${e.message}")
+            emptyList()
         }
-        return rows
-    }
 
     private fun getTdFullCsv(): List<TdCsvRow> {
         val now = Instant.now().epochSecond
@@ -386,7 +314,12 @@ class QuoteService(
                 "796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv"
 
         return try {
-            val csvText = runBlocking { client.get(url).bodyAsText() }
+            val csvText =
+                restClient
+                    .get()
+                    .uri(url)
+                    .retrieve()
+                    .body<String>() ?: ""
             val rows = parseTdCsv(csvText)
             tdFullCsvCache = rows
             tdFullCsvTimestamp = now
