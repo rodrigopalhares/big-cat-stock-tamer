@@ -82,6 +82,19 @@ class PriceHistoryService(
                 ?.get(PriceHistories.close)
         }
 
+    fun getPricesForDate(
+        assetTickers: List<String>,
+        date: LocalDate
+    ): Map<String, Double> =
+        transaction {
+            PriceHistories
+                .select(PriceHistories.assetId, PriceHistories.close)
+                .where {
+                    (PriceHistories.assetId inList assetTickers) and
+                        (PriceHistories.date eq date)
+                }.associate { it[PriceHistories.assetId] to it[PriceHistories.close] }
+        }
+
     fun getLastStoredDate(assetTicker: String): LocalDate? =
         transaction {
             PriceHistories

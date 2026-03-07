@@ -5,6 +5,7 @@ import com.stocks.dto.NO_QUOTE_TYPES
 import com.stocks.dto.PortfolioSummary
 import com.stocks.model.AssetEntity
 import org.springframework.stereotype.Service
+import java.time.LocalDate
 
 @Service
 class PortfolioService(
@@ -18,28 +19,76 @@ class PortfolioService(
     ): List<AssetPosition> {
         val positions = mutableListOf<AssetPosition>()
 
-        // Pre-fetch live quotes if requested
+        // Pre-fetch quotes: use DB prices for today first, only call API for missing ones
         val liveQuotes = mutableMapOf<String, Double>()
         if (fetchQuotes) {
-            val yfTickers = mutableListOf<String>()
-            val tdTickers = mutableListOf<String>()
+            val today = LocalDate.now()
+
+            // Collect all quotable tickers and map yfTicker -> assetTicker
+            val yfTickerToAsset = mutableMapOf<String, String>()
+            val tdTickerToAsset = mutableMapOf<String, String>()
 
             for (asset in assets) {
                 val ticker = asset.ticker.value
                 if (asset.transactions.empty()) continue
                 if (asset.type in NO_QUOTE_TYPES) continue
                 if (asset.type == "TESOURO_DIRETO") {
-                    if (asset.yfTicker != null) tdTickers.add(asset.yfTicker!!)
+                    if (asset.yfTicker != null) tdTickerToAsset[asset.yfTicker!!] = ticker
                 } else {
-                    yfTickers.add(resolveYfTicker(ticker, asset.yfTicker))
+                    yfTickerToAsset[resolveYfTicker(ticker, asset.yfTicker)] = ticker
                 }
             }
 
-            if (yfTickers.isNotEmpty()) {
-                liveQuotes.putAll(quoteService.fetchQuotesBatch(yfTickers))
+            // Check which assets already have today's price in DB
+            val allAssetTickers = yfTickerToAsset.values + tdTickerToAsset.values
+            val todayPrices =
+                if (allAssetTickers.isNotEmpty()) {
+                    priceHistoryService.getPricesForDate(allAssetTickers.toList(), today)
+                } else {
+                    emptyMap()
+                }
+
+            // Populate liveQuotes from DB and filter out tickers that already have today's price
+            val yfTickersToFetch = mutableListOf<String>()
+            for ((yfTicker, assetTicker) in yfTickerToAsset) {
+                val dbPrice = todayPrices[assetTicker]
+                if (dbPrice != null) {
+                    liveQuotes[yfTicker] = dbPrice
+                } else {
+                    yfTickersToFetch.add(yfTicker)
+                }
             }
-            if (tdTickers.isNotEmpty()) {
-                liveQuotes.putAll(quoteService.fetchTdQuotesBatch(tdTickers))
+
+            val tdTickersToFetch = mutableListOf<String>()
+            for ((tdTicker, assetTicker) in tdTickerToAsset) {
+                val dbPrice = todayPrices[assetTicker]
+                if (dbPrice != null) {
+                    liveQuotes[tdTicker] = dbPrice
+                } else {
+                    tdTickersToFetch.add(tdTicker)
+                }
+            }
+
+            // Fetch only missing quotes from API and save to DB
+            if (yfTickersToFetch.isNotEmpty()) {
+                val fetched = quoteService.fetchQuotesBatch(yfTickersToFetch)
+                liveQuotes.putAll(fetched)
+                val records =
+                    fetched.mapNotNull { (yfTicker, price) ->
+                        val assetTicker = yfTickerToAsset[yfTicker] ?: return@mapNotNull null
+                        PriceRecord(assetTicker, today, price)
+                    }
+                priceHistoryService.upsertPrices(records)
+            }
+            if (tdTickersToFetch.isNotEmpty()) {
+                val fetched = quoteService.fetchTdQuotesBatch(tdTickersToFetch)
+                liveQuotes.putAll(fetched)
+                val records =
+                    fetched.mapNotNull { (tdTicker, price) ->
+                        val assetTicker = tdTickerToAsset[tdTicker] ?: return@mapNotNull null
+                        PriceRecord(assetTicker, today, price)
+                    }
+                priceHistoryService.upsertPrices(records)
             }
         }
 
@@ -62,17 +111,21 @@ class PortfolioService(
             val calc = calculationService.calculatePosition(transactionData)
             if (calc.quantity <= 0 && calc.realizedPnl == 0.0) continue
 
-            // Resolve current price: prefer DB, fall back to live
-            var currentPrice: Double? = priceHistoryService.getLatestPrice(ticker)
-
-            if (currentPrice == null && fetchQuotes) {
-                currentPrice =
-                    if (asset.type == "TESOURO_DIRETO") {
-                        asset.yfTicker?.let { liveQuotes[it] }
-                    } else {
-                        liveQuotes[resolveYfTicker(ticker, asset.yfTicker)]
-                    }
-            }
+            // Resolve current price: when fetching quotes, prefer live/today's price; otherwise use latest from DB
+            val currentPrice: Double? =
+                if (fetchQuotes) {
+                    val liveKey =
+                        if (asset.type == "TESOURO_DIRETO") {
+                            asset.yfTicker
+                        } else if (asset.type !in NO_QUOTE_TYPES) {
+                            resolveYfTicker(ticker, asset.yfTicker)
+                        } else {
+                            null
+                        }
+                    liveKey?.let { liveQuotes[it] } ?: priceHistoryService.getLatestPrice(ticker)
+                } else {
+                    priceHistoryService.getLatestPrice(ticker)
+                }
 
             val unrealizedPnl =
                 if (currentPrice != null && calc.quantity > 0) {
