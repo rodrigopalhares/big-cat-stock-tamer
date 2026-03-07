@@ -1,6 +1,7 @@
 package com.stocks.service
 
 import com.stocks.dto.AssetPosition
+import com.stocks.dto.NO_QUOTE_TYPES
 import com.stocks.dto.PortfolioSummary
 import com.stocks.model.AssetEntity
 import org.springframework.stereotype.Service
@@ -26,6 +27,7 @@ class PortfolioService(
             for (asset in assets) {
                 val ticker = asset.ticker.value
                 if (asset.transactions.empty()) continue
+                if (asset.type in NO_QUOTE_TYPES) continue
                 if (asset.type == "TESOURO_DIRETO") {
                     if (asset.yfTicker != null) tdTickers.add(asset.yfTicker!!)
                 } else {
