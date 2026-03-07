@@ -27,25 +27,26 @@
                 </thead>
                 <tbody>
                     <tr th:each="row : ${rows}"
-                        th:classappend="${row.error != null} ? 'table-danger' : ''">
+                        th:classappend="${row.error != null} ? 'table-danger' : ''"
+                        th:data-has-error="${row.error != null}">
                         <td>
                             <span th:text="${row.rowIndex + 1}"></span>
-                            <span th:if="${row.error != null}" class="badge bg-danger ms-1"
-                                  th:title="${row.error}">Erro</span>
+                            <span th:if="${row.error != null}" class="badge bg-danger ms-1 csv-error-badge"
+                                  th:title="${row.error}" th:text="${row.error}"></span>
                         </td>
                         <td>
                             <input type="text" class="form-control form-control-sm csv-field"
                                    data-field="ticker" th:value="${row.ticker}"
-                                   th:disabled="${row.error != null}" style="width:80px">
+                                   style="width:80px">
                         </td>
                         <td>
                             <input type="date" class="form-control form-control-sm csv-field"
                                    data-field="date" th:value="${row.date}"
-                                   th:disabled="${row.error != null}" style="width:140px">
+                                   style="width:140px">
                         </td>
                         <td>
                             <select class="form-select form-select-sm csv-field"
-                                    data-field="type" th:disabled="${row.error != null}" style="width:90px">
+                                    data-field="type" style="width:90px">
                                 <option value="BUY" th:selected="${row.type == 'BUY'}">Compra</option>
                                 <option value="SELL" th:selected="${row.type == 'SELL'}">Venda</option>
                             </select>
@@ -53,37 +54,37 @@
                         <td>
                             <input type="number" class="form-control form-control-sm csv-field text-end"
                                    data-field="quantity" th:value="${row.quantity}" step="0.0001"
-                                   th:disabled="${row.error != null}" style="width:100px">
+                                   style="width:100px">
                         </td>
                         <td>
                             <input type="number" class="form-control form-control-sm csv-field text-end"
                                    data-field="price" th:value="${row.price}" step="0.0001"
-                                   th:disabled="${row.error != null}" style="width:100px">
+                                   style="width:100px">
                         </td>
                         <td>
                             <input type="number" class="form-control form-control-sm csv-field text-end"
                                    data-field="fees" th:value="${row.fees}" step="0.01"
-                                   th:disabled="${row.error != null}" style="width:80px">
+                                   style="width:80px">
                         </td>
                         <td>
                             <input type="text" class="form-control form-control-sm csv-field"
                                    data-field="broker" th:value="${row.broker}"
-                                   th:disabled="${row.error != null}" style="width:80px">
+                                   style="width:80px">
                         </td>
                         <td>
                             <input type="text" class="form-control form-control-sm csv-field"
                                    data-field="notes" th:value="${row.notes}"
-                                   th:disabled="${row.error != null}" style="width:120px">
+                                   style="width:120px">
                         </td>
                         <td>
                             <select class="form-select form-select-sm csv-field"
-                                    data-field="currency" th:disabled="${row.error != null}" style="width:70px">
+                                    data-field="currency" style="width:70px">
                                 <option value="BRL" th:selected="${row.currency == 'BRL'}">BRL</option>
                                 <option value="USD" th:selected="${row.currency == 'USD'}">USD</option>
                             </select>
                         </td>
                         <td>
-                            <span th:if="${row.error != null}" class="badge bg-danger" th:text="${row.error}"></span>
+                            <span th:if="${row.error != null}" class="badge bg-danger csv-error-badge" th:text="${row.error}"></span>
                             <span th:if="${row.error == null && row.assetStatus.name() == 'EXISTS'}"
                                   class="badge bg-success">Existente</span>
                             <span th:if="${row.error == null && row.assetStatus.name() == 'WILL_CREATE'}"
@@ -92,9 +93,10 @@
                                   class="badge bg-warning text-dark">Desconhecido</span>
                         </td>
                         <td class="text-center">
-                            <input th:if="${row.error == null}" type="checkbox"
+                            <input type="checkbox"
                                    class="form-check-input csv-ignore-check"
                                    th:data-ticker="${row.ticker}"
+                                   th:checked="${row.error != null}"
                                    onchange="onCsvRowIgnoreToggle(this)">
                         </td>
                     </tr>
