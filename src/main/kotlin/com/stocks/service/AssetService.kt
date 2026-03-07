@@ -10,11 +10,60 @@ import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 
 @Service
-class AssetService {
+class AssetService(
+    private val calculationService: CalculationService,
+) {
     fun findAll(): List<AssetResponse> =
         transaction {
             AssetEntity.all().sortedBy { it.ticker.value }.map { it.toResponse() }
         }
+
+    fun findFiltered(
+        type: String?,
+        position: String?,
+    ): List<AssetResponse> =
+        transaction {
+            var assets = AssetEntity.all().sortedBy { it.ticker.value }.toList()
+
+            if (!type.isNullOrBlank()) {
+                assets = assets.filter { it.type == type }
+            }
+
+            if (!position.isNullOrBlank() && position != "all") {
+                val tickersWithPosition = computeTickersWithPosition()
+                assets =
+                    when (position) {
+                        "with" -> assets.filter { it.ticker.value in tickersWithPosition }
+                        "without" -> assets.filter { it.ticker.value !in tickersWithPosition }
+                        else -> assets
+                    }
+            }
+
+            assets.map { it.toResponse() }
+        }
+
+    private fun computeTickersWithPosition(): Set<String> {
+        val allTransactions =
+            com.stocks.model.TransactionEntity
+                .all()
+                .toList()
+                .groupBy { it.assetId }
+
+        return allTransactions
+            .filter { (_, txs) ->
+                val data =
+                    txs.map {
+                        TransactionData(
+                            type = it.type,
+                            quantity = it.quantity,
+                            price = it.price,
+                            fees = it.fees,
+                            date = it.date,
+                        )
+                    }
+                calculationService.calculatePosition(data).quantity > 0
+            }.keys
+    }
 
     fun findById(ticker: String): AssetResponse? =
         transaction {

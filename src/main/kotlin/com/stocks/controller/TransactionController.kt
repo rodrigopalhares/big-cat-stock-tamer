@@ -1,5 +1,6 @@
 package com.stocks.controller
 
+import com.stocks.dto.ASSET_TYPES
 import com.stocks.dto.BatchRequest
 import com.stocks.dto.TransactionRequest
 import com.stocks.dto.TransactionResponse
@@ -61,13 +62,15 @@ class TransactionController(
     @GetMapping("/")
     fun listTransactions(
         @RequestParam(required = false) ticker: String?,
+        @RequestParam(required = false) type: String?,
+        @RequestParam(required = false) position: String?,
         model: Model,
     ): String {
         val selectedTicker = ticker?.uppercase()
 
         val transactions =
             transaction {
-                transactionService.listTransactions(selectedTicker).map { it.toTemplateData() }
+                transactionService.listTransactions(selectedTicker, type, position).map { it.toTemplateData() }
             }
 
         val assets =
@@ -79,7 +82,10 @@ class TransactionController(
 
         model.addAttribute("transactions", transactions)
         model.addAttribute("assets", assets)
+        model.addAttribute("assetTypes", ASSET_TYPES)
         model.addAttribute("selectedTicker", selectedTicker)
+        model.addAttribute("selectedType", type ?: "")
+        model.addAttribute("selectedPosition", position ?: "")
         model.addAttribute("today", LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE))
         return "transactions"
     }

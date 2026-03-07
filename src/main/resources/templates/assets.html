@@ -65,9 +65,28 @@
     <!-- Asset list -->
     <div class="col-lg-8">
         <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white fw-semibold">
-                Ativos Cadastrados
-                <span class="badge bg-secondary ms-1" th:text="${#lists.size(assets)}"></span>
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">
+                    Ativos Cadastrados
+                    <span class="badge bg-secondary ms-1" th:text="${#lists.size(assets)}"></span>
+                </span>
+                <div class="d-flex align-items-center gap-2">
+                    <form method="get" action="/assets/" class="d-flex align-items-center gap-2 mb-0">
+                        <select name="type" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+                            <option value="">Tipo: Todos</option>
+                            <option th:each="t : ${assetTypes}" th:value="${t}" th:text="${t}" th:selected="${t == selectedType}"></option>
+                        </select>
+                        <select name="position" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+                            <option value="">Posição: Todos</option>
+                            <option value="with" th:selected="${selectedPosition == 'with'}">Com posição</option>
+                            <option value="without" th:selected="${selectedPosition == 'without'}">Sem posição</option>
+                        </select>
+                    </form>
+                    <a th:if="${selectedType != '' or selectedPosition != ''}" href="/assets/"
+                       class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                </div>
             </div>
             <div class="card-body p-0">
                 <div th:if="${!assets.isEmpty()}" class="table-responsive">
