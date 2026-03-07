@@ -13,6 +13,10 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentHashMap
 
+private const val USER_AGENT =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"
+
 @Service
 class QuoteService(
     private val restClient: RestClient
@@ -230,10 +234,11 @@ class QuoteService(
             restClient
                 .get()
                 .uri(url)
+                .header("User-Agent", USER_AGENT)
                 .retrieve()
                 .body<YahooChartResponse>()
         } catch (e: Exception) {
-            logger.debug("Yahoo API error for $yfTicker: ${e.message}")
+            logger.warn("Yahoo API error for $yfTicker: ${e.message}")
             null
         }
     }
@@ -262,6 +267,7 @@ class QuoteService(
                 restClient
                     .get()
                     .uri(url)
+                    .header("User-Agent", USER_AGENT)
                     .retrieve()
                     .body<YahooChartResponse>()
             val result = response?.chart?.result?.firstOrNull() ?: return emptyList()

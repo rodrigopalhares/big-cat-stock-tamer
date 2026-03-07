@@ -26,8 +26,19 @@
                     <tr th:each="row : ${assetRows}"
                         th:classappend="${row.assetStatus.name() == 'EXISTS'} ? 'table-light' : ''">
                         <td>
-                            <strong th:text="${row.ticker}"></strong>
-                            <input type="hidden" class="asset-field" data-field="ticker" th:value="${row.ticker}">
+                            <div th:if="${row.assetStatus.name() != 'EXISTS'}" class="input-group input-group-sm" style="width:140px">
+                                <input type="text" class="form-control form-control-sm asset-field"
+                                       data-field="ticker" th:value="${row.ticker}"
+                                       th:data-original-ticker="${row.ticker}"
+                                       onchange="onTickerChange(this)">
+                                <span class="input-group-text d-none ticker-spinner">
+                                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                                </span>
+                            </div>
+                            <span th:if="${row.assetStatus.name() == 'EXISTS'}">
+                                <strong th:text="${row.ticker}"></strong>
+                                <input type="hidden" class="asset-field" data-field="ticker" th:value="${row.ticker}">
+                            </span>
                         </td>
                         <td>
                             <span th:if="${row.assetStatus.name() == 'EXISTS'}"
@@ -58,7 +69,8 @@
                         <td>
                             <input th:if="${row.assetStatus.name() != 'EXISTS'}"
                                    type="text" class="form-control form-control-sm asset-field"
-                                   data-field="yfTicker" th:value="${row.yfTicker}" style="width:120px">
+                                   data-field="yfTicker" th:value="${row.yfTicker}" style="width:120px"
+                                   onchange="onYfTickerChange(this)">
                             <span th:if="${row.assetStatus.name() == 'EXISTS'}"
                                   class="text-muted" th:text="${row.yfTicker}"></span>
                         </td>

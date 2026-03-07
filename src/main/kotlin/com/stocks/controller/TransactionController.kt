@@ -9,6 +9,7 @@ import com.stocks.dto.TransactionRequest
 import com.stocks.dto.TransactionResponse
 import com.stocks.model.AssetEntity
 import com.stocks.model.TransactionEntity
+import com.stocks.service.QuoteService
 import com.stocks.service.TickerLookupStatus
 import com.stocks.service.TransactionService
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -24,6 +25,7 @@ import java.time.format.DateTimeFormatter
 @RequestMapping("/transactions")
 class TransactionController(
     private val transactionService: TransactionService,
+    private val quoteService: QuoteService,
 ) {
     // --- HTML Routes ---
 
@@ -60,6 +62,22 @@ class TransactionController(
                 </div>"""
             }
         }
+    }
+
+    @GetMapping("/asset-info")
+    @ResponseBody
+    fun assetInfo(
+        @RequestParam ticker: String,
+    ): ResponseEntity<Map<String, String>> {
+        val info = quoteService.fetchAssetInfo(ticker)
+        return ResponseEntity.ok(
+            mapOf(
+                "name" to info.name,
+                "type" to info.type,
+                "yfTicker" to info.yfTicker,
+                "currency" to info.currency,
+            ),
+        )
     }
 
     @GetMapping("/")
