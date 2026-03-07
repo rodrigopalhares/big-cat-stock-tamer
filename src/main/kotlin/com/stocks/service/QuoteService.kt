@@ -308,10 +308,13 @@ class QuoteService(
                 delimiter = ';'
             }.readAllWithHeader(csvText).map { rawRow ->
                 val row = rawRow.mapKeys { it.key.lowercase().trim() }
+                val tipoTitulo = row["tipo titulo"] ?: ""
+                val dataVencimento = row["data vencimento"] ?: ""
                 val dataBase =
                     try {
-                        LocalDate.parse(row["data base"], tdDateFormatter)
+                        LocalDate.parse(row["data base"].orEmpty(), tdDateFormatter)
                     } catch (e: Exception) {
+                        logger.warn("Error parsing TD date ${row["data base"]} for row $tipoTitulo $dataVencimento: ${e.message}")
                         null
                     }
 
@@ -319,8 +322,8 @@ class QuoteService(
                 val pu = puStr?.toDoubleOrNull()
 
                 TdCsvRow(
-                    tipoTitulo = row["tipo titulo"] ?: "",
-                    dataVencimento = row["data vencimento"] ?: "",
+                    tipoTitulo = tipoTitulo,
+                    dataVencimento = dataVencimento,
                     dataBase = dataBase,
                     puCompraManha = pu
                 )
@@ -334,7 +337,7 @@ class QuoteService(
     private fun getTdFullCsv(): List<TdCsvRow> {
         val now = Instant.now().epochSecond
         tdFullCsvCache?.let { cache ->
-            if (now - tdFullCsvTimestamp < 3600) return cache
+            if (now - tdFullCsvTimestamp < 4*3600) return cache
         }
 
         val url =
@@ -363,7 +366,7 @@ class QuoteService(
     private fun getTdLatestCsv(): List<TdCsvRow> {
         val now = Instant.now().epochSecond
         tdLatestCsvCache?.let { cache ->
-            if (now - tdLatestCsvTimestamp < 3600) return cache
+            if (now - tdLatestCsvTimestamp < 4*3600) return cache
         }
 
         val allRows = getTdFullCsv()
