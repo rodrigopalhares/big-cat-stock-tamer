@@ -11,7 +11,7 @@ import java.time.LocalDate
 fun resolveYfTicker(
     ticker: String,
     yfTicker: String?
-): String = yfTicker ?: if ("." !in ticker) "$ticker.SA" else ticker
+): String = yfTicker ?: classifyTicker(ticker).yfCandidates.first()
 
 // Data class for asset categorization input
 data class AssetTickerInfo(
