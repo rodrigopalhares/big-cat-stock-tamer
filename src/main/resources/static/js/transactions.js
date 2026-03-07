@@ -146,8 +146,10 @@ function onCsvRowIgnoreToggle(checkbox) {
     var row = checkbox.closest('tr');
     if (checkbox.checked) {
         row.classList.add('text-decoration-line-through', 'text-muted');
+        if (row.dataset.hasError === 'true') row.classList.add('table-danger');
     } else {
         row.classList.remove('text-decoration-line-through', 'text-muted');
+        if (row.dataset.hasError === 'true') row.classList.remove('table-danger');
     }
     updateBatchCount();
 }
@@ -157,7 +159,6 @@ function updateBatchCount() {
     if (!table) return;
     var total = 0;
     table.querySelectorAll('tbody tr').forEach(function (tr) {
-        if (tr.classList.contains('table-danger')) return;
         var check = tr.querySelector('.csv-ignore-check');
         if (!check || !check.checked) total++;
     });
@@ -242,19 +243,19 @@ function csvNextStep() {
         })
         .then(function (html) {
             document.getElementById('csv-preview-area').innerHTML = html;
-            // Auto-check ignored tickers from step 1
-            if (ignoredTickers.size > 0) {
-                document.querySelectorAll('#csvPreviewTable tbody tr').forEach(function (tr) {
-                    var check = tr.querySelector('.csv-ignore-check');
-                    if (!check) return;
-                    var ticker = (check.dataset.ticker || '').toUpperCase();
-                    if (ignoredTickers.has(ticker)) {
-                        check.checked = true;
-                        tr.classList.add('text-decoration-line-through', 'text-muted');
-                    }
-                });
-                updateBatchCount();
-            }
+            // Apply visual style to pre-checked rows (errors and ignored tickers from step 1)
+            document.querySelectorAll('#csvPreviewTable tbody tr').forEach(function (tr) {
+                var check = tr.querySelector('.csv-ignore-check');
+                if (!check) return;
+                var ticker = (check.dataset.ticker || '').toUpperCase();
+                if (ignoredTickers.has(ticker)) {
+                    check.checked = true;
+                }
+                if (check.checked) {
+                    tr.classList.add('text-decoration-line-through', 'text-muted');
+                }
+            });
+            updateBatchCount();
         })
         .catch(function (err) {
             document.getElementById('csv-preview-area').innerHTML =
@@ -272,13 +273,13 @@ function batchSubmit() {
 
     const rows = [];
     const tbody = table.querySelector('tbody');
-    const trs = tbody.querySelectorAll('tr:not(.table-danger)');
+    const trs = tbody.querySelectorAll('tr');
 
     trs.forEach(function (tr) {
         var ignoreCheck = tr.querySelector('.csv-ignore-check');
         if (ignoreCheck && ignoreCheck.checked) return;
 
-        const fields = tr.querySelectorAll('.csv-field:not(:disabled)');
+        const fields = tr.querySelectorAll('.csv-field');
         if (fields.length === 0) return;
 
         const row = {};
