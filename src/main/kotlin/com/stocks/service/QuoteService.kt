@@ -337,7 +337,7 @@ class QuoteService(
     private fun getTdFullCsv(): List<TdCsvRow> {
         val now = Instant.now().epochSecond
         tdFullCsvCache?.let { cache ->
-            if (now - tdFullCsvTimestamp < 4*3600) return cache
+            if (now - tdFullCsvTimestamp < 4 * 3600) return cache
         }
 
         val url =
@@ -366,7 +366,7 @@ class QuoteService(
     private fun getTdLatestCsv(): List<TdCsvRow> {
         val now = Instant.now().epochSecond
         tdLatestCsvCache?.let { cache ->
-            if (now - tdLatestCsvTimestamp < 4*3600) return cache
+            if (now - tdLatestCsvTimestamp < 4 * 3600) return cache
         }
 
         val allRows = getTdFullCsv()

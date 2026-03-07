@@ -50,6 +50,8 @@ function txOnFeesInput() {
 
 // Stores new assets collected from the asset review step
 let pendingNewAssets = [];
+// Stores tickers ignored in the asset review step
+let ignoredTickers = new Set();
 
 document.addEventListener('DOMContentLoaded', function () {
     const modal = document.getElementById('csvImportModal');
@@ -60,6 +62,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const preview = document.getElementById('csv-preview-area');
             if (preview) preview.innerHTML = '';
             pendingNewAssets = [];
+            ignoredTickers = new Set();
         });
     }
 });
@@ -130,6 +133,40 @@ function onYfTickerChange(inputElement) {
         .catch(function () {});
 }
 
+function onAssetIgnoreToggle(checkbox) {
+    var row = checkbox.closest('tr');
+    if (checkbox.checked) {
+        row.classList.add('text-decoration-line-through', 'text-muted');
+    } else {
+        row.classList.remove('text-decoration-line-through', 'text-muted');
+    }
+}
+
+function onCsvRowIgnoreToggle(checkbox) {
+    var row = checkbox.closest('tr');
+    if (checkbox.checked) {
+        row.classList.add('text-decoration-line-through', 'text-muted');
+    } else {
+        row.classList.remove('text-decoration-line-through', 'text-muted');
+    }
+    updateBatchCount();
+}
+
+function updateBatchCount() {
+    var table = document.getElementById('csvPreviewTable');
+    if (!table) return;
+    var total = 0;
+    table.querySelectorAll('tbody tr').forEach(function (tr) {
+        if (tr.classList.contains('table-danger')) return;
+        var check = tr.querySelector('.csv-ignore-check');
+        if (!check || !check.checked) total++;
+    });
+    var countEl = document.getElementById('csvBatchCount');
+    var btn = document.getElementById('csvBatchSubmitBtn');
+    if (countEl) countEl.textContent = total;
+    if (btn) btn.disabled = (total === 0);
+}
+
 function csvNextStep() {
     const table = document.getElementById('csvAssetTable');
     if (!table) return;
@@ -137,14 +174,20 @@ function csvNextStep() {
     const assets = [];
     const tbody = table.querySelector('tbody');
     const trs = tbody.querySelectorAll('tr');
+    ignoredTickers = new Set();
 
     trs.forEach(function (tr) {
+        var ignoreCheck = tr.querySelector('.asset-ignore-check');
         const fields = tr.querySelectorAll('.asset-field');
         const row = {};
         fields.forEach(function (field) {
             const key = field.dataset.field;
             row[key] = field.value;
         });
+        if (ignoreCheck && ignoreCheck.checked) {
+            ignoredTickers.add((row.ticker || '').toUpperCase());
+            return;
+        }
         if (row.status && row.status !== 'EXISTS') {
             assets.push({
                 ticker: row.ticker,
@@ -199,6 +242,19 @@ function csvNextStep() {
         })
         .then(function (html) {
             document.getElementById('csv-preview-area').innerHTML = html;
+            // Auto-check ignored tickers from step 1
+            if (ignoredTickers.size > 0) {
+                document.querySelectorAll('#csvPreviewTable tbody tr').forEach(function (tr) {
+                    var check = tr.querySelector('.csv-ignore-check');
+                    if (!check) return;
+                    var ticker = (check.dataset.ticker || '').toUpperCase();
+                    if (ignoredTickers.has(ticker)) {
+                        check.checked = true;
+                        tr.classList.add('text-decoration-line-through', 'text-muted');
+                    }
+                });
+                updateBatchCount();
+            }
         })
         .catch(function (err) {
             document.getElementById('csv-preview-area').innerHTML =
@@ -219,6 +275,9 @@ function batchSubmit() {
     const trs = tbody.querySelectorAll('tr:not(.table-danger)');
 
     trs.forEach(function (tr) {
+        var ignoreCheck = tr.querySelector('.csv-ignore-check');
+        if (ignoreCheck && ignoreCheck.checked) return;
+
         const fields = tr.querySelectorAll('.csv-field:not(:disabled)');
         if (fields.length === 0) return;
 

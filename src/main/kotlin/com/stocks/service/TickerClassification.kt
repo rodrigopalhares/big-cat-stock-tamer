@@ -13,7 +13,7 @@ private val internationalPattern = Regex("^[A-Z]{1,5}$")
 
 fun classifyTicker(ticker: String): TickerClassification =
     when {
-        ";" in ticker ->
+        ";" in ticker || ticker.startsWith("TD:") ->
             TickerClassification(
                 suggestedType = "TESOURO_DIRETO",
                 yfCandidates = listOf(ticker),

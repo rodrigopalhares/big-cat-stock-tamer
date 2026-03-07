@@ -22,6 +22,7 @@
                         <th>Notas</th>
                         <th>Moeda</th>
                         <th>Status</th>
+                        <th class="text-center">Ignorar</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -90,6 +91,12 @@
                             <span th:if="${row.error == null && row.assetStatus.name() == 'UNKNOWN'}"
                                   class="badge bg-warning text-dark">Desconhecido</span>
                         </td>
+                        <td class="text-center">
+                            <input th:if="${row.error == null}" type="checkbox"
+                                   class="form-check-input csv-ignore-check"
+                                   th:data-ticker="${row.ticker}"
+                                   onchange="onCsvRowIgnoreToggle(this)">
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -103,9 +110,10 @@
                 </span>
             </span>
             <button type="button" class="btn btn-primary" onclick="batchSubmit()"
+                    id="csvBatchSubmitBtn"
                     th:disabled="${rows.?[error == null].isEmpty()}">
                 <i class="bi bi-check-lg"></i> Confirmar Importação
-                (<span th:text="${rows.?[error == null].size()}"></span> transações)
+                (<span id="csvBatchCount" th:text="${rows.?[error == null].size()}"></span> transações)
             </button>
         </div>
     </div>
