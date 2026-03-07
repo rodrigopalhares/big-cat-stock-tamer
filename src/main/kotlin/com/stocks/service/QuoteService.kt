@@ -25,6 +25,12 @@ class QuoteService(
 
     private val rateCache = ConcurrentHashMap<String, Pair<Double, Long>>()
 
+    private val quoteCache = ConcurrentHashMap<String, Pair<Double, Long>>()
+
+    private companion object {
+        const val QUOTE_CACHE_TTL_SECONDS = 4 * 3600L
+    }
+
     @Volatile
     private var tdFullCsvCache: List<TdCsvRow>? = null
 
@@ -81,11 +87,24 @@ class QuoteService(
     fun fetchQuotesBatch(yfTickers: List<String>): Map<String, Double> {
         if (yfTickers.isEmpty()) return emptyMap()
 
+        val now = Instant.now().epochSecond
         val results = mutableMapOf<String, Double>()
+        val tickersToFetch = mutableListOf<String>()
+
         for (ticker in yfTickers) {
+            val cached = quoteCache[ticker]
+            if (cached != null && now - cached.second < QUOTE_CACHE_TTL_SECONDS) {
+                results[ticker] = cached.first
+            } else {
+                tickersToFetch.add(ticker)
+            }
+        }
+
+        for (ticker in tickersToFetch) {
             try {
                 val price = fetchSingleQuote(ticker)
                 if (price != null && price > 0) {
+                    quoteCache[ticker] = price to now
                     results[ticker] = price
                 }
             } catch (e: Exception) {
@@ -150,11 +169,25 @@ class QuoteService(
     fun fetchTdQuotesBatch(yfTickers: List<String>): Map<String, Double> {
         if (yfTickers.isEmpty()) return emptyMap()
 
-        val rows = getTdLatestCsv()
-        if (rows.isEmpty()) return emptyMap()
-
+        val now = Instant.now().epochSecond
         val results = mutableMapOf<String, Double>()
-        for (yfTicker in yfTickers) {
+        val tickersToFetch = mutableListOf<String>()
+
+        for (ticker in yfTickers) {
+            val cached = quoteCache[ticker]
+            if (cached != null && now - cached.second < QUOTE_CACHE_TTL_SECONDS) {
+                results[ticker] = cached.first
+            } else {
+                tickersToFetch.add(ticker)
+            }
+        }
+
+        if (tickersToFetch.isEmpty()) return results
+
+        val rows = getTdLatestCsv()
+        if (rows.isEmpty()) return results
+
+        for (yfTicker in tickersToFetch) {
             try {
                 if (";" !in yfTicker) {
                     logger.warn("Invalid TD yf_ticker format: $yfTicker")
@@ -164,6 +197,7 @@ class QuoteService(
                 val matched = rows.filter { it.tipoTitulo == title && it.dataVencimento == maturity }
                 val price = matched.firstOrNull()?.puCompraManha
                 if (price != null && price > 0) {
+                    quoteCache[yfTicker] = price to now
                     results[yfTicker] = price
                 }
             } catch (e: Exception) {
