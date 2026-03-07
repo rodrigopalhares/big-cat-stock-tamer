@@ -131,7 +131,7 @@ class TransactionControllerTest(
 
         // --- CSV Batch Import Tests ---
 
-        test("parse csv returns html fragment with preview table") {
+        test("parse csv returns html fragment with asset review table") {
             transaction {
                 AssetEntity.new("PETR4") {
                     name = "Petrobras"
@@ -145,14 +145,32 @@ class TransactionControllerTest(
                     post("/transactions/parse-csv")
                         .param("csv", "PETR4\t01/06/2024\tC\t100\t25,50\t10,00\tXP\t0\tBRL\t")
                 ).andExpect(status().isOk)
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("csvAssetTable")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("PETR4")))
+        }
+
+        test("parse csv step2 returns transaction preview") {
+            transaction {
+                AssetEntity.new("PETR4") {
+                    name = "Petrobras"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+            }
+
+            mockMvc
+                .perform(
+                    post("/transactions/parse-csv-step2")
+                        .param("csv", "PETR4\t01/06/2024\tC\t100\t25,50\t10,00\tXP\t0\tBRL\t")
+                ).andExpect(status().isOk)
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("csvPreviewTable")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("PETR4")))
         }
 
-        test("parse csv with invalid date returns error indicator") {
+        test("parse csv step2 with invalid date returns error indicator") {
             mockMvc
                 .perform(
-                    post("/transactions/parse-csv")
+                    post("/transactions/parse-csv-step2")
                         .param("csv", "PETR4\t2024-06-01\tC\t100\t25,50\t0\tXP\t0\tBRL\t")
                 ).andExpect(status().isOk)
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("table-danger")))

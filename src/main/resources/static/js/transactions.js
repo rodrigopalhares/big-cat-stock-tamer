@@ -48,6 +48,9 @@ function txOnFeesInput() {
 
 // --- CSV Batch Import ---
 
+// Stores new assets collected from the asset review step
+let pendingNewAssets = [];
+
 document.addEventListener('DOMContentLoaded', function () {
     const modal = document.getElementById('csvImportModal');
     if (modal) {
@@ -56,9 +59,70 @@ document.addEventListener('DOMContentLoaded', function () {
             if (textarea) textarea.value = '';
             const preview = document.getElementById('csv-preview-area');
             if (preview) preview.innerHTML = '';
+            pendingNewAssets = [];
         });
     }
 });
+
+function csvNextStep() {
+    const table = document.getElementById('csvAssetTable');
+    if (!table) return;
+
+    const assets = [];
+    const tbody = table.querySelector('tbody');
+    const trs = tbody.querySelectorAll('tr');
+
+    trs.forEach(function (tr) {
+        const fields = tr.querySelectorAll('.asset-field');
+        const row = {};
+        fields.forEach(function (field) {
+            const key = field.dataset.field;
+            row[key] = field.value;
+        });
+        if (row.status && row.status !== 'EXISTS') {
+            assets.push({
+                ticker: row.ticker,
+                name: row.name || '',
+                type: row.type || 'STOCK',
+                yfTicker: row.yfTicker || '',
+                currency: row.currency || 'BRL',
+            });
+        }
+    });
+
+    pendingNewAssets = assets;
+
+    const rawCsv = document.getElementById('csvRawHidden');
+    if (!rawCsv) return;
+
+    const btn = document.querySelector('#csvAssetTable + * + * button, button[onclick="csvNextStep()"]');
+    const spinner = document.getElementById('csv-step2-spinner');
+    if (btn) btn.disabled = true;
+    if (spinner) spinner.classList.remove('d-none');
+
+    const formData = new FormData();
+    formData.append('csv', rawCsv.value);
+
+    fetch('/transactions/parse-csv-step2', {
+        method: 'POST',
+        body: formData,
+    })
+        .then(function (response) {
+            if (!response.ok) throw new Error('Erro ao processar: ' + response.status);
+            return response.text();
+        })
+        .then(function (html) {
+            document.getElementById('csv-preview-area').innerHTML = html;
+        })
+        .catch(function (err) {
+            document.getElementById('csv-preview-area').innerHTML =
+                '<div class="alert alert-danger">' + err.message + '</div>';
+        })
+        .finally(function () {
+            if (btn) btn.disabled = false;
+            if (spinner) spinner.classList.add('d-none');
+        });
+}
 
 function batchSubmit() {
     const table = document.getElementById('csvPreviewTable');
@@ -85,14 +149,20 @@ function batchSubmit() {
     });
 
     if (rows.length === 0) {
-        alert('Nenhuma linha válida para importar.');
+        document.getElementById('csv-preview-area').innerHTML =
+            '<div class="alert alert-warning">Nenhuma linha válida para importar.</div>';
         return;
+    }
+
+    const payload = { rows: rows };
+    if (pendingNewAssets.length > 0) {
+        payload.assets = pendingNewAssets;
     }
 
     fetch('/transactions/batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rows: rows }),
+        body: JSON.stringify(payload),
     })
         .then(function (response) {
             if (!response.ok) throw new Error('Erro ao importar: ' + response.status);
@@ -102,6 +172,7 @@ function batchSubmit() {
             location.href = '/transactions/';
         })
         .catch(function (err) {
-            alert(err.message);
+            document.getElementById('csv-preview-area').innerHTML =
+                '<div class="alert alert-danger">' + err.message + '</div>';
         });
 }
