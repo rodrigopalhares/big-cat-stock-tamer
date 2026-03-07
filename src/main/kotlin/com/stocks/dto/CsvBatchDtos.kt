@@ -10,6 +10,27 @@ enum class AssetStatus {
     UNKNOWN,
 }
 
+data class CsvAssetRow(
+    val ticker: String,
+    val name: String,
+    val type: String,
+    val yfTicker: String,
+    val currency: String,
+    val assetStatus: AssetStatus,
+)
+
+data class AssetBatchRequest(
+    val assets: List<AssetBatchRow>,
+)
+
+data class AssetBatchRow(
+    val ticker: String,
+    val name: String,
+    val type: String,
+    val yfTicker: String,
+    val currency: String,
+)
+
 data class CsvRow(
     val rowIndex: Int,
     val ticker: String,

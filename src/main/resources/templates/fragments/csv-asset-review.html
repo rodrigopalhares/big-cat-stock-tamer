@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="csvAssetReview">
+    <div th:if="${assetRows.isEmpty()}" class="alert alert-warning">
+        Nenhum ticker encontrado no CSV.
+    </div>
+
+    <div th:if="${!assetRows.isEmpty()}">
+        <h6 class="mb-3"><i class="bi bi-box-seam"></i> Etapa 1: Revisão de Ativos</h6>
+        <p class="text-muted small">Revise os ativos encontrados no CSV. Ativos novos podem ser configurados antes de prosseguir.</p>
+
+        <div class="table-responsive" style="max-height: 50vh; overflow-y: auto;">
+            <table class="table table-sm table-bordered align-middle small" id="csvAssetTable">
+                <thead class="table-light sticky-top">
+                    <tr>
+                        <th>Ticker</th>
+                        <th>Status</th>
+                        <th>Nome</th>
+                        <th>Tipo</th>
+                        <th>YF Ticker</th>
+                        <th>Moeda</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="row : ${assetRows}"
+                        th:classappend="${row.assetStatus.name() == 'EXISTS'} ? 'table-light' : ''">
+                        <td>
+                            <strong th:text="${row.ticker}"></strong>
+                            <input type="hidden" class="asset-field" data-field="ticker" th:value="${row.ticker}">
+                        </td>
+                        <td>
+                            <span th:if="${row.assetStatus.name() == 'EXISTS'}"
+                                  class="badge bg-success">Existente</span>
+                            <span th:if="${row.assetStatus.name() == 'WILL_CREATE'}"
+                                  class="badge bg-info">Novo</span>
+                            <span th:if="${row.assetStatus.name() == 'UNKNOWN'}"
+                                  class="badge bg-warning text-dark">Desconhecido</span>
+                            <input type="hidden" class="asset-field" data-field="status" th:value="${row.assetStatus.name()}">
+                        </td>
+                        <td>
+                            <input th:if="${row.assetStatus.name() != 'EXISTS'}"
+                                   type="text" class="form-control form-control-sm asset-field"
+                                   data-field="name" th:value="${row.name}" style="width:200px">
+                            <span th:if="${row.assetStatus.name() == 'EXISTS'}"
+                                  class="text-muted" th:text="${row.name}"></span>
+                        </td>
+                        <td>
+                            <select th:if="${row.assetStatus.name() != 'EXISTS'}"
+                                    class="form-select form-select-sm asset-field"
+                                    data-field="type" style="width:130px">
+                                <option th:each="t : ${assetTypes}" th:value="${t}" th:text="${t}"
+                                        th:selected="${t == row.type}"></option>
+                            </select>
+                            <span th:if="${row.assetStatus.name() == 'EXISTS'}"
+                                  class="text-muted" th:text="${row.type}"></span>
+                        </td>
+                        <td>
+                            <input th:if="${row.assetStatus.name() != 'EXISTS'}"
+                                   type="text" class="form-control form-control-sm asset-field"
+                                   data-field="yfTicker" th:value="${row.yfTicker}" style="width:120px">
+                            <span th:if="${row.assetStatus.name() == 'EXISTS'}"
+                                  class="text-muted" th:text="${row.yfTicker}"></span>
+                        </td>
+                        <td>
+                            <select th:if="${row.assetStatus.name() != 'EXISTS'}"
+                                    class="form-select form-select-sm asset-field"
+                                    data-field="currency" style="width:80px">
+                                <option value="BRL" th:selected="${row.currency == 'BRL'}">BRL</option>
+                                <option value="USD" th:selected="${row.currency == 'USD'}">USD</option>
+                            </select>
+                            <span th:if="${row.assetStatus.name() == 'EXISTS'}"
+                                  class="text-muted" th:text="${row.currency}"></span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <textarea id="csvRawHidden" class="d-none" th:text="${rawCsv}"></textarea>
+
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <span class="text-muted small">
+                <span th:text="${assetRows.size()}"></span> ativos encontrados
+                <span th:if="${newAssetCount > 0}" class="text-info ms-2">
+                    (<span th:text="${newAssetCount}"></span> novos)
+                </span>
+            </span>
+            <button type="button" class="btn btn-primary" onclick="csvNextStep()">
+                <i class="bi bi-arrow-right"></i> Próximo
+                <span id="csv-step2-spinner" class="d-none">
+                    <span class="spinner-border spinner-border-sm" role="status"></span>
+                </span>
+            </button>
+        </div>
+    </div>
+</div>
+</body>
+</html>

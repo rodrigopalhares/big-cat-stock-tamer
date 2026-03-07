@@ -1,7 +1,10 @@
 package com.stocks.controller
 
 import com.stocks.dto.ASSET_TYPES
+import com.stocks.dto.AssetBatchRow
+import com.stocks.dto.AssetStatus
 import com.stocks.dto.BatchRequest
+import com.stocks.dto.BatchRowRequest
 import com.stocks.dto.TransactionRequest
 import com.stocks.dto.TransactionResponse
 import com.stocks.model.AssetEntity
@@ -134,6 +137,20 @@ class TransactionController(
         @RequestParam csv: String,
         model: Model,
     ): String {
+        val assetRows = transactionService.extractDistinctAssets(csv)
+        val newAssetCount = assetRows.count { it.assetStatus != AssetStatus.EXISTS }
+        model.addAttribute("assetRows", assetRows)
+        model.addAttribute("assetTypes", ASSET_TYPES)
+        model.addAttribute("rawCsv", csv)
+        model.addAttribute("newAssetCount", newAssetCount)
+        return "fragments/csv-asset-review :: csvAssetReview"
+    }
+
+    @PostMapping("/parse-csv-step2")
+    fun parseCsvStep2(
+        @RequestParam csv: String,
+        model: Model,
+    ): String {
         val rows = transactionService.parseCsvWithAssetLookup(csv)
         model.addAttribute("rows", rows)
         return "fragments/csv-preview :: csvPreview"
@@ -142,11 +159,17 @@ class TransactionController(
     @PostMapping("/batch")
     @ResponseBody
     fun batchImport(
-        @RequestBody request: BatchRequest,
+        @RequestBody request: BatchImportRequest,
     ): ResponseEntity<Map<String, Int>> {
-        val inserted = transactionService.batchImport(request)
+        val batchRequest = BatchRequest(rows = request.rows)
+        val inserted = transactionService.batchImport(batchRequest, request.assets ?: emptyList())
         return ResponseEntity.ok(mapOf("inserted" to inserted))
     }
+
+    data class BatchImportRequest(
+        val rows: List<BatchRowRequest>,
+        val assets: List<AssetBatchRow>? = null,
+    )
 
     // --- JSON API Routes ---
 
