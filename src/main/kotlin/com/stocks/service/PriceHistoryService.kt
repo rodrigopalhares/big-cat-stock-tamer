@@ -1,5 +1,6 @@
 package com.stocks.service
 
+import com.stocks.dto.NO_QUOTE_TYPES
 import com.stocks.model.*
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -32,6 +33,7 @@ fun categorizeAssets(assets: List<AssetTickerInfo>): TickerMaps {
     val tdTickerMap = mutableMapOf<String, String>()
 
     for (asset in assets) {
+        if (asset.type in NO_QUOTE_TYPES) continue
         if (asset.type == "TESOURO_DIRETO") {
             if (asset.yfTicker != null) {
                 tdTickerMap[asset.yfTicker] = asset.ticker
