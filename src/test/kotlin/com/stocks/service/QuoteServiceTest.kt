@@ -119,11 +119,9 @@ class QuoteServiceTest :
         }
 
         test("fetchAssetInfo - unknown ticker returns fallback AssetInfo") {
+            // XYZW99 matches BR stock pattern (4 letters + 1-2 digits), only tries .SA
             mockServer
                 .expect(requestTo(containsString("XYZW99.SA")))
-                .andRespond(withResourceNotFound())
-            mockServer
-                .expect(requestTo(containsString("XYZW99")))
                 .andRespond(withResourceNotFound())
 
             val info = service.fetchAssetInfo("XYZW99")
@@ -134,10 +132,7 @@ class QuoteServiceTest :
         }
 
         test("fetchAssetInfo - USD currency is preserved") {
-            // "AAPL" has no dot, so it tries AAPL.SA first (fail), then AAPL (hit)
-            mockServer
-                .expect(requestTo(containsString("AAPL.SA")))
-                .andRespond(withResourceNotFound())
+            // "AAPL" is classified as INTERNATIONAL, tries AAPL first (hit)
             mockServer
                 .expect(requestTo(containsString("AAPL")))
                 .andRespond(withSuccess(loadFixture("yahoo_chart_usd_asset.json"), MediaType.APPLICATION_JSON))
@@ -145,15 +140,18 @@ class QuoteServiceTest :
             val info = service.fetchAssetInfo("AAPL")
             info.currency shouldBe "USD"
             info.name shouldBe "Apple Inc."
+            info.type shouldBe "INTERNATIONAL"
         }
 
-        test("fetchAssetInfo - non-BRL/USD currency defaults to BRL") {
+        test("fetchAssetInfo - non-BRL/USD currency defaults to defaultCurrency from classification") {
             mockServer
                 .expect(requestTo(containsString("SAP.DE")))
                 .andRespond(withSuccess(loadFixture("yahoo_chart_eur_asset.json"), MediaType.APPLICATION_JSON))
 
             val info = service.fetchAssetInfo("SAP.DE")
-            info.currency shouldBe "BRL"
+            // SAP.DE is classified as INTERNATIONAL with defaultCurrency=USD
+            info.currency shouldBe "USD"
+            info.type shouldBe "INTERNATIONAL"
         }
 
         // ==================== fetchExchangeRate ====================

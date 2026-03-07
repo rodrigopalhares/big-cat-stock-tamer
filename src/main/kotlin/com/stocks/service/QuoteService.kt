@@ -36,8 +36,9 @@ class QuoteService(
     // ---------- Asset info via Yahoo Finance v8 API ----------
 
     fun fetchAssetInfo(ticker: String): AssetInfo {
-        val fallbackYf = if ("." !in ticker) "$ticker.SA" else ticker
-        val candidates = if ("." !in ticker) listOf("$ticker.SA", ticker) else listOf(ticker)
+        val classification = classifyTicker(ticker)
+        val candidates = classification.yfCandidates
+        val fallbackYf = candidates.first()
 
         for (yfTicker in candidates) {
             try {
@@ -53,11 +54,12 @@ class QuoteService(
                     when {
                         quoteType == "ETF" -> "ETF"
                         quoteType == "EQUITY" && isBrazilianReit(symbol, name) -> "REIT"
+                        classification.suggestedType != null -> classification.suggestedType
                         else -> "STOCK"
                     }
 
-                var currency = (meta.currency ?: "BRL").uppercase()
-                if (currency !in listOf("BRL", "USD")) currency = "BRL"
+                var currency = (meta.currency ?: classification.defaultCurrency).uppercase()
+                if (currency !in listOf("BRL", "USD")) currency = classification.defaultCurrency
 
                 return AssetInfo(name = name, type = assetType, yfTicker = yfTicker, currency = currency)
             } catch (e: Exception) {
@@ -66,7 +68,8 @@ class QuoteService(
             }
         }
 
-        return AssetInfo(name = ticker, type = "STOCK", yfTicker = fallbackYf, currency = "BRL")
+        val fallbackType = classification.suggestedType ?: "STOCK"
+        return AssetInfo(name = ticker, type = fallbackType, yfTicker = fallbackYf, currency = classification.defaultCurrency)
     }
 
     // ---------- Current quotes ----------
