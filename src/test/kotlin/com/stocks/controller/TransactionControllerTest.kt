@@ -4,6 +4,8 @@ import com.stocks.model.AssetEntity
 import com.stocks.model.TransactionEntity
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.extensions.spring.SpringExtension
+import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
@@ -194,5 +196,209 @@ class TransactionControllerTest(
 
             val count = transaction { TransactionEntity.all().count() }
             assert(count == 1L) { "Expected 1 transaction, got $count" }
+        }
+
+        // --- Filter Tests ---
+
+        test("filter transactions by asset type") {
+            transaction {
+                AssetEntity.new("PETR4") {
+                    name = "Petrobras"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+                AssetEntity.new("MXRF11") {
+                    name = "Maxi Renda"
+                    type = "REIT"
+                    currency = "BRL"
+                }
+                TransactionEntity.new {
+                    assetId = "PETR4"
+                    type = "BUY"
+                    quantity = 10.0
+                    price = 25.0
+                    fees = 0.0
+                    date = LocalDate.of(2024, 1, 1)
+                }
+                TransactionEntity.new {
+                    assetId = "MXRF11"
+                    type = "BUY"
+                    quantity = 100.0
+                    price = 10.0
+                    fees = 0.0
+                    date = LocalDate.of(2024, 1, 1)
+                }
+            }
+
+            val result =
+                mockMvc
+                    .perform(get("/transactions/").param("type", "REIT"))
+                    .andExpect(status().isOk)
+                    .andReturn()
+
+            val body = result.response.contentAsString
+            body shouldContain "<td class=\"fw-bold\">MXRF11</td>"
+            body shouldNotContain "<td class=\"fw-bold\">PETR4</td>"
+        }
+
+        test("filter transactions with position") {
+            transaction {
+                AssetEntity.new("PETR4") {
+                    name = "Petrobras"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+                AssetEntity.new("VALE3") {
+                    name = "Vale"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+                TransactionEntity.new {
+                    assetId = "PETR4"
+                    type = "BUY"
+                    quantity = 10.0
+                    price = 25.0
+                    fees = 0.0
+                    date = LocalDate.of(2024, 1, 1)
+                }
+                TransactionEntity.new {
+                    assetId = "VALE3"
+                    type = "BUY"
+                    quantity = 5.0
+                    price = 60.0
+                    fees = 0.0
+                    date = LocalDate.of(2024, 1, 1)
+                }
+                TransactionEntity.new {
+                    assetId = "VALE3"
+                    type = "SELL"
+                    quantity = 5.0
+                    price = 70.0
+                    fees = 0.0
+                    date = LocalDate.of(2024, 2, 1)
+                }
+            }
+
+            val result =
+                mockMvc
+                    .perform(get("/transactions/").param("position", "with"))
+                    .andExpect(status().isOk)
+                    .andReturn()
+
+            val body = result.response.contentAsString
+            body shouldContain "<td class=\"fw-bold\">PETR4</td>"
+            body shouldNotContain "<td class=\"fw-bold\">VALE3</td>"
+        }
+
+        test("filter transactions without position") {
+            transaction {
+                AssetEntity.new("PETR4") {
+                    name = "Petrobras"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+                AssetEntity.new("VALE3") {
+                    name = "Vale"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+                TransactionEntity.new {
+                    assetId = "PETR4"
+                    type = "BUY"
+                    quantity = 10.0
+                    price = 25.0
+                    fees = 0.0
+                    date = LocalDate.of(2024, 1, 1)
+                }
+                TransactionEntity.new {
+                    assetId = "VALE3"
+                    type = "BUY"
+                    quantity = 5.0
+                    price = 60.0
+                    fees = 0.0
+                    date = LocalDate.of(2024, 1, 1)
+                }
+                TransactionEntity.new {
+                    assetId = "VALE3"
+                    type = "SELL"
+                    quantity = 5.0
+                    price = 70.0
+                    fees = 0.0
+                    date = LocalDate.of(2024, 2, 1)
+                }
+            }
+
+            val result =
+                mockMvc
+                    .perform(get("/transactions/").param("position", "without"))
+                    .andExpect(status().isOk)
+                    .andReturn()
+
+            val body = result.response.contentAsString
+            body shouldContain "<td class=\"fw-bold\">VALE3</td>"
+            body shouldNotContain "<td class=\"fw-bold\">PETR4</td>"
+        }
+
+        test("filter transactions by type and position combined") {
+            transaction {
+                AssetEntity.new("PETR4") {
+                    name = "Petrobras"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+                AssetEntity.new("MXRF11") {
+                    name = "Maxi Renda"
+                    type = "REIT"
+                    currency = "BRL"
+                }
+                AssetEntity.new("HGLG11") {
+                    name = "CSHG Log"
+                    type = "REIT"
+                    currency = "BRL"
+                }
+                TransactionEntity.new {
+                    assetId = "PETR4"
+                    type = "BUY"
+                    quantity = 10.0
+                    price = 25.0
+                    fees = 0.0
+                    date = LocalDate.of(2024, 1, 1)
+                }
+                TransactionEntity.new {
+                    assetId = "MXRF11"
+                    type = "BUY"
+                    quantity = 100.0
+                    price = 10.0
+                    fees = 0.0
+                    date = LocalDate.of(2024, 1, 1)
+                }
+                TransactionEntity.new {
+                    assetId = "HGLG11"
+                    type = "BUY"
+                    quantity = 50.0
+                    price = 160.0
+                    fees = 0.0
+                    date = LocalDate.of(2024, 1, 1)
+                }
+                TransactionEntity.new {
+                    assetId = "HGLG11"
+                    type = "SELL"
+                    quantity = 50.0
+                    price = 170.0
+                    fees = 0.0
+                    date = LocalDate.of(2024, 2, 1)
+                }
+            }
+
+            val result =
+                mockMvc
+                    .perform(get("/transactions/").param("type", "REIT").param("position", "with"))
+                    .andExpect(status().isOk)
+                    .andReturn()
+
+            val body = result.response.contentAsString
+            body shouldContain "<td class=\"fw-bold\">MXRF11</td>"
+            body shouldNotContain "<td class=\"fw-bold\">PETR4</td>"
+            body shouldNotContain "<td class=\"fw-bold\">HGLG11</td>"
         }
     })

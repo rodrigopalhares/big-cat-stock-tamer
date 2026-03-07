@@ -39,6 +39,7 @@ enum class TickerLookupStatus {
 @Service
 class TransactionService(
     private val quoteService: QuoteService,
+    private val calculationService: CalculationService,
 ) {
     /**
      * Find an existing asset or auto-create it by fetching info from Yahoo Finance.
@@ -147,10 +148,16 @@ class TransactionService(
         }
 
     /**
-     * List transactions, optionally filtered by ticker.
+     * List transactions, optionally filtered by ticker, asset type, and position status.
      */
-    fun listTransactions(ticker: String?): List<TransactionEntity> =
+    fun listTransactions(
+        ticker: String?,
+        type: String? = null,
+        position: String? = null,
+    ): List<TransactionEntity> =
         transaction {
+            val eligibleTickers = resolveEligibleTickers(type, position)
+
             var query =
                 TransactionEntity
                     .all()
@@ -160,8 +167,58 @@ class TransactionService(
                 query = query.filter { it.assetId == ticker.uppercase() }
             }
 
+            if (eligibleTickers != null) {
+                query = query.filter { it.assetId in eligibleTickers }
+            }
+
             query.toList()
         }
+
+    private fun resolveEligibleTickers(
+        type: String?,
+        position: String?,
+    ): Set<String>? {
+        val hasTypeFilter = !type.isNullOrBlank()
+        val hasPositionFilter = !position.isNullOrBlank() && position != "all"
+        if (!hasTypeFilter && !hasPositionFilter) return null
+
+        return transaction {
+            var assets = AssetEntity.all().toList()
+
+            if (hasTypeFilter) {
+                assets = assets.filter { it.type == type }
+            }
+
+            if (hasPositionFilter) {
+                val allTxByAsset =
+                    TransactionEntity.all().toList().groupBy { it.assetId }
+                val tickersWithPosition =
+                    allTxByAsset
+                        .filter { (_, txs) ->
+                            val data =
+                                txs.map {
+                                    TransactionData(
+                                        type = it.type,
+                                        quantity = it.quantity,
+                                        price = it.price,
+                                        fees = it.fees,
+                                        date = it.date,
+                                    )
+                                }
+                            calculationService.calculatePosition(data).quantity > 0
+                        }.keys
+
+                assets =
+                    when (position) {
+                        "with" -> assets.filter { it.ticker.value in tickersWithPosition }
+                        "without" -> assets.filter { it.ticker.value !in tickersWithPosition }
+                        else -> assets
+                    }
+            }
+
+            assets.map { it.ticker.value }.toSet()
+        }
+    }
 
     /**
      * Delete a transaction by ID. Throws 404 if not found.

@@ -137,10 +137,24 @@
                         Histórico
                         <span class="badge bg-secondary ms-1" th:text="${#lists.size(transactions)}"></span>
                     </span>
-                    <a th:if="${selectedTicker != null}" href="/transactions/"
-                        class="btn btn-sm btn-outline-secondary">
-                        <i class="bi bi-x-lg"></i> Limpar filtro
-                    </a>
+                    <div class="d-flex align-items-center gap-2">
+                        <form method="get" action="/transactions/" class="d-flex align-items-center gap-2 mb-0">
+                            <input th:if="${selectedTicker != null}" type="hidden" name="ticker" th:value="${selectedTicker}">
+                            <select name="type" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+                                <option value="">Tipo: Todos</option>
+                                <option th:each="t : ${assetTypes}" th:value="${t}" th:text="${t}" th:selected="${t == selectedType}"></option>
+                            </select>
+                            <select name="position" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+                                <option value="">Posição: Todos</option>
+                                <option value="with" th:selected="${selectedPosition == 'with'}">Com posição</option>
+                                <option value="without" th:selected="${selectedPosition == 'without'}">Sem posição</option>
+                            </select>
+                        </form>
+                        <a th:if="${selectedTicker != null or selectedType != '' or selectedPosition != ''}" href="/transactions/"
+                            class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-x-lg"></i>
+                        </a>
+                    </div>
                 </div>
                 <div class="card-body p-0">
                     <div th:if="${!transactions.isEmpty()}" class="table-responsive">

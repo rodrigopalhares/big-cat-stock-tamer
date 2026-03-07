@@ -77,9 +77,15 @@ class AssetController(
     }
 
     @GetMapping("/")
-    fun listAssets(model: Model): String {
-        model.addAttribute("assets", assetService.findAll())
+    fun listAssets(
+        @RequestParam(required = false) type: String?,
+        @RequestParam(required = false) position: String?,
+        model: Model,
+    ): String {
+        model.addAttribute("assets", assetService.findFiltered(type, position))
         model.addAttribute("assetTypes", ASSET_TYPES)
+        model.addAttribute("selectedType", type ?: "")
+        model.addAttribute("selectedPosition", position ?: "")
         return "assets"
     }
 
