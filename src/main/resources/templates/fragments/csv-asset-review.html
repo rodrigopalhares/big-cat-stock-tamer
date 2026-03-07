@@ -20,6 +20,7 @@
                         <th>Tipo</th>
                         <th>YF Ticker</th>
                         <th>Moeda</th>
+                        <th class="text-center">Ignorar</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -83,6 +84,10 @@
                             </select>
                             <span th:if="${row.assetStatus.name() == 'EXISTS'}"
                                   class="text-muted" th:text="${row.currency}"></span>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox" class="form-check-input asset-ignore-check"
+                                   onchange="onAssetIgnoreToggle(this)">
                         </td>
                     </tr>
                 </tbody>
