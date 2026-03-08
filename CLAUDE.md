@@ -17,6 +17,8 @@ A personal stock portfolio tracking application built with Kotlin and Spring Boo
 - **English Code**: All code (variables, functions, classes, comments) must be in English.
 - **Portuguese UI**: User interface (templates, labels, error messages) can remain in Portuguese.
 - **Surgical Changes**: Make focused changes and ensure verification with tests.
+- **Tests Required**: When creating or modifying a feature, always create or update the corresponding tests.
+- **Skills Maintenance**: When a feature has an associated skill (in `.claude/skills/`), update the skill if the changes affect its scope.
 
 ## Tech Stack
 
