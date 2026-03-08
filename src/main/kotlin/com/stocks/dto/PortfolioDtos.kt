@@ -29,9 +29,3 @@ data class PortfolioSummary(
     val dividendPnl: Double = 0.0,
     val positions: List<AssetPosition>,
 )
-
-data class PriceHistoryResponse(
-    val assetId: String,
-    val date: java.time.LocalDate,
-    val close: Double,
-)

@@ -23,7 +23,7 @@ class MonthlyEvolutionService(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    fun generateMonthRange(
+    internal fun generateMonthRange(
         start: YearMonth,
         end: YearMonth
     ): List<YearMonth> {
@@ -36,7 +36,7 @@ class MonthlyEvolutionService(
         return months
     }
 
-    fun computePositionAtDate(
+    internal fun computePositionAtDate(
         transactions: List<TransactionData>,
         date: LocalDate
     ): PositionCalcResult {
@@ -44,7 +44,7 @@ class MonthlyEvolutionService(
         return calculationService.calculatePosition(filtered)
     }
 
-    fun findFirstTransactionMonth(): YearMonth? =
+    internal fun findFirstTransactionMonth(): YearMonth? =
         transaction {
             val minDate =
                 TransactionEntity
@@ -56,7 +56,7 @@ class MonthlyEvolutionService(
             minDate?.let { YearMonth.from(it) }
         }
 
-    fun getMonthEndPrice(
+    internal fun getMonthEndPrice(
         ticker: String,
         monthEnd: LocalDate
     ): Double? =

@@ -82,4 +82,13 @@ tasks.jacocoTestReport {
         xml.required.set(true)
         html.required.set(true)
     }
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map {
+                fileTree(it) {
+                    exclude("com/stocks/StocksApplication*")
+                }
+            },
+        ),
+    )
 }
