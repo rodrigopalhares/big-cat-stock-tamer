@@ -3,25 +3,25 @@ package com.stocks.service
 import com.stocks.model.AssetEntity
 import com.stocks.model.DividendEntity
 import com.stocks.model.TransactionEntity
+import io.kotest.core.extensions.ApplyExtension
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.extensions.spring.SpringExtension
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.maps.shouldContainKey
 import io.kotest.matchers.shouldBe
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.web.server.ResponseStatusException
 import java.time.LocalDate
 
+@ApplyExtension(SpringExtension::class)
 @SpringBootTest
 @ActiveProfiles("test")
 class DividendServiceTest(
     private val dividendService: DividendService,
 ) : FunSpec({
-
-        extensions(SpringExtension)
 
         beforeEach {
             transaction {

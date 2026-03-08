@@ -1,28 +1,34 @@
 package com.stocks.controller
 
+import com.ninjasquad.springmockk.MockkBean
 import com.stocks.model.*
+import com.stocks.service.QuoteService
+import io.kotest.core.extensions.ApplyExtension
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.extensions.spring.SpringExtension
 import io.kotest.matchers.string.shouldContain
-import org.jetbrains.exposed.sql.transactions.transaction
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import io.mockk.every
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import java.time.LocalDate
 
+@ApplyExtension(SpringExtension::class)
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class MonthlyEvolutionControllerTest(
     private val mockMvc: MockMvc,
+    @MockkBean private val quoteService: QuoteService,
 ) : FunSpec({
 
-        extensions(SpringExtension)
-
         beforeEach {
+            every { quoteService.fetchHistoricalQuotesBatch(any(), any()) } returns emptyMap()
+            every { quoteService.fetchTdHistoricalQuotesBatch(any()) } returns emptyMap()
             transaction {
                 MonthlySnapshotEntity.all().forEach { it.delete() }
                 DividendEntity.all().forEach { it.delete() }
