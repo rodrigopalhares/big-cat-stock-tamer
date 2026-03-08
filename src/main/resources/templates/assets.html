@@ -127,7 +127,8 @@
                                                      data-asset-name=${asset.name != null ? asset.name : ''},
                                                      data-asset-type=${asset.type != null ? asset.type : 'STOCK'},
                                                      data-asset-yf-ticker=${asset.yfTicker != null ? asset.yfTicker : ''},
-                                                     data-asset-currency=${asset.currency != null ? asset.currency : 'BRL'}"
+                                                     data-asset-currency=${asset.currency != null ? asset.currency : 'BRL'},
+                                                     data-asset-delisted=${asset.delisted}"
                                             onclick="openEditModal(this)">
                                         <i class="bi bi-pencil"></i>
                                     </button>
@@ -183,6 +184,10 @@
                             <option value="USD">USD — Dólar</option>
                         </select>
                     </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="editDelisted" name="delisted" value="on">
+                        <label class="form-check-label" for="editDelisted">Deslistado</label>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -204,6 +209,7 @@ function openEditModal(btn) {
     const type     = btn.dataset.assetType || 'STOCK';
     const yfTicker = btn.dataset.assetYfTicker || '';
     const currency = btn.dataset.assetCurrency || 'BRL';
+    const delisted = btn.dataset.assetDelisted === 'true';
     document.getElementById('editModalTicker').textContent = ticker;
     document.getElementById('editAssetForm').action = '/assets/' + ticker + '/edit';
     document.getElementById('editName').value = name;
@@ -212,6 +218,7 @@ function openEditModal(btn) {
         opt.selected = opt.value === type;
     for (let opt of document.getElementById('editCurrency').options)
         opt.selected = opt.value === currency;
+    document.getElementById('editDelisted').checked = delisted;
     new bootstrap.Modal(document.getElementById('editAssetModal')).show();
 }
 </script>

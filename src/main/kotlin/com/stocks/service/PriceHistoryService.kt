@@ -20,6 +20,7 @@ data class AssetTickerInfo(
     val ticker: String,
     val yfTicker: String?,
     val type: String?,
+    val delisted: Boolean = false,
 )
 
 // Result of categorization
@@ -34,6 +35,7 @@ fun categorizeAssets(assets: List<AssetTickerInfo>): TickerMaps {
     val tdTickerMap = mutableMapOf<String, String>()
 
     for (asset in assets) {
+        if (asset.delisted) continue
         if (asset.type in NO_QUOTE_TYPES) continue
         if (asset.type == "TESOURO_DIRETO") {
             if (asset.yfTicker != null) {
@@ -137,11 +139,72 @@ class PriceHistoryService(
         }
     }
 
+    fun generateDelistedPrices(assetTicker: String) {
+        val txPrices =
+            transaction {
+                TransactionEntity
+                    .find { Transactions.assetId eq assetTicker }
+                    .toList()
+                    .sortedBy { it.date }
+                    .map { it.date to it.price }
+            }
+        if (txPrices.isEmpty()) return
+
+        val today = LocalDate.now()
+        val records = mutableListOf<PriceRecord>()
+
+        if (txPrices.size == 1) {
+            val (startDate, price) = txPrices.first()
+            var d = startDate
+            while (!d.isAfter(today)) {
+                records.add(PriceRecord(assetTicker, d, price))
+                d = d.plusDays(1)
+            }
+        } else {
+            for (i in 0 until txPrices.size - 1) {
+                val (dateA, priceA) = txPrices[i]
+                val (dateB, priceB) = txPrices[i + 1]
+                val totalDays =
+                    java.time.temporal.ChronoUnit.DAYS
+                        .between(dateA, dateB)
+                var d = dateA
+                while (d.isBefore(dateB)) {
+                    val dayOffset =
+                        java.time.temporal.ChronoUnit.DAYS
+                            .between(dateA, d)
+                    val price =
+                        if (totalDays > 0) {
+                            priceA + (priceB - priceA) * dayOffset.toDouble() / totalDays.toDouble()
+                        } else {
+                            priceA
+                        }
+                    records.add(PriceRecord(assetTicker, d, price))
+                    d = d.plusDays(1)
+                }
+            }
+            val lastPrice = txPrices.last().second
+            var d = txPrices.last().first
+            while (!d.isAfter(today)) {
+                records.add(PriceRecord(assetTicker, d, lastPrice))
+                d = d.plusDays(1)
+            }
+        }
+
+        upsertPrices(records)
+        logger.info("Generated ${records.size} delisted prices for $assetTicker")
+    }
+
     fun runBackfill() {
         transaction {
             val assets = AssetEntity.all().toList()
             val today = LocalDate.now()
             val startDates = mutableMapOf<String, LocalDate>()
+
+            // Process delisted assets separately
+            val delistedAssets = assets.filter { it.delisted && !it.transactions.empty() }
+            for (asset in delistedAssets) {
+                generateDelistedPrices(asset.ticker.value)
+            }
 
             val assetInfoList =
                 assets.mapNotNull { asset ->
@@ -151,7 +214,7 @@ class PriceHistoryService(
                     val start = if (lastStored != null) lastStored.plusDays(1) else firstTx
                     if (start > today) return@mapNotNull null
                     startDates[ticker] = start
-                    AssetTickerInfo(ticker, asset.yfTicker, asset.type)
+                    AssetTickerInfo(ticker, asset.yfTicker, asset.type, asset.delisted)
                 }
 
             val maps = categorizeAssets(assetInfoList)
@@ -197,10 +260,16 @@ class PriceHistoryService(
             val assets = AssetEntity.all().toList()
             val today = LocalDate.now()
 
+            // Process delisted assets separately
+            val delistedAssets = assets.filter { it.delisted && !it.transactions.empty() }
+            for (asset in delistedAssets) {
+                generateDelistedPrices(asset.ticker.value)
+            }
+
             val assetInfoList =
                 assets
                     .filter { !it.transactions.empty() }
-                    .map { AssetTickerInfo(it.ticker.value, it.yfTicker, it.type) }
+                    .map { AssetTickerInfo(it.ticker.value, it.yfTicker, it.type, it.delisted) }
 
             val maps = categorizeAssets(assetInfoList)
 

@@ -14,6 +14,7 @@ object Assets : IdTable<String>("assets") {
     val name = varchar("name", 255).nullable()
     val type = varchar("type", 50).nullable()
     val currency = varchar("currency", 10).default("BRL")
+    val delisted = bool("delisted").default(false)
     val createdAt = datetime("created_at").clientDefault { LocalDateTime.now() }
 
     override val primaryKey = PrimaryKey(id)
@@ -29,6 +30,7 @@ class AssetEntity(
     var name by Assets.name
     var type by Assets.type
     var currency by Assets.currency
+    var delisted by Assets.delisted
     var createdAt by Assets.createdAt
 
     val transactions by TransactionEntity referrersOn Transactions.assetId

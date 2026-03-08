@@ -403,6 +403,58 @@ class AssetControllerTest(
             body shouldContain "10/03/2024"
         }
 
+        test("edit asset with delisted flag") {
+            transaction {
+                AssetEntity.new("PETR4") {
+                    name = "Petrobras"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+            }
+
+            mockMvc
+                .perform(
+                    post("/assets/PETR4/edit")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("name", "Petrobras")
+                        .param("type", "STOCK")
+                        .param("currency", "BRL")
+                        .param("yf_ticker", "")
+                        .param("delisted", "on")
+                ).andExpect(status().is3xxRedirection)
+
+            val updated = transaction { AssetEntity.findById("PETR4")!! }
+            transaction {
+                updated.delisted shouldBe true
+            }
+        }
+
+        test("edit asset without delisted defaults to false") {
+            transaction {
+                AssetEntity.new("PETR4") {
+                    name = "Petrobras"
+                    type = "STOCK"
+                    currency = "BRL"
+                    delisted = true
+                }
+            }
+
+            mockMvc
+                .perform(
+                    post("/assets/PETR4/edit")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("name", "Petrobras")
+                        .param("type", "STOCK")
+                        .param("currency", "BRL")
+                        .param("yf_ticker", "")
+                ).andExpect(status().is3xxRedirection)
+
+            val updated = transaction { AssetEntity.findById("PETR4")!! }
+            transaction {
+                updated.delisted shouldBe false
+            }
+        }
+
         test("edit asset with returnTo redirects correctly") {
             transaction {
                 AssetEntity.new("PETR4") {

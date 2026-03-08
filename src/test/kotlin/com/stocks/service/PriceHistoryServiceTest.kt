@@ -72,6 +72,16 @@ class CategorizeAssetsTest :
             result.yfTickerMap shouldBe mapOf("PETR4.SA" to "PETR4", "BOVA11.SA" to "BOVA11")
             result.tdTickerMap shouldBe mapOf("Tesouro Selic;01/03/2029" to "TD1")
         }
+
+        test("categorizeAssets skips delisted asset") {
+            val assets =
+                listOf(
+                    AssetTickerInfo("PETR4", null, "STOCK", delisted = true),
+                    AssetTickerInfo("VALE3", null, "STOCK"),
+                )
+            val result = categorizeAssets(assets)
+            result.yfTickerMap shouldBe mapOf("VALE3.SA" to "VALE3")
+        }
     })
 
 class FilterBatchToRecordsTest :
@@ -251,6 +261,116 @@ class PriceHistoryServiceIntegrationTest(
         }
 
         // --- runBackfill ---
+
+        // --- generateDelistedPrices ---
+
+        test("generateDelistedPrices with no transactions does nothing") {
+            transaction {
+                AssetEntity.new("DELIST1") {
+                    name = "Delisted Corp"
+                    type = "STOCK"
+                    currency = "BRL"
+                    delisted = true
+                }
+            }
+
+            priceHistoryService.generateDelistedPrices("DELIST1")
+
+            val count = transaction { PriceHistories.selectAll().count() }
+            count shouldBe 0
+        }
+
+        test("generateDelistedPrices with one transaction repeats price") {
+            val txDate = LocalDate.now().minusDays(3)
+            transaction {
+                AssetEntity.new("DELIST1") {
+                    name = "Delisted Corp"
+                    type = "STOCK"
+                    currency = "BRL"
+                    delisted = true
+                }
+                TransactionEntity.new {
+                    assetId = "DELIST1"
+                    type = "BUY"
+                    quantity = 10.0
+                    price = 25.0
+                    fees = 0.0
+                    date = txDate
+                }
+            }
+
+            priceHistoryService.generateDelistedPrices("DELIST1")
+
+            val count = transaction { PriceHistories.selectAll().count() }
+            // txDate to today inclusive = 4 days
+            count shouldBe 4
+            priceHistoryService.getLatestPrice("DELIST1") shouldBe (25.0 plusOrMinus 0.001)
+        }
+
+        test("generateDelistedPrices with two transactions interpolates") {
+            val dateA = LocalDate.of(2024, 1, 1)
+            val dateB = LocalDate.of(2024, 1, 5)
+            transaction {
+                AssetEntity.new("DELIST2") {
+                    name = "Delisted Corp 2"
+                    type = "STOCK"
+                    currency = "BRL"
+                    delisted = true
+                }
+                TransactionEntity.new {
+                    assetId = "DELIST2"
+                    type = "BUY"
+                    quantity = 10.0
+                    price = 10.0
+                    fees = 0.0
+                    date = dateA
+                }
+                TransactionEntity.new {
+                    assetId = "DELIST2"
+                    type = "SELL"
+                    quantity = 10.0
+                    price = 20.0
+                    fees = 0.0
+                    date = dateB
+                }
+            }
+
+            priceHistoryService.generateDelistedPrices("DELIST2")
+
+            // Check interpolated price on Jan 3 (day 2 out of 4-day span): 10 + (20-10)*2/4 = 15.0
+            val jan3Price =
+                priceHistoryService.getPricesForDate(listOf("DELIST2"), LocalDate.of(2024, 1, 3))
+            jan3Price["DELIST2"] shouldBe (15.0 plusOrMinus 0.001)
+
+            // Price on dateB and after should be flat at 20.0
+            val latestPrice = priceHistoryService.getLatestPrice("DELIST2")
+            latestPrice shouldBe (20.0 plusOrMinus 0.001)
+        }
+
+        test("runBackfill processes delisted assets without calling Yahoo API") {
+            transaction {
+                AssetEntity.new("DELIST1") {
+                    name = "Delisted Corp"
+                    type = "STOCK"
+                    currency = "BRL"
+                    delisted = true
+                }
+                TransactionEntity.new {
+                    assetId = "DELIST1"
+                    type = "BUY"
+                    quantity = 10.0
+                    price = 25.0
+                    fees = 0.0
+                    date = LocalDate.now().minusDays(2)
+                }
+            }
+
+            // No mocking needed - delisted should not call quoteService
+            priceHistoryService.runBackfill()
+
+            val count = transaction { PriceHistories.selectAll().count() }
+            count shouldBe 3 // 3 days: today-2, today-1, today
+        }
 
         test("runBackfill stock asset fetches and stores prices") {
             transaction {
