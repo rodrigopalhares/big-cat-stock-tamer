@@ -198,9 +198,10 @@ class AssetController(
         @RequestParam(defaultValue = "STOCK") type: String,
         @RequestParam(name = "yf_ticker", defaultValue = "") yfTicker: String,
         @RequestParam(defaultValue = "BRL") currency: String,
+        @RequestParam(defaultValue = "false") delisted: String,
         @RequestParam(name = "returnTo", required = false) returnTo: String?,
     ): String {
-        assetService.update(ticker, name, type, yfTicker, currency)
+        assetService.update(ticker, name, type, yfTicker, currency, delisted = (delisted == "on" || delisted == "true"))
         return "redirect:${returnTo ?: "/assets/"}"
     }
 

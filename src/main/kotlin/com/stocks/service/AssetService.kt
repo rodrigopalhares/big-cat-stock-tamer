@@ -94,7 +94,8 @@ class AssetService(
         name: String?,
         type: String?,
         yfTicker: String?,
-        currency: String?
+        currency: String?,
+        delisted: Boolean,
     ): AssetResponse =
         transaction {
             val asset =
@@ -105,6 +106,7 @@ class AssetService(
             asset.type = type?.ifBlank { "STOCK" }
             asset.yfTicker = yfTicker?.ifBlank { null }
             asset.currency = currency?.ifBlank { "BRL" } ?: asset.currency
+            asset.delisted = delisted
 
             asset.toResponse()
         }

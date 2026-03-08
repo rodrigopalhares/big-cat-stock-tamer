@@ -32,6 +32,7 @@ class PortfolioService(
             for (asset in assets) {
                 val ticker = asset.ticker.value
                 if (asset.transactions.empty()) continue
+                if (asset.delisted) continue
                 if (asset.type in NO_QUOTE_TYPES) continue
                 if (asset.type == "TESOURO_DIRETO") {
                     if (asset.yfTicker != null) tdTickerToAsset[asset.yfTicker!!] = ticker

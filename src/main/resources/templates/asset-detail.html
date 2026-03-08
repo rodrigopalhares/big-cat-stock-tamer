@@ -52,6 +52,11 @@
                                 <option value="USD" th:selected="${asset.currency == 'USD'}">USD — Dólar</option>
                             </select>
                         </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="delistedCheck" name="delisted" value="on"
+                                   th:checked="${asset.delisted}">
+                            <label class="form-check-label" for="delistedCheck">Deslistado</label>
+                        </div>
                         <button type="submit" class="btn btn-primary w-100">
                             <i class="bi bi-check-lg"></i> Salvar
                         </button>
