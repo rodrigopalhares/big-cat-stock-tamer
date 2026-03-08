@@ -103,7 +103,9 @@
                         </thead>
                         <tbody>
                             <tr th:each="asset : ${assets}">
-                                <td class="fw-bold" th:text="${asset.ticker}"></td>
+                                <td class="fw-bold">
+                                    <a th:href="'/assets/' + ${asset.ticker}" class="text-decoration-none" th:text="${asset.ticker}"></a>
+                                </td>
                                 <td class="text-muted" th:text="${asset.name != null ? asset.name : '—'}"></td>
                                 <td>
                                     <span th:if="${asset.type != null}" th:replace="~{fragments/badge :: assetBadge(${asset.type})}"></span>

@@ -161,8 +161,8 @@ class DividendControllerTest(
                     .andReturn()
 
             val body = result.response.contentAsString
-            body shouldContain "<td class=\"fw-bold\">PETR4</td>"
-            body shouldNotContain "<td class=\"fw-bold\">VALE3</td>"
+            body shouldContain "PETR4</a>"
+            body shouldNotContain "VALE3</a>"
         }
 
         test("filter dividends by type via api") {

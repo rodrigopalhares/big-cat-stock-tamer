@@ -175,7 +175,9 @@
                             <tbody>
                                 <tr th:each="t : ${transactions}">
                                     <td th:text="${#temporals.format(t.date, 'dd/MM/yyyy')}"></td>
-                                    <td class="fw-bold" th:text="${t.assetTicker}"></td>
+                                    <td class="fw-bold">
+                                        <a th:href="'/assets/' + ${t.assetTicker}" class="text-decoration-none" th:text="${t.assetTicker}"></a>
+                                    </td>
                                     <td>
                                         <span class="badge"
                                             th:classappend="${t.type == 'BUY'} ? 'bg-success' : 'bg-danger'"
