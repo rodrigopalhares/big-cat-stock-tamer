@@ -21,6 +21,7 @@ class AssetService(
     fun findFiltered(
         type: String?,
         position: String?,
+        delisted: String? = null,
     ): List<AssetResponse> =
         transaction {
             var assets = AssetEntity.all().sortedBy { it.ticker.value }.toList()
@@ -39,10 +40,19 @@ class AssetService(
                     }
             }
 
+            if (!delisted.isNullOrBlank()) {
+                assets =
+                    when (delisted) {
+                        "active" -> assets.filter { !it.delisted }
+                        "delisted" -> assets.filter { it.delisted }
+                        else -> assets
+                    }
+            }
+
             assets.map { it.toResponse() }
         }
 
-    private fun computeTickersWithPosition(): Set<String> {
+    fun computeTickersWithPosition(): Set<String> {
         val allTransactions =
             com.stocks.model.TransactionEntity
                 .all()

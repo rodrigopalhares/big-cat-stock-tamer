@@ -189,6 +189,7 @@ class PortfolioService(
                     exchangeRate = exchangeRate,
                     currentValueBrl = currentValueBrl,
                     unrealizedPnlBrl = unrealizedPnlBrl,
+                    delisted = asset.delisted,
                 )
             )
         }

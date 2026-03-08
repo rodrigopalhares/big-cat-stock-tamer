@@ -191,7 +191,7 @@ class PriceHistoryService(
         }
 
         upsertPrices(records)
-        logger.info("Generated ${records.size} delisted prices for $assetTicker")
+        logger.debug("Generated ${records.size} delisted prices for $assetTicker")
     }
 
     fun runBackfill() {

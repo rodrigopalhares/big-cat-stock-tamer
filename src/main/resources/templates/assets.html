@@ -81,8 +81,13 @@
                             <option value="with" th:selected="${selectedPosition == 'with'}">Com posição</option>
                             <option value="without" th:selected="${selectedPosition == 'without'}">Sem posição</option>
                         </select>
+                        <select name="delisted" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+                            <option value="">Status: Todos</option>
+                            <option value="active" th:selected="${selectedDelisted == 'active'}">Apenas ativos</option>
+                            <option value="delisted" th:selected="${selectedDelisted == 'delisted'}">Apenas deslistados</option>
+                        </select>
                     </form>
-                    <a th:if="${selectedType != '' or selectedPosition != ''}" href="/assets/"
+                    <a th:if="${selectedType != '' or selectedPosition != '' or selectedDelisted != ''}" href="/assets/"
                        class="btn btn-sm btn-outline-secondary">
                         <i class="bi bi-x-lg"></i>
                     </a>
@@ -102,9 +107,11 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr th:each="asset : ${assets}">
+                            <tr th:each="asset : ${assets}"
+                                th:style="${!#sets.contains(tickersWithPosition, asset.ticker)} ? 'opacity: 0.55' : ''">
                                 <td class="fw-bold">
                                     <a th:href="'/assets/' + ${asset.ticker}" class="text-decoration-none" th:text="${asset.ticker}"></a>
+                                    <i th:if="${asset.delisted}" class="bi bi-x-circle text-secondary ms-1" title="Deslistado" style="font-size: 0.8em"></i>
                                 </td>
                                 <td class="text-muted" th:text="${asset.name != null ? asset.name : '—'}"></td>
                                 <td>
