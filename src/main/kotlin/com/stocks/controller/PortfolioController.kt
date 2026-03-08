@@ -40,7 +40,9 @@ class PortfolioController(
                 positions to summary
             }
 
-        model.addAttribute("positions", positions)
+        val sortedPositions = positions.sortedWith(compareBy({ it.type ?: "" }, { it.ticker }))
+        model.addAttribute("positions", sortedPositions)
+        model.addAttribute("assetTypes", positions.mapNotNull { it.type }.distinct().sorted())
         model.addAttribute("totalInvested", summary.totalInvested)
         model.addAttribute("realizedPnl", summary.realizedPnl)
         model.addAttribute("currentValue", summary.currentValue)

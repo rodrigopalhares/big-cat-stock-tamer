@@ -26,7 +26,7 @@
 
 <!-- Summary cards -->
 <div class="row g-3 mb-4">
-    <div class="col-sm-6 col-lg-3">
+    <div class="col-sm-6 col-xl">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="text-muted small mb-1">Total Investido<span th:if="${hasUsd}" class="text-info"> (BRL)</span></div>
@@ -34,7 +34,7 @@
             </div>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
+    <div class="col-sm-6 col-xl">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="text-muted small mb-1">Lucro Realizado<span th:if="${hasUsd}" class="text-info"> (BRL)</span></div>
@@ -44,7 +44,7 @@
             </div>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
+    <div class="col-sm-6 col-xl">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="text-muted small mb-1">Valor de Mercado<span th:if="${hasUsd}" class="text-info"> (BRL)</span></div>
@@ -55,7 +55,7 @@
             </div>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
+    <div class="col-sm-6 col-xl">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="text-muted small mb-1">Lucro Não Realizado<span th:if="${hasUsd}" class="text-info"> (BRL)</span></div>
@@ -67,7 +67,7 @@
             </div>
         </div>
     </div>
-    <div class="col-sm-6 col-lg-3">
+    <div class="col-sm-6 col-xl">
         <div class="card border-0 shadow-sm h-100">
             <div class="card-body">
                 <div class="text-muted small mb-1"><i class="bi bi-cash-coin me-1"></i>Proventos Recebidos</div>
@@ -91,35 +91,47 @@
 
 <!-- Positions table -->
 <div class="card border-0 shadow-sm">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <div class="card-header bg-white">
         <span class="fw-semibold">Posições</span>
-        <a href="/transactions/" class="btn btn-sm btn-primary">
-            <i class="bi bi-plus-lg"></i> Nova Transação
-        </a>
+    </div>
+    <div class="card-body border-bottom py-2">
+        <div class="row g-2 align-items-center">
+            <div class="col-auto">
+                <select id="filterType" class="form-select form-select-sm">
+                    <option value="">Todos os tipos</option>
+                    <option th:each="t : ${assetTypes}" th:value="${t}" th:text="${t}"></option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <div class="form-check form-check-inline mb-0">
+                    <input id="filterPosition" type="checkbox" class="form-check-input" checked>
+                    <label class="form-check-label small" for="filterPosition">Apenas com posição</label>
+                </div>
+            </div>
+        </div>
     </div>
     <div class="card-body p-0">
         <div th:if="${!positions.isEmpty()}" class="table-responsive">
-            <table class="table table-hover mb-0 align-middle">
+            <table id="positionsTable" class="table table-hover mb-0 align-middle">
                 <thead class="table-light">
                     <tr>
-                        <th>Ticker</th>
-                        <th>Tipo</th>
-                        <th>Moeda</th>
-                        <th class="text-end">Qtd</th>
-                        <th class="text-end">Preço Médio</th>
-                        <th class="text-end">Cotação</th>
-                        <th class="text-end">Valor Atual</th>
-                        <th class="text-end">Lucro Não Real.</th>
-                        <th class="text-end">Custo Total</th>
-                        <th class="text-end">Proventos</th>
-                        <th class="text-end">Lucro Realizado</th>
-                        <th class="text-end">TIR/mês</th>
-                        <th class="text-end">TIR/ano</th>
-                        <th class="text-center">Ações</th>
+                        <th data-sort="text">Ticker<span class="sort-arrow"></span></th>
+                        <th data-sort="text">Tipo<span class="sort-arrow"></span></th>
+                        <th data-sort="text">Moeda<span class="sort-arrow"></span></th>
+                        <th class="text-end" data-sort="num">Qtd<span class="sort-arrow"></span></th>
+                        <th class="text-end" data-sort="num">Preço Médio<span class="sort-arrow"></span></th>
+                        <th class="text-end" data-sort="num">Cotação<span class="sort-arrow"></span></th>
+                        <th class="text-end" data-sort="num">Valor Atual<span class="sort-arrow"></span></th>
+                        <th class="text-end" data-sort="num">Lucro Não Real.<span class="sort-arrow"></span></th>
+                        <th class="text-end" data-sort="num">Custo Total<span class="sort-arrow"></span></th>
+                        <th class="text-end" data-sort="num">Proventos<span class="sort-arrow"></span></th>
+                        <th class="text-end" data-sort="num">Lucro Realizado<span class="sort-arrow"></span></th>
+                        <th class="text-end" data-sort="num">TIR/mês<span class="sort-arrow"></span></th>
+                        <th class="text-end" data-sort="num">TIR/ano<span class="sort-arrow"></span></th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr th:each="p : ${positions}">
+                    <tr th:each="p : ${positions}" th:attr="data-type=${p.type},data-quantity=${p.quantity}">
                         <th:block th:with="sym=${p.currency == 'USD' ? 'US$' : 'R$'}">
                         <td>
                             <a th:href="'/assets/' + ${p.ticker}" class="fw-bold text-decoration-none" th:text="${p.ticker}"></a>
@@ -176,11 +188,6 @@
                             <span th:if="${p.irrAnnual != null}" th:text="${#numbers.formatDecimal(p.irrAnnual * 100, 1, 2) + '%'}"></span>
                             <span th:unless="${p.irrAnnual != null}">—</span>
                         </td>
-                        <td class="text-center">
-                            <a th:href="'/transactions/?ticker=' + ${#uris.escapeQueryParam(p.ticker)}" class="btn btn-sm btn-outline-secondary">
-                                <i class="bi bi-list-ul"></i>
-                            </a>
-                        </td>
                         </th:block>
                     </tr>
                 </tbody>
@@ -200,6 +207,7 @@
 <div th:if="${hasEvolutionData}" id="evolution-data" hidden
      th:attr="data-labels=${chartLabels},data-datasets=${chartDatasets},data-invested=${chartInvestedLine}"></div>
 <script th:if="${hasEvolutionData}" src="/js/dashboard.js"></script>
+<script src="/js/dashboard-table.js"></script>
 
 </body>
 </html>
