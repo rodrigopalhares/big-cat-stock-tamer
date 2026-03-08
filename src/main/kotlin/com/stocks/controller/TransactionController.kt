@@ -140,6 +140,31 @@ class TransactionController(
         return "redirect:/transactions/"
     }
 
+    @PostMapping("/{transactionId}/edit")
+    fun editTransaction(
+        @PathVariable transactionId: Int,
+        @RequestParam type: String,
+        @RequestParam quantity: Double,
+        @RequestParam price: Double,
+        @RequestParam(defaultValue = "0.0") fees: Double,
+        @RequestParam date: String,
+        @RequestParam(defaultValue = "") broker: String,
+        @RequestParam(defaultValue = "") notes: String,
+        @RequestParam(name = "returnTo", required = false) returnTo: String?,
+    ): String {
+        transactionService.updateTransaction(
+            id = transactionId,
+            type = type,
+            quantity = quantity,
+            price = price,
+            fees = fees,
+            date = LocalDate.parse(date),
+            broker = broker,
+            notes = notes,
+        )
+        return "redirect:${returnTo ?: "/transactions/"}"
+    }
+
     @PostMapping("/{transactionId}/delete")
     fun deleteTransaction(
         @PathVariable transactionId: Int,

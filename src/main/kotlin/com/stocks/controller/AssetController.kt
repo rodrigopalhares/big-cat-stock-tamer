@@ -3,6 +3,7 @@ package com.stocks.controller
 import com.stocks.dto.ASSET_TYPES
 import com.stocks.dto.AssetRequest
 import com.stocks.dto.AssetResponse
+import com.stocks.dto.DIVIDEND_TYPES
 import com.stocks.service.AssetService
 import com.stocks.service.DividendService
 import com.stocks.service.QuoteService
@@ -129,6 +130,7 @@ class AssetController(
         model.addAttribute("transactions", transactions)
         model.addAttribute("dividends", dividends)
         model.addAttribute("assetTypes", ASSET_TYPES)
+        model.addAttribute("dividendTypes", DIVIDEND_TYPES)
         return "asset-detail"
     }
 
