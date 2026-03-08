@@ -1,0 +1,14 @@
+# Secrets and credentials
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.jks
+
+# Database files
+data/
+
+# IDE and OS
+.idea/
+*.iml
