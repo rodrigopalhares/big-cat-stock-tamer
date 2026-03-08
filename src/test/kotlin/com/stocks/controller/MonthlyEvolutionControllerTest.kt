@@ -25,6 +25,7 @@ class MonthlyEvolutionControllerTest(
         beforeEach {
             transaction {
                 MonthlySnapshotEntity.all().forEach { it.delete() }
+                DividendEntity.all().forEach { it.delete() }
                 TransactionEntity.all().forEach { it.delete() }
                 PriceHistoryEntity.all().forEach { it.delete() }
                 AssetEntity.all().forEach { it.delete() }

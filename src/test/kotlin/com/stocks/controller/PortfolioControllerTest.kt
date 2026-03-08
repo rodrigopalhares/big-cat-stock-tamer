@@ -1,6 +1,7 @@
 package com.stocks.controller
 
 import com.stocks.model.AssetEntity
+import com.stocks.model.DividendEntity
 import com.stocks.model.TransactionEntity
 import com.stocks.service.QuoteService
 import io.kotest.core.spec.style.FunSpec
@@ -26,6 +27,7 @@ class PortfolioControllerTest(
 
         beforeEach {
             transaction {
+                DividendEntity.all().forEach { it.delete() }
                 TransactionEntity.all().forEach { it.delete() }
                 AssetEntity.all().forEach { it.delete() }
             }

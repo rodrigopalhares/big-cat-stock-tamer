@@ -2,6 +2,7 @@ package com.stocks.service
 
 import com.ninjasquad.springmockk.MockkBean
 import com.stocks.model.AssetEntity
+import com.stocks.model.DividendEntity
 import com.stocks.model.PriceHistories
 import com.stocks.model.TransactionEntity
 import io.kotest.core.spec.style.FunSpec
@@ -138,6 +139,7 @@ class PriceHistoryServiceIntegrationTest(
             transaction {
                 // Clean up in correct order: prices -> transactions -> assets
                 PriceHistories.deleteAll()
+                DividendEntity.all().forEach { it.delete() }
                 TransactionEntity.all().forEach { it.delete() }
                 AssetEntity.all().forEach { it.delete() }
             }

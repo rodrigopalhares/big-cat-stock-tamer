@@ -32,6 +32,7 @@ class AssetEntity(
     var createdAt by Assets.createdAt
 
     val transactions by TransactionEntity referrersOn Transactions.assetId
+    val dividends by DividendEntity referrersOn Dividends.assetId
     val priceHistory by PriceHistoryEntity referrersOn PriceHistories.assetId
     val monthlySnapshots by MonthlySnapshotEntity referrersOn MonthlySnapshots.assetId
 }

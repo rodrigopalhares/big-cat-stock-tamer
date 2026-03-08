@@ -12,6 +12,7 @@ class PortfolioService(
     private val calculationService: CalculationService,
     private val quoteService: QuoteService,
     private val priceHistoryService: PriceHistoryService,
+    private val dividendService: DividendService,
 ) {
     fun buildPositions(
         assets: List<AssetEntity>,
@@ -92,6 +93,9 @@ class PortfolioService(
             }
         }
 
+        val dividendPnlByAsset = dividendService.getDividendPnlByAsset()
+        val dividendCashFlowsByAsset = dividendService.getDividendCashFlowsByAsset()
+
         for (asset in assets) {
             val ticker = asset.ticker.value
             val txList = asset.transactions.toList()
@@ -141,8 +145,12 @@ class PortfolioService(
                     null
                 }
 
-            val irr = calculationService.calculateIrr(calc.cashFlows, currentValue)
-            val irrAnnual = calculationService.calculateXirr(calc.cashFlows, currentValue)
+            val dividendPnl = dividendPnlByAsset[ticker] ?: 0.0
+            val dividendCashFlows = dividendCashFlowsByAsset[ticker] ?: emptyList()
+            val allCashFlows = (calc.cashFlows + dividendCashFlows).sortedBy { it.first }
+
+            val irr = calculationService.calculateIrr(allCashFlows, currentValue)
+            val irrAnnual = calculationService.calculateXirr(allCashFlows, currentValue)
             val irrMonthly = irrAnnual?.let { Math.pow(1 + it, 1.0 / 12.0) - 1 }
 
             val currency = asset.currency
@@ -172,6 +180,7 @@ class PortfolioService(
                     currentValue = currentValue,
                     unrealizedPnl = unrealizedPnl,
                     realizedPnl = calc.realizedPnl,
+                    dividendPnl = dividendPnl,
                     irr = irr,
                     irrAnnual = irrAnnual,
                     irrMonthly = irrMonthly,
@@ -200,11 +209,17 @@ class PortfolioService(
         val unrealizedBrl = positions.mapNotNull { it.unrealizedPnlBrl }
         val unrealizedPnl = if (unrealizedBrl.isNotEmpty()) unrealizedBrl.sum() else null
 
+        val dividendPnl =
+            positions.sumOf { p ->
+                if (p.exchangeRate != null) p.dividendPnl * p.exchangeRate else p.dividendPnl
+            }
+
         return PortfolioSummary(
             totalInvested = totalInvested,
             currentValue = currentValue,
             realizedPnl = realizedPnl,
             unrealizedPnl = unrealizedPnl,
+            dividendPnl = dividendPnl,
             positions = positions,
         )
     }
