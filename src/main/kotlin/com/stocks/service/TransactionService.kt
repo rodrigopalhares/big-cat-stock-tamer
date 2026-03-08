@@ -1,12 +1,5 @@
 package com.stocks.service
 
-import com.stocks.dto.AssetBatchRow
-import com.stocks.dto.AssetInfo
-import com.stocks.dto.AssetStatus
-import com.stocks.dto.BatchRequest
-import com.stocks.dto.CsvAssetRow
-import com.stocks.dto.CsvRow
-import com.stocks.dto.parseCsvRows
 import com.stocks.model.AssetEntity
 import com.stocks.model.TransactionEntity
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
@@ -259,104 +252,6 @@ class TransactionService(
                 TransactionEntity.findById(id)
                     ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found")
             tx.delete()
-        }
-    }
-
-    /**
-     * Batch import transactions from parsed CSV rows.
-     * Creates new assets from the provided asset list before inserting transactions.
-     */
-    fun batchImport(
-        request: BatchRequest,
-        newAssets: List<AssetBatchRow> = emptyList(),
-    ): Int {
-        var inserted = 0
-        transaction {
-            for (asset in newAssets) {
-                val normalized = asset.ticker.uppercase().trim()
-                if (AssetEntity.findById(normalized) == null) {
-                    AssetEntity.new(normalized) {
-                        yfTicker = asset.yfTicker.ifBlank { null }
-                        name = asset.name.ifBlank { null }
-                        type = asset.type.ifBlank { "STOCK" }
-                        currency = asset.currency.ifBlank { "BRL" }
-                    }
-                }
-            }
-
-            for (row in request.rows) {
-                val normalized = row.ticker.uppercase().trim()
-                findOrCreateAsset(normalized)
-
-                TransactionEntity.new {
-                    assetId = normalized
-                    type = row.type.uppercase()
-                    quantity = row.quantity
-                    price = row.price
-                    fees = row.fees
-                    date = LocalDate.parse(row.date)
-                    broker = row.broker.ifBlank { null }
-                    notes = row.notes.ifBlank { null }
-                }
-                inserted++
-            }
-        }
-        return inserted
-    }
-
-    /**
-     * Extract distinct tickers from CSV and resolve asset info for each.
-     */
-    fun extractDistinctAssets(rawCsv: String): List<CsvAssetRow> {
-        val lines = rawCsv.lines().filter { it.isNotBlank() }
-        val tickers =
-            lines
-                .mapNotNull { line ->
-                    val cols = line.split("\t")
-                    cols
-                        .getOrNull(0)
-                        ?.trim()
-                        ?.uppercase()
-                        ?.takeIf { it.isNotBlank() }
-                }.distinct()
-
-        val existingTickers = transaction { AssetEntity.all().map { it.ticker.value }.toSet() }
-
-        return tickers.map { ticker ->
-            if (ticker in existingTickers) {
-                val asset = transaction { AssetEntity.findById(ticker)!! }
-                CsvAssetRow(
-                    ticker = ticker,
-                    name = transaction { asset.name ?: "" },
-                    type = transaction { asset.type ?: "STOCK" },
-                    yfTicker = transaction { asset.yfTicker ?: "" },
-                    currency = transaction { asset.currency },
-                    assetStatus = AssetStatus.EXISTS,
-                )
-            } else {
-                val info: AssetInfo = quoteService.fetchAssetInfo(ticker)
-                val found = info.name != ticker
-                CsvAssetRow(
-                    ticker = ticker,
-                    name = if (found) info.name else "",
-                    type = if (found) info.type else "STOCK",
-                    yfTicker = info.yfTicker,
-                    currency = info.currency,
-                    assetStatus = if (found) AssetStatus.WILL_CREATE else AssetStatus.UNKNOWN,
-                )
-            }
-        }
-    }
-
-    /**
-     * Parse CSV text and resolve asset statuses for unknown tickers.
-     */
-    fun parseCsvWithAssetLookup(csv: String): List<CsvRow> {
-        val existingTickers = transaction { AssetEntity.all().map { it.ticker.value }.toSet() }
-
-        return parseCsvRows(csv, existingTickers) { ticker ->
-            val info = quoteService.fetchAssetInfo(ticker)
-            if (info.name != ticker) AssetStatus.WILL_CREATE else AssetStatus.UNKNOWN
         }
     }
 

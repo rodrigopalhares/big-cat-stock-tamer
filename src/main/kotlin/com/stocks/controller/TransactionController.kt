@@ -9,6 +9,7 @@ import com.stocks.dto.TransactionRequest
 import com.stocks.dto.TransactionResponse
 import com.stocks.model.AssetEntity
 import com.stocks.model.TransactionEntity
+import com.stocks.service.CsvParsingService
 import com.stocks.service.QuoteService
 import com.stocks.service.TickerLookupStatus
 import com.stocks.service.TransactionService
@@ -25,6 +26,7 @@ import java.time.format.DateTimeFormatter
 @RequestMapping("/transactions")
 class TransactionController(
     private val transactionService: TransactionService,
+    private val csvParsingService: CsvParsingService,
     private val quoteService: QuoteService,
 ) {
     // --- HTML Routes ---
@@ -181,7 +183,7 @@ class TransactionController(
         @RequestParam csv: String,
         model: Model,
     ): String {
-        val assetRows = transactionService.extractDistinctAssets(csv)
+        val assetRows = csvParsingService.extractDistinctAssets(csv)
         val newAssetCount = assetRows.count { it.assetStatus != AssetStatus.EXISTS }
         model.addAttribute("assetRows", assetRows)
         model.addAttribute("assetTypes", ASSET_TYPES)
@@ -195,7 +197,7 @@ class TransactionController(
         @RequestParam csv: String,
         model: Model,
     ): String {
-        val rows = transactionService.parseCsvWithAssetLookup(csv)
+        val rows = csvParsingService.parseCsvWithAssetLookup(csv)
         model.addAttribute("rows", rows)
         return "fragments/csv-preview :: csvPreview"
     }
@@ -206,7 +208,7 @@ class TransactionController(
         @RequestBody request: BatchImportRequest,
     ): ResponseEntity<Map<String, Int>> {
         val batchRequest = BatchRequest(rows = request.rows)
-        val inserted = transactionService.batchImport(batchRequest, request.assets ?: emptyList())
+        val inserted = csvParsingService.batchImport(batchRequest, request.assets ?: emptyList())
         return ResponseEntity.ok(mapOf("inserted" to inserted))
     }
 
