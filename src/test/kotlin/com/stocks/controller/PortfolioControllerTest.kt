@@ -4,17 +4,19 @@ import com.stocks.model.AssetEntity
 import com.stocks.model.DividendEntity
 import com.stocks.model.TransactionEntity
 import com.stocks.service.QuoteService
+import io.kotest.core.extensions.ApplyExtension
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.extensions.spring.SpringExtension
-import org.jetbrains.exposed.sql.transactions.transaction
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import java.time.LocalDate
 
+@ApplyExtension(SpringExtension::class)
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -22,8 +24,6 @@ class PortfolioControllerTest(
     private val mockMvc: MockMvc,
     private val quoteService: QuoteService,
 ) : FunSpec({
-
-        extensions(SpringExtension)
 
         beforeEach {
             transaction {

@@ -9,7 +9,7 @@ import com.stocks.dto.CsvRow
 import com.stocks.dto.parseCsvRows
 import com.stocks.model.AssetEntity
 import com.stocks.model.TransactionEntity
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException

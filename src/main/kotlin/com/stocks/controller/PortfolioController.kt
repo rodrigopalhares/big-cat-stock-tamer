@@ -1,18 +1,18 @@
 package com.stocks.controller
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.stocks.dto.AssetPosition
 import com.stocks.dto.PortfolioSummary
 import com.stocks.model.AssetEntity
 import com.stocks.service.MonthlyEvolutionService
 import com.stocks.service.PortfolioService
 import com.stocks.service.PriceHistoryService
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Controller
 import org.springframework.ui.Model
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.server.ResponseStatusException
+import tools.jackson.databind.ObjectMapper
 import java.time.format.DateTimeFormatter
 
 @Controller

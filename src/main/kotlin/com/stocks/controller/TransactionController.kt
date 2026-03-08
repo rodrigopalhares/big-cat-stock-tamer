@@ -12,7 +12,7 @@ import com.stocks.model.TransactionEntity
 import com.stocks.service.QuoteService
 import com.stocks.service.TickerLookupStatus
 import com.stocks.service.TransactionService
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Controller

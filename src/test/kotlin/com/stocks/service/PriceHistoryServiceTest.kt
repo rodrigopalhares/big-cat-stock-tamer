@@ -5,6 +5,7 @@ import com.stocks.model.AssetEntity
 import com.stocks.model.DividendEntity
 import com.stocks.model.PriceHistories
 import com.stocks.model.TransactionEntity
+import io.kotest.core.extensions.ApplyExtension
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.extensions.spring.SpringExtension
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -13,9 +14,9 @@ import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.every
-import org.jetbrains.exposed.sql.deleteAll
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.deleteAll
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
 import java.time.LocalDate
@@ -126,14 +127,13 @@ class FilterBatchToRecordsTest :
 
 // ==================== Integration Tests (SpringBootTest + MockkBean) ====================
 
+@ApplyExtension(SpringExtension::class)
 @SpringBootTest
 @ActiveProfiles("test")
 class PriceHistoryServiceIntegrationTest(
     private val priceHistoryService: PriceHistoryService,
     @MockkBean private val quoteService: QuoteService,
 ) : FunSpec({
-
-        extensions(SpringExtension)
 
         beforeEach {
             transaction {

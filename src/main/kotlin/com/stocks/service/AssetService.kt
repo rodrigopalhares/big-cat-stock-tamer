@@ -4,7 +4,7 @@ import com.stocks.dto.AssetRequest
 import com.stocks.dto.AssetResponse
 import com.stocks.dto.toResponse
 import com.stocks.model.AssetEntity
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException

@@ -4,10 +4,13 @@ import com.stocks.dto.MonthlyEvolutionRow
 import com.stocks.dto.MonthlyEvolutionSummary
 import com.stocks.dto.MonthlySnapshotResponse
 import com.stocks.model.*
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.SortOrder
+import org.jetbrains.exposed.v1.core.and
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.lessEq
+import org.jetbrains.exposed.v1.jdbc.deleteAll
+import org.jetbrains.exposed.v1.jdbc.select
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.LocalDate
@@ -16,6 +19,7 @@ import java.time.YearMonth
 @Service
 class MonthlyEvolutionService(
     private val calculationService: CalculationService,
+    private val priceHistoryService: PriceHistoryService,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -69,6 +73,8 @@ class MonthlyEvolutionService(
         }
 
     fun recalculate() {
+        priceHistoryService.runBackfill()
+
         transaction {
             MonthlySnapshots.deleteAll()
         }

@@ -1,12 +1,12 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("org.springframework.boot") version "3.4.3"
+    id("org.springframework.boot") version "4.0.3"
     id("io.spring.dependency-management") version "1.1.7"
-    kotlin("jvm") version "2.1.10"
-    kotlin("plugin.spring") version "2.1.10"
+    kotlin("jvm") version "2.3.10"
+    kotlin("plugin.spring") version "2.3.10"
     jacoco
-    id("org.jlleitschuh.gradle.ktlint") version "14.0.1"
+    id("org.jlleitschuh.gradle.ktlint") version "14.1.0"
 }
 
 group = "com.stocks"
@@ -25,23 +25,25 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.boot:spring-boot-starter-restclient")
+    implementation("org.springframework.boot:spring-boot-starter-jackson")
 
     // Kotlin
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
     // Exposed ORM
-    implementation("org.jetbrains.exposed:exposed-core:0.57.0")
-    implementation("org.jetbrains.exposed:exposed-dao:0.57.0")
-    implementation("org.jetbrains.exposed:exposed-jdbc:0.57.0")
-    implementation("org.jetbrains.exposed:exposed-java-time:0.57.0")
-    implementation("org.jetbrains.exposed:exposed-spring-boot-starter:0.57.0")
+    implementation("org.jetbrains.exposed:exposed-core:1.1.1")
+    implementation("org.jetbrains.exposed:exposed-dao:1.1.1")
+    implementation("org.jetbrains.exposed:exposed-jdbc:1.1.1")
+    implementation("org.jetbrains.exposed:exposed-java-time:1.1.1")
+    implementation("org.jetbrains.exposed:exposed-spring-boot4-starter:1.1.1")
 
     // H2 Database
     runtimeOnly("com.h2database:h2")
 
     // Flyway
-    implementation("org.flywaydb:flyway-core")
+    implementation("org.springframework.boot:spring-boot-starter-flyway")
 
     // CSV parsing
     implementation("com.github.doyaaaaaken:kotlin-csv-jvm:1.10.0")
@@ -50,12 +52,13 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-test") {
         exclude(group = "org.mockito")
     }
-    testImplementation("io.kotest:kotest-runner-junit5:5.9.1")
-    testImplementation("io.kotest:kotest-assertions-core:5.9.1")
-    testImplementation("io.kotest:kotest-property:5.9.1")
-    testImplementation("io.kotest.extensions:kotest-extensions-spring:1.3.0")
-    testImplementation("io.mockk:mockk:1.13.13")
-    testImplementation("com.ninja-squad:springmockk:4.0.2")
+    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+    testImplementation("io.kotest:kotest-runner-junit5:6.1.4")
+    testImplementation("io.kotest:kotest-assertions-core:6.1.4")
+    testImplementation("io.kotest:kotest-property:6.1.4")
+    testImplementation("io.kotest:kotest-extensions-spring:6.1.4")
+    testImplementation("io.mockk:mockk:1.14.9")
+    testImplementation("com.ninja-squad:springmockk:5.0.1")
 }
 
 kotlin {
