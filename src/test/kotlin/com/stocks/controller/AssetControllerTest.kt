@@ -187,8 +187,8 @@ class AssetControllerTest(
                     .andReturn()
 
             val body = result.response.contentAsString
-            body shouldContain "<td class=\"fw-bold\">MXRF11</td>"
-            body shouldNotContain "<td class=\"fw-bold\">PETR4</td>"
+            body shouldContain "MXRF11</a>"
+            body shouldNotContain "PETR4</a>"
         }
 
         test("filter assets with position") {
@@ -220,8 +220,8 @@ class AssetControllerTest(
                     .andReturn()
 
             val body = result.response.contentAsString
-            body shouldContain "<td class=\"fw-bold\">PETR4</td>"
-            body shouldNotContain "<td class=\"fw-bold\">VALE3</td>"
+            body shouldContain "PETR4</a>"
+            body shouldNotContain "VALE3</a>"
         }
 
         test("filter assets without position") {
@@ -253,8 +253,8 @@ class AssetControllerTest(
                     .andReturn()
 
             val body = result.response.contentAsString
-            body shouldContain "<td class=\"fw-bold\">VALE3</td>"
-            body shouldNotContain "<td class=\"fw-bold\">PETR4</td>"
+            body shouldContain "VALE3</a>"
+            body shouldNotContain "PETR4</a>"
         }
 
         test("filter assets by type and position combined") {
@@ -299,9 +299,130 @@ class AssetControllerTest(
                     .andReturn()
 
             val body = result.response.contentAsString
-            body shouldContain "<td class=\"fw-bold\">MXRF11</td>"
-            body shouldNotContain "<td class=\"fw-bold\">PETR4</td>"
-            body shouldNotContain "<td class=\"fw-bold\">HGLG11</td>"
+            body shouldContain "MXRF11</a>"
+            body shouldNotContain "PETR4</a>"
+            body shouldNotContain "HGLG11</a>"
+        }
+
+        // --- Asset Detail Tests ---
+
+        test("asset detail page returns 200 with asset data") {
+            transaction {
+                AssetEntity.new("PETR4") {
+                    name = "Petrobras"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+            }
+
+            val result =
+                mockMvc
+                    .perform(get("/assets/PETR4"))
+                    .andExpect(status().isOk)
+                    .andReturn()
+
+            val body = result.response.contentAsString
+            body shouldContain "PETR4"
+            body shouldContain "Petrobras"
+        }
+
+        test("asset detail page is case insensitive") {
+            transaction {
+                AssetEntity.new("PETR4") {
+                    name = "Petrobras"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+            }
+
+            mockMvc
+                .perform(get("/assets/petr4"))
+                .andExpect(status().isOk)
+        }
+
+        test("asset detail page returns 404 for unknown ticker") {
+            mockMvc
+                .perform(get("/assets/NONEXISTENT"))
+                .andExpect(status().isNotFound)
+        }
+
+        test("asset detail page shows transactions") {
+            transaction {
+                AssetEntity.new("PETR4") {
+                    name = "Petrobras"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+                TransactionEntity.new {
+                    assetId = "PETR4"
+                    type = "BUY"
+                    quantity = 100.0
+                    price = 25.0
+                    fees = 10.0
+                    date = LocalDate.of(2024, 1, 15)
+                    broker = "XP"
+                }
+            }
+
+            val result =
+                mockMvc
+                    .perform(get("/assets/PETR4"))
+                    .andExpect(status().isOk)
+                    .andReturn()
+
+            val body = result.response.contentAsString
+            body shouldContain "Compra"
+            body shouldContain "15/01/2024"
+            body shouldContain "XP"
+        }
+
+        test("asset detail page shows dividends") {
+            transaction {
+                AssetEntity.new("PETR4") {
+                    name = "Petrobras"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+                DividendEntity.new {
+                    assetId = "PETR4"
+                    type = "DIVIDENDO"
+                    date = LocalDate.of(2024, 3, 10)
+                    totalAmount = 50.0
+                    taxWithheld = 0.0
+                }
+            }
+
+            val result =
+                mockMvc
+                    .perform(get("/assets/PETR4"))
+                    .andExpect(status().isOk)
+                    .andReturn()
+
+            val body = result.response.contentAsString
+            body shouldContain "DIVIDENDO"
+            body shouldContain "10/03/2024"
+        }
+
+        test("edit asset with returnTo redirects correctly") {
+            transaction {
+                AssetEntity.new("PETR4") {
+                    name = "Petrobras"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+            }
+
+            mockMvc
+                .perform(
+                    post("/assets/PETR4/edit")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("name", "Petrobras PN")
+                        .param("type", "STOCK")
+                        .param("currency", "BRL")
+                        .param("yf_ticker", "")
+                        .param("returnTo", "/assets/PETR4")
+                ).andExpect(status().is3xxRedirection)
+                .andExpect(redirectedUrl("/assets/PETR4"))
         }
 
         test("no filters returns all assets") {
@@ -325,7 +446,7 @@ class AssetControllerTest(
                     .andReturn()
 
             val body = result.response.contentAsString
-            body shouldContain "<td class=\"fw-bold\">PETR4</td>"
-            body shouldContain "<td class=\"fw-bold\">MXRF11</td>"
+            body shouldContain "PETR4</a>"
+            body shouldContain "MXRF11</a>"
         }
     })

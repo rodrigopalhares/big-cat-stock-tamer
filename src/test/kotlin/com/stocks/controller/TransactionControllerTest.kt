@@ -257,8 +257,8 @@ class TransactionControllerTest(
                     .andReturn()
 
             val body = result.response.contentAsString
-            body shouldContain "<td class=\"fw-bold\">MXRF11</td>"
-            body shouldNotContain "<td class=\"fw-bold\">PETR4</td>"
+            body shouldContain "MXRF11</a>"
+            body shouldNotContain "PETR4</a>"
         }
 
         test("filter transactions with position") {
@@ -306,8 +306,8 @@ class TransactionControllerTest(
                     .andReturn()
 
             val body = result.response.contentAsString
-            body shouldContain "<td class=\"fw-bold\">PETR4</td>"
-            body shouldNotContain "<td class=\"fw-bold\">VALE3</td>"
+            body shouldContain "PETR4</a>"
+            body shouldNotContain "VALE3</a>"
         }
 
         test("filter transactions without position") {
@@ -355,8 +355,8 @@ class TransactionControllerTest(
                     .andReturn()
 
             val body = result.response.contentAsString
-            body shouldContain "<td class=\"fw-bold\">VALE3</td>"
-            body shouldNotContain "<td class=\"fw-bold\">PETR4</td>"
+            body shouldContain "VALE3</a>"
+            body shouldNotContain "PETR4</a>"
         }
 
         test("filter transactions by type and position combined") {
@@ -417,8 +417,8 @@ class TransactionControllerTest(
                     .andReturn()
 
             val body = result.response.contentAsString
-            body shouldContain "<td class=\"fw-bold\">MXRF11</td>"
-            body shouldNotContain "<td class=\"fw-bold\">PETR4</td>"
-            body shouldNotContain "<td class=\"fw-bold\">HGLG11</td>"
+            body shouldContain "MXRF11</a>"
+            body shouldNotContain "PETR4</a>"
+            body shouldNotContain "HGLG11</a>"
         }
     })

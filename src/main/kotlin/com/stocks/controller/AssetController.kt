@@ -4,7 +4,10 @@ import com.stocks.dto.ASSET_TYPES
 import com.stocks.dto.AssetRequest
 import com.stocks.dto.AssetResponse
 import com.stocks.service.AssetService
+import com.stocks.service.DividendService
 import com.stocks.service.QuoteService
+import com.stocks.service.TransactionService
+import org.jetbrains.exposed.sql.transactions.transaction
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Controller
@@ -17,6 +20,8 @@ import org.springframework.web.server.ResponseStatusException
 class AssetController(
     private val quoteService: QuoteService,
     private val assetService: AssetService,
+    private val transactionService: TransactionService,
+    private val dividendService: DividendService,
 ) {
     // --- HTML Routes ---
 
@@ -74,6 +79,57 @@ class AssetController(
             """.trimIndent()
 
         return preview + oob
+    }
+
+    @GetMapping("/{ticker}")
+    fun assetDetail(
+        @PathVariable ticker: String,
+        model: Model,
+    ): String {
+        val normalizedTicker = ticker.uppercase()
+        val asset =
+            assetService.findById(normalizedTicker)
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found")
+
+        val transactions =
+            transaction {
+                transactionService.listTransactions(normalizedTicker).map { tx ->
+                    TransactionController.TransactionTemplateData(
+                        id = tx.id.value,
+                        assetTicker = tx.assetId,
+                        type = tx.type,
+                        quantity = tx.quantity,
+                        price = tx.price,
+                        fees = tx.fees,
+                        date = tx.date,
+                        broker = tx.broker,
+                        notes = tx.notes,
+                        total = if (tx.type == "BUY") tx.quantity * tx.price + tx.fees else tx.quantity * tx.price - tx.fees,
+                    )
+                }
+            }
+
+        val dividends =
+            transaction {
+                dividendService.listDividends(normalizedTicker).map { d ->
+                    DividendController.DividendTemplateData(
+                        id = d.id.value,
+                        assetTicker = d.assetId,
+                        type = d.type,
+                        date = d.date,
+                        totalAmount = d.totalAmount,
+                        taxWithheld = d.taxWithheld,
+                        netAmount = d.totalAmount - d.taxWithheld,
+                        notes = d.notes,
+                    )
+                }
+            }
+
+        model.addAttribute("asset", asset)
+        model.addAttribute("transactions", transactions)
+        model.addAttribute("dividends", dividends)
+        model.addAttribute("assetTypes", ASSET_TYPES)
+        return "asset-detail"
     }
 
     @GetMapping("/")
@@ -140,9 +196,10 @@ class AssetController(
         @RequestParam(defaultValue = "STOCK") type: String,
         @RequestParam(name = "yf_ticker", defaultValue = "") yfTicker: String,
         @RequestParam(defaultValue = "BRL") currency: String,
+        @RequestParam(name = "returnTo", required = false) returnTo: String?,
     ): String {
         assetService.update(ticker, name, type, yfTicker, currency)
-        return "redirect:/assets/"
+        return "redirect:${returnTo ?: "/assets/"}"
     }
 
     @PostMapping("/{ticker}/delete")

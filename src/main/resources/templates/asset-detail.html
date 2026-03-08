@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{base :: head('Ativo — ' + ${asset.ticker})}"></head>
+<body>
+<nav th:replace="~{base :: navbar}"></nav>
+
+<div class="container-fluid py-4 px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">
+            <a href="/assets/" class="text-decoration-none text-muted me-2"><i class="bi bi-arrow-left"></i></a>
+            <i class="bi bi-building"></i>
+            <span th:text="${asset.ticker}"></span>
+            <small class="text-muted" th:if="${asset.name != null}" th:text="' — ' + ${asset.name}"></small>
+        </h2>
+    </div>
+
+    <div class="row g-4">
+        <!-- Left column: Asset info + edit form -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white fw-semibold">
+                    <i class="bi bi-pencil"></i> Dados do Ativo
+                </div>
+                <div class="card-body">
+                    <form method="post" th:action="'/assets/' + ${asset.ticker} + '/edit'">
+                        <input type="hidden" name="returnTo" th:value="'/assets/' + ${asset.ticker}">
+                        <div class="mb-3">
+                            <label class="form-label">Ticker</label>
+                            <input type="text" class="form-control" th:value="${asset.ticker}" readonly disabled>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Nome</label>
+                            <input type="text" name="name" class="form-control" placeholder="Ex: Petrobras PN"
+                                   th:value="${asset.name}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Tipo</label>
+                            <select name="type" class="form-select">
+                                <option th:each="t : ${assetTypes}" th:value="${t}" th:text="${t}"
+                                        th:selected="${t == asset.type}"></option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">YF Ticker <span class="text-muted small">(Yahoo Finance)</span></label>
+                            <input type="text" name="yf_ticker" class="form-control" placeholder="Ex: PETR4.SA"
+                                   th:value="${asset.yfTicker}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Moeda</label>
+                            <select name="currency" class="form-select">
+                                <option value="BRL" th:selected="${asset.currency == 'BRL'}">BRL — Real</option>
+                                <option value="USD" th:selected="${asset.currency == 'USD'}">USD — Dólar</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-check-lg"></i> Salvar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right column: Transactions + Dividends -->
+        <div class="col-lg-8">
+            <!-- Transactions card -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">
+                        <i class="bi bi-arrow-left-right"></i> Transações
+                        <span class="badge bg-secondary ms-1" th:text="${#lists.size(transactions)}"></span>
+                    </span>
+                    <a th:href="'/transactions/?ticker=' + ${asset.ticker}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus-lg"></i> Nova
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div th:if="${!transactions.isEmpty()}" class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Tipo</th>
+                                    <th class="text-end">Qtd</th>
+                                    <th class="text-end">Preço</th>
+                                    <th class="text-end">Taxas</th>
+                                    <th class="text-end">Total</th>
+                                    <th>Corretora</th>
+                                    <th class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="t : ${transactions}">
+                                    <td th:text="${#temporals.format(t.date, 'dd/MM/yyyy')}"></td>
+                                    <td>
+                                        <span class="badge"
+                                            th:classappend="${t.type == 'BUY'} ? 'bg-success' : 'bg-danger'"
+                                            th:text="${t.type == 'BUY'} ? 'Compra' : 'Venda'"></span>
+                                    </td>
+                                    <td class="text-end" th:text="${#numbers.formatDecimal(t.quantity, 1, 4)}"></td>
+                                    <td class="text-end">R$ <span th:text="${#numbers.formatDecimal(t.price, 1, 2)}"></span></td>
+                                    <td class="text-end text-muted">R$ <span th:text="${#numbers.formatDecimal(t.fees, 1, 2)}"></span></td>
+                                    <td class="text-end fw-semibold">R$ <span th:text="${#numbers.formatDecimal(t.total, 1, 2)}"></span></td>
+                                    <td class="text-muted" th:text="${t.broker != null ? t.broker : '—'}"></td>
+                                    <td class="text-center">
+                                        <form method="post" th:action="'/transactions/' + ${t.id} + '/delete'"
+                                            class="d-inline" onsubmit="return confirm('Excluir esta transação?')">
+                                            <input type="hidden" name="returnTo" th:value="'/assets/' + ${asset.ticker}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger border-0" title="Excluir">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div th:if="${transactions.isEmpty()}" class="text-center py-4 text-muted">
+                        <i class="bi bi-inbox fs-3"></i>
+                        <p class="mt-2 mb-0">Nenhuma transação registrada.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dividends card -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">
+                        <i class="bi bi-cash-coin"></i> Proventos
+                        <span class="badge bg-secondary ms-1" th:text="${#lists.size(dividends)}"></span>
+                    </span>
+                    <a th:href="'/dividends/?ticker=' + ${asset.ticker}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus-lg"></i> Novo
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div th:if="${!dividends.isEmpty()}" class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Tipo</th>
+                                    <th class="text-end">Valor Bruto</th>
+                                    <th class="text-end">IR Retido</th>
+                                    <th class="text-end">Valor Líquido</th>
+                                    <th class="text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="d : ${dividends}">
+                                    <td th:text="${#temporals.format(d.date, 'dd/MM/yyyy')}"></td>
+                                    <td>
+                                        <span th:replace="~{fragments/badge :: dividendBadge(${d.type})}"></span>
+                                    </td>
+                                    <td class="text-end">R$ <span th:text="${#numbers.formatDecimal(d.totalAmount, 1, 2)}"></span></td>
+                                    <td class="text-end text-muted">R$ <span th:text="${#numbers.formatDecimal(d.taxWithheld, 1, 2)}"></span></td>
+                                    <td class="text-end fw-semibold text-success">R$ <span th:text="${#numbers.formatDecimal(d.netAmount, 1, 2)}"></span></td>
+                                    <td class="text-center">
+                                        <form method="post" th:action="'/dividends/' + ${d.id} + '/delete'"
+                                            class="d-inline" onsubmit="return confirm('Excluir este provento?')">
+                                            <input type="hidden" name="returnTo" th:value="'/assets/' + ${asset.ticker}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger border-0" title="Excluir">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div th:if="${dividends.isEmpty()}" class="text-center py-4 text-muted">
+                        <i class="bi bi-inbox fs-3"></i>
+                        <p class="mt-2 mb-0">Nenhum provento registrado.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<th:block th:replace="~{base :: scripts}"></th:block>
+</body>
+</html>

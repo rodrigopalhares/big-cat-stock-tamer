@@ -143,9 +143,10 @@ class TransactionController(
     @PostMapping("/{transactionId}/delete")
     fun deleteTransaction(
         @PathVariable transactionId: Int,
+        @RequestParam(name = "returnTo", required = false) returnTo: String?,
     ): String {
         transactionService.deleteTransaction(transactionId)
-        return "redirect:/transactions/"
+        return "redirect:${returnTo ?: "/transactions/"}"
     }
 
     // --- CSV Batch Import Routes ---

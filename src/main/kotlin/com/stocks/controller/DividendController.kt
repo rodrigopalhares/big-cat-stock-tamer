@@ -115,9 +115,10 @@ class DividendController(
     @PostMapping("/{dividendId}/delete")
     fun deleteDividend(
         @PathVariable dividendId: Int,
+        @RequestParam(name = "returnTo", required = false) returnTo: String?,
     ): String {
         dividendService.deleteDividend(dividendId)
-        return "redirect:/dividends/"
+        return "redirect:${returnTo ?: "/dividends/"}"
     }
 
     // --- JSON API Routes ---

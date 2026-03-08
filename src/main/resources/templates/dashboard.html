@@ -122,7 +122,7 @@
                     <tr th:each="p : ${positions}">
                         <th:block th:with="sym=${p.currency == 'USD' ? 'US$' : 'R$'}">
                         <td>
-                            <span class="fw-bold" th:text="${p.ticker}"></span>
+                            <a th:href="'/assets/' + ${p.ticker}" class="fw-bold text-decoration-none" th:text="${p.ticker}"></a>
                             <br th:if="${p.name != null}"><small th:if="${p.name != null}" class="text-muted" th:text="${p.name}"></small>
                         </td>
                         <td>

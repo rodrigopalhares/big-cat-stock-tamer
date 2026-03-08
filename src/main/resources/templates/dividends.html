@@ -107,7 +107,9 @@
                             <tbody>
                                 <tr th:each="d : ${dividends}">
                                     <td th:text="${#temporals.format(d.date, 'dd/MM/yyyy')}"></td>
-                                    <td class="fw-bold" th:text="${d.assetTicker}"></td>
+                                    <td class="fw-bold">
+                                        <a th:href="'/assets/' + ${d.assetTicker}" class="text-decoration-none" th:text="${d.assetTicker}"></a>
+                                    </td>
                                     <td>
                                         <span th:replace="~{fragments/badge :: dividendBadge(${d.type})}"></span>
                                     </td>
