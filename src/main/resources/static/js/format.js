@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var node
   while ((node = walker.nextNode())) {
     var text = node.textContent
-    var formatted = text.replace(/(?<![/\d,])\d{4,}(?![/\d])/g, function (match) {
+    var formatted = text.replace(/(?<![/\d,a-zA-Z:])\d{4,}(?![/\d])/g, function (match) {
       return match.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
     })
     if (formatted !== text) {
