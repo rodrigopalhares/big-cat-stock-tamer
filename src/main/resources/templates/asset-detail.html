@@ -101,7 +101,21 @@
                                     <td class="text-end text-muted">R$ <span th:text="${#numbers.formatDecimal(t.fees, 1, 2)}"></span></td>
                                     <td class="text-end fw-semibold">R$ <span th:text="${#numbers.formatDecimal(t.total, 1, 2)}"></span></td>
                                     <td class="text-muted" th:text="${t.broker != null ? t.broker : '—'}"></td>
-                                    <td class="text-center">
+                                    <td class="text-center text-nowrap">
+                                        <button type="button" class="btn btn-sm btn-outline-primary border-0"
+                                            title="Editar"
+                                            th:attr="data-tx-id=${t.id},
+                                                     data-tx-type=${t.type},
+                                                     data-tx-quantity=${t.quantity},
+                                                     data-tx-price=${t.price},
+                                                     data-tx-fees=${t.fees},
+                                                     data-tx-date=${t.date},
+                                                     data-tx-broker=${t.broker != null ? t.broker : ''},
+                                                     data-tx-notes=${t.notes != null ? t.notes : ''},
+                                                     data-return-to=${'/assets/' + asset.ticker}"
+                                            onclick="openEditTxModal(this, this.dataset.returnTo)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
                                         <form method="post" th:action="'/transactions/' + ${t.id} + '/delete'"
                                             class="d-inline" onsubmit="return confirm('Excluir esta transação?')">
                                             <input type="hidden" name="returnTo" th:value="'/assets/' + ${asset.ticker}">
@@ -154,7 +168,19 @@
                                     <td class="text-end">R$ <span th:text="${#numbers.formatDecimal(d.totalAmount, 1, 2)}"></span></td>
                                     <td class="text-end text-muted">R$ <span th:text="${#numbers.formatDecimal(d.taxWithheld, 1, 2)}"></span></td>
                                     <td class="text-end fw-semibold text-success">R$ <span th:text="${#numbers.formatDecimal(d.netAmount, 1, 2)}"></span></td>
-                                    <td class="text-center">
+                                    <td class="text-center text-nowrap">
+                                        <button type="button" class="btn btn-sm btn-outline-primary border-0"
+                                            title="Editar"
+                                            th:attr="data-div-id=${d.id},
+                                                     data-div-type=${d.type},
+                                                     data-div-total-amount=${d.totalAmount},
+                                                     data-div-tax-withheld=${d.taxWithheld},
+                                                     data-div-date=${d.date},
+                                                     data-div-notes=${d.notes != null ? d.notes : ''},
+                                                     data-return-to=${'/assets/' + asset.ticker}"
+                                            onclick="openEditDivModal(this, this.dataset.returnTo)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
                                         <form method="post" th:action="'/dividends/' + ${d.id} + '/delete'"
                                             class="d-inline" onsubmit="return confirm('Excluir este provento?')">
                                             <input type="hidden" name="returnTo" th:value="'/assets/' + ${asset.ticker}">
@@ -177,6 +203,149 @@
     </div>
 </div>
 
+<!-- Edit Transaction Modal -->
+<div class="modal fade" id="editTxModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> Editar Transação</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editTxForm" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Tipo</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="type" id="editTxTypeBuy" value="BUY">
+                            <label class="btn btn-outline-success" for="editTxTypeBuy">
+                                <i class="bi bi-arrow-down-circle"></i> Compra
+                            </label>
+                            <input type="radio" class="btn-check" name="type" id="editTxTypeSell" value="SELL">
+                            <label class="btn btn-outline-danger" for="editTxTypeSell">
+                                <i class="bi bi-arrow-up-circle"></i> Venda
+                            </label>
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Quantidade</label>
+                            <input type="number" id="editTxQty" name="quantity" class="form-control" step="0.0001" min="0.0001" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Preço Unit. (R$)</label>
+                            <input type="number" id="editTxPrice" name="price" class="form-control" step="0.0001" min="0" required>
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Taxas (R$)</label>
+                            <input type="number" id="editTxFees" name="fees" class="form-control" step="0.01" min="0" value="0">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Data</label>
+                            <input type="date" id="editTxDate" name="date" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Corretora</label>
+                        <input type="text" id="editTxBroker" name="broker" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea id="editTxNotes" name="notes" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Dividend Modal -->
+<div class="modal fade" id="editDivModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> Editar Provento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editDivForm" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Tipo</label>
+                        <select id="editDivType" name="type" class="form-select" required>
+                            <option th:each="t : ${dividendTypes}" th:value="${t}" th:text="${t}"></option>
+                        </select>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Valor Bruto (R$)</label>
+                            <input type="number" id="editDivTotalAmount" name="total_amount" class="form-control" step="0.01" min="0.01" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">IR Retido (R$)</label>
+                            <input type="number" id="editDivTaxWithheld" name="tax_withheld" class="form-control" step="0.01" min="0" value="0">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Data</label>
+                        <input type="date" id="editDivDate" name="date" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notas</label>
+                        <textarea id="editDivNotes" name="notes" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <th:block th:replace="~{base :: scripts}"></th:block>
+<script>
+function openEditTxModal(btn, returnTo) {
+    document.getElementById('editTxForm').action = '/transactions/' + btn.dataset.txId + '/edit';
+    document.getElementById('editTxTypeBuy').checked = btn.dataset.txType === 'BUY';
+    document.getElementById('editTxTypeSell').checked = btn.dataset.txType === 'SELL';
+    document.getElementById('editTxQty').value = btn.dataset.txQuantity;
+    document.getElementById('editTxPrice').value = btn.dataset.txPrice;
+    document.getElementById('editTxFees').value = btn.dataset.txFees;
+    document.getElementById('editTxDate').value = btn.dataset.txDate;
+    document.getElementById('editTxBroker').value = btn.dataset.txBroker;
+    document.getElementById('editTxNotes').value = btn.dataset.txNotes;
+    var existing = document.getElementById('editTxReturnTo');
+    if (existing) existing.remove();
+    if (returnTo) {
+        var input = document.createElement('input');
+        input.type = 'hidden'; input.name = 'returnTo'; input.id = 'editTxReturnTo'; input.value = returnTo;
+        document.getElementById('editTxForm').appendChild(input);
+    }
+    new bootstrap.Modal(document.getElementById('editTxModal')).show();
+}
+function openEditDivModal(btn, returnTo) {
+    document.getElementById('editDivForm').action = '/dividends/' + btn.dataset.divId + '/edit';
+    for (var opt of document.getElementById('editDivType').options)
+        opt.selected = opt.value === btn.dataset.divType;
+    document.getElementById('editDivTotalAmount').value = btn.dataset.divTotalAmount;
+    document.getElementById('editDivTaxWithheld').value = btn.dataset.divTaxWithheld;
+    document.getElementById('editDivDate').value = btn.dataset.divDate;
+    document.getElementById('editDivNotes').value = btn.dataset.divNotes;
+    var existing = document.getElementById('editDivReturnTo');
+    if (existing) existing.remove();
+    if (returnTo) {
+        var input = document.createElement('input');
+        input.type = 'hidden'; input.name = 'returnTo'; input.id = 'editDivReturnTo'; input.value = returnTo;
+        document.getElementById('editDivForm').appendChild(input);
+    }
+    new bootstrap.Modal(document.getElementById('editDivModal')).show();
+}
+</script>
 </body>
 </html>

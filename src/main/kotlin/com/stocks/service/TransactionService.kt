@@ -224,6 +224,33 @@ class TransactionService(
     }
 
     /**
+     * Update an existing transaction by ID. Throws 404 if not found.
+     */
+    fun updateTransaction(
+        id: Int,
+        type: String,
+        quantity: Double,
+        price: Double,
+        fees: Double,
+        date: LocalDate,
+        broker: String?,
+        notes: String?,
+    ) {
+        transaction {
+            val tx =
+                TransactionEntity.findById(id)
+                    ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found")
+            tx.type = type.uppercase()
+            tx.quantity = quantity
+            tx.price = price
+            tx.fees = fees
+            tx.date = date
+            tx.broker = broker?.ifBlank { null }
+            tx.notes = notes?.ifBlank { null }
+        }
+    }
+
+    /**
      * Delete a transaction by ID. Throws 404 if not found.
      */
     fun deleteTransaction(id: Int) {

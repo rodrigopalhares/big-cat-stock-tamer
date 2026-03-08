@@ -5,6 +5,7 @@ import com.stocks.model.DividendEntity
 import com.stocks.model.TransactionEntity
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.extensions.spring.SpringExtension
+import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -408,5 +409,77 @@ class DividendControllerTest(
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.dividendPnl").value(0.0))
                 .andExpect(jsonPath("$.positions[0].dividendPnl").value(0.0))
+        }
+
+        // --- Edit Dividend Tests ---
+
+        test("edit dividend via form updates data") {
+            val divId =
+                transaction {
+                    AssetEntity.new("PETR4") {
+                        name = "Petrobras"
+                        type = "STOCK"
+                        currency = "BRL"
+                    }
+                    DividendEntity
+                        .new {
+                            assetId = "PETR4"
+                            type = "DIVIDENDO"
+                            date = LocalDate.of(2024, 3, 10)
+                            totalAmount = 50.0
+                            taxWithheld = 0.0
+                        }.id.value
+                }
+
+            mockMvc
+                .perform(
+                    post("/dividends/$divId/edit")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("type", "JCP")
+                        .param("total_amount", "75.0")
+                        .param("tax_withheld", "11.25")
+                        .param("date", "2024-06-15")
+                        .param("notes", "pagamento JCP")
+                ).andExpect(status().is3xxRedirection)
+                .andExpect(redirectedUrl("/dividends/"))
+
+            transaction {
+                val div = DividendEntity.findById(divId)!!
+                div.type shouldBe "JCP"
+                div.totalAmount shouldBe 75.0
+                div.taxWithheld shouldBe 11.25
+                div.notes shouldBe "pagamento JCP"
+            }
+        }
+
+        test("edit dividend with returnTo redirects correctly") {
+            val divId =
+                transaction {
+                    AssetEntity.new("PETR4") {
+                        name = "Petrobras"
+                        type = "STOCK"
+                        currency = "BRL"
+                    }
+                    DividendEntity
+                        .new {
+                            assetId = "PETR4"
+                            type = "DIVIDENDO"
+                            date = LocalDate.of(2024, 3, 10)
+                            totalAmount = 50.0
+                            taxWithheld = 0.0
+                        }.id.value
+                }
+
+            mockMvc
+                .perform(
+                    post("/dividends/$divId/edit")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("type", "DIVIDENDO")
+                        .param("total_amount", "50.0")
+                        .param("tax_withheld", "0.0")
+                        .param("date", "2024-03-10")
+                        .param("returnTo", "/assets/PETR4")
+                ).andExpect(status().is3xxRedirection)
+                .andExpect(redirectedUrl("/assets/PETR4"))
         }
     })

@@ -112,6 +112,27 @@ class DividendController(
         return "redirect:/dividends/"
     }
 
+    @PostMapping("/{dividendId}/edit")
+    fun editDividend(
+        @PathVariable dividendId: Int,
+        @RequestParam type: String,
+        @RequestParam(name = "total_amount") totalAmount: Double,
+        @RequestParam(name = "tax_withheld", defaultValue = "0.0") taxWithheld: Double,
+        @RequestParam date: String,
+        @RequestParam(defaultValue = "") notes: String,
+        @RequestParam(name = "returnTo", required = false) returnTo: String?,
+    ): String {
+        dividendService.updateDividend(
+            id = dividendId,
+            type = type,
+            date = LocalDate.parse(date),
+            totalAmount = totalAmount,
+            taxWithheld = taxWithheld,
+            notes = notes,
+        )
+        return "redirect:${returnTo ?: "/dividends/"}"
+    }
+
     @PostMapping("/{dividendId}/delete")
     fun deleteDividend(
         @PathVariable dividendId: Int,

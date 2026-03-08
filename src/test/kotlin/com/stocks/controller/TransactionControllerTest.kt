@@ -5,6 +5,7 @@ import com.stocks.model.DividendEntity
 import com.stocks.model.TransactionEntity
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.extensions.spring.SpringExtension
+import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -420,5 +421,85 @@ class TransactionControllerTest(
             body shouldContain "MXRF11</a>"
             body shouldNotContain "PETR4</a>"
             body shouldNotContain "HGLG11</a>"
+        }
+
+        // --- Edit Transaction Tests ---
+
+        test("edit transaction via form updates data") {
+            val txId =
+                transaction {
+                    AssetEntity.new("PETR4") {
+                        name = "Petrobras"
+                        type = "STOCK"
+                        currency = "BRL"
+                    }
+                    TransactionEntity
+                        .new {
+                            assetId = "PETR4"
+                            type = "BUY"
+                            quantity = 100.0
+                            price = 25.0
+                            fees = 10.0
+                            date = LocalDate.of(2024, 1, 15)
+                            broker = "XP"
+                        }.id.value
+                }
+
+            mockMvc
+                .perform(
+                    post("/transactions/$txId/edit")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("type", "SELL")
+                        .param("quantity", "50.0")
+                        .param("price", "30.0")
+                        .param("fees", "5.0")
+                        .param("date", "2024-06-01")
+                        .param("broker", "Clear")
+                        .param("notes", "venda parcial")
+                ).andExpect(status().is3xxRedirection)
+                .andExpect(redirectedUrl("/transactions/"))
+
+            transaction {
+                val tx = TransactionEntity.findById(txId)!!
+                tx.type shouldBe "SELL"
+                tx.quantity shouldBe 50.0
+                tx.price shouldBe 30.0
+                tx.fees shouldBe 5.0
+                tx.broker shouldBe "Clear"
+                tx.notes shouldBe "venda parcial"
+            }
+        }
+
+        test("edit transaction with returnTo redirects correctly") {
+            val txId =
+                transaction {
+                    AssetEntity.new("PETR4") {
+                        name = "Petrobras"
+                        type = "STOCK"
+                        currency = "BRL"
+                    }
+                    TransactionEntity
+                        .new {
+                            assetId = "PETR4"
+                            type = "BUY"
+                            quantity = 100.0
+                            price = 25.0
+                            fees = 0.0
+                            date = LocalDate.of(2024, 1, 15)
+                        }.id.value
+                }
+
+            mockMvc
+                .perform(
+                    post("/transactions/$txId/edit")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .param("type", "BUY")
+                        .param("quantity", "100.0")
+                        .param("price", "26.0")
+                        .param("fees", "0.0")
+                        .param("date", "2024-01-15")
+                        .param("returnTo", "/assets/PETR4")
+                ).andExpect(status().is3xxRedirection)
+                .andExpect(redirectedUrl("/assets/PETR4"))
         }
     })

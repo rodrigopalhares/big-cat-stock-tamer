@@ -56,6 +56,26 @@ class DividendService(
             DividendEntity.wrapRows(query).toList()
         }
 
+    fun updateDividend(
+        id: Int,
+        type: String,
+        date: LocalDate,
+        totalAmount: Double,
+        taxWithheld: Double,
+        notes: String?,
+    ) {
+        transaction {
+            val dividend =
+                DividendEntity.findById(id)
+                    ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Dividend not found")
+            dividend.type = type.uppercase().trim()
+            dividend.date = date
+            dividend.totalAmount = totalAmount
+            dividend.taxWithheld = taxWithheld
+            dividend.notes = notes?.ifBlank { null }
+        }
+    }
+
     fun deleteDividend(id: Int) {
         transaction {
             val dividend =
