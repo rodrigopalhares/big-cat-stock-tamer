@@ -14,6 +14,7 @@ data class AssetPosition(
     val irr: Double? = null,
     val irrMonthly: Double? = null,
     val irrAnnual: Double? = null,
+    val dividendPnl: Double = 0.0,
     val currency: String = "BRL",
     val exchangeRate: Double? = null,
     val currentValueBrl: Double? = null,
@@ -25,6 +26,7 @@ data class PortfolioSummary(
     val currentValue: Double?,
     val realizedPnl: Double,
     val unrealizedPnl: Double?,
+    val dividendPnl: Double = 0.0,
     val positions: List<AssetPosition>,
 )
 

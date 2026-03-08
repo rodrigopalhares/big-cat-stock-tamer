@@ -9,3 +9,13 @@
          type == 'OUTROS' ? 'bg-secondary' :
          'bg-secondary')}"
       th:text="${type}">TYPE</span>
+
+<span th:fragment="dividendBadge(type)"
+      th:class="${'badge ' +
+        (type == 'DIVIDENDO' ? 'bg-success' :
+         type == 'JCP' ? 'bg-primary' :
+         type == 'RENDIMENTO' ? 'bg-info' :
+         type == 'BONIFICACAO' ? 'bg-warning text-dark' :
+         type == 'BTC' ? 'bg-secondary' :
+         'bg-secondary')}"
+      th:text="${type}">TYPE</span>

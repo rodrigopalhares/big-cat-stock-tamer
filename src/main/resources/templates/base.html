@@ -41,6 +41,12 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link" th:classappend="${#strings.startsWith(requestURI, '/dividends')} ? 'active'"
+                       href="/dividends/">
+                        <i class="bi bi-cash-coin"></i> Proventos
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" th:classappend="${#strings.startsWith(requestURI, '/evolution')} ? 'active'"
                        href="/evolution/">
                         <i class="bi bi-graph-up"></i> Evolução
