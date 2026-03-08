@@ -135,6 +135,7 @@
                         <th:block th:with="sym=${p.currency == 'USD' ? 'US$' : 'R$'}">
                         <td>
                             <a th:href="'/assets/' + ${p.ticker}" class="fw-bold text-decoration-none" th:text="${p.ticker}"></a>
+                            <i th:if="${p.delisted}" class="bi bi-x-circle text-secondary ms-1" title="Deslistado" style="font-size: 0.8em"></i>
                             <br th:if="${p.name != null}"><small th:if="${p.name != null}" class="text-muted" th:text="${p.name}"></small>
                         </td>
                         <td>

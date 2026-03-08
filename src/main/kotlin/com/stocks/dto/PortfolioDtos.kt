@@ -19,6 +19,7 @@ data class AssetPosition(
     val exchangeRate: Double? = null,
     val currentValueBrl: Double? = null,
     val unrealizedPnlBrl: Double? = null,
+    val delisted: Boolean = false,
 )
 
 data class PortfolioSummary(

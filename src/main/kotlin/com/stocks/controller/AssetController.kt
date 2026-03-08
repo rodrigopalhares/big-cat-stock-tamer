@@ -138,12 +138,15 @@ class AssetController(
     fun listAssets(
         @RequestParam(required = false) type: String?,
         @RequestParam(required = false) position: String?,
+        @RequestParam(required = false) delisted: String?,
         model: Model,
     ): String {
-        model.addAttribute("assets", assetService.findFiltered(type, position))
+        model.addAttribute("assets", assetService.findFiltered(type, position, delisted))
         model.addAttribute("assetTypes", ASSET_TYPES)
         model.addAttribute("selectedType", type ?: "")
         model.addAttribute("selectedPosition", position ?: "")
+        model.addAttribute("selectedDelisted", delisted ?: "")
+        model.addAttribute("tickersWithPosition", transaction { assetService.computeTickersWithPosition() })
         return "assets"
     }
 
@@ -161,6 +164,10 @@ class AssetController(
         if (assetService.exists(normalizedTicker)) {
             model.addAttribute("assets", assetService.findAll())
             model.addAttribute("assetTypes", ASSET_TYPES)
+            model.addAttribute("selectedType", "")
+            model.addAttribute("selectedPosition", "")
+            model.addAttribute("selectedDelisted", "")
+            model.addAttribute("tickersWithPosition", transaction { assetService.computeTickersWithPosition() })
             model.addAttribute("error", "Ativo '$normalizedTicker' já cadastrado.")
             return "assets"
         }
