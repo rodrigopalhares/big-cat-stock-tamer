@@ -1,8 +1,8 @@
 package com.stocks.service
 
-import com.stocks.model.AssetEntity
-import com.stocks.model.DividendEntity
-import com.stocks.model.TransactionEntity
+import com.stocks.clearAllData
+import com.stocks.createAsset
+import com.stocks.createDividend
 import io.kotest.core.extensions.ApplyExtension
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.extensions.spring.SpringExtension
@@ -24,21 +24,11 @@ class DividendServiceTest(
 ) : FunSpec({
 
         beforeEach {
-            transaction {
-                DividendEntity.all().forEach { it.delete() }
-                TransactionEntity.all().forEach { it.delete() }
-                AssetEntity.all().forEach { it.delete() }
-            }
+            clearAllData()
         }
 
         test("create dividend for existing asset") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
 
             val dividend =
                 dividendService.createDividend(
@@ -63,13 +53,7 @@ class DividendServiceTest(
         }
 
         test("create dividend normalizes ticker to uppercase") {
-            transaction {
-                AssetEntity.new("MXRF11") {
-                    name = "Maxi Renda"
-                    type = "REIT"
-                    currency = "BRL"
-                }
-            }
+            createAsset("MXRF11", name = "Maxi Renda", type = "REIT")
 
             val dividend =
                 dividendService.createDividend(
@@ -88,13 +72,7 @@ class DividendServiceTest(
         }
 
         test("create dividend with JCP and tax withheld") {
-            transaction {
-                AssetEntity.new("BBAS3") {
-                    name = "Banco do Brasil"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-            }
+            createAsset("BBAS3", name = "Banco do Brasil")
 
             val dividend =
                 dividendService.createDividend(
@@ -114,13 +92,7 @@ class DividendServiceTest(
         }
 
         test("create dividend with blank notes stores null") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
 
             val dividend =
                 dividendService.createDividend(
@@ -138,27 +110,9 @@ class DividendServiceTest(
         }
 
         test("list dividends returns all sorted by date desc") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                DividendEntity.new {
-                    assetId = "PETR4"
-                    type = "DIVIDENDO"
-                    date = LocalDate.of(2024, 3, 15)
-                    totalAmount = 50.0
-                    taxWithheld = 0.0
-                }
-                DividendEntity.new {
-                    assetId = "PETR4"
-                    type = "JCP"
-                    date = LocalDate.of(2024, 6, 15)
-                    totalAmount = 100.0
-                    taxWithheld = 15.0
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createDividend("PETR4", date = LocalDate.of(2024, 3, 15), totalAmount = 50.0)
+            createDividend("PETR4", type = "JCP", date = LocalDate.of(2024, 6, 15), totalAmount = 100.0, taxWithheld = 15.0)
 
             val dividends = dividendService.listDividends()
             dividends shouldHaveSize 2
@@ -169,32 +123,10 @@ class DividendServiceTest(
         }
 
         test("list dividends filtered by ticker") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                AssetEntity.new("VALE3") {
-                    name = "Vale"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                DividendEntity.new {
-                    assetId = "PETR4"
-                    type = "DIVIDENDO"
-                    date = LocalDate.of(2024, 3, 15)
-                    totalAmount = 50.0
-                    taxWithheld = 0.0
-                }
-                DividendEntity.new {
-                    assetId = "VALE3"
-                    type = "DIVIDENDO"
-                    date = LocalDate.of(2024, 6, 15)
-                    totalAmount = 80.0
-                    taxWithheld = 0.0
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createAsset("VALE3", name = "Vale")
+            createDividend("PETR4", date = LocalDate.of(2024, 3, 15), totalAmount = 50.0)
+            createDividend("VALE3", date = LocalDate.of(2024, 6, 15), totalAmount = 80.0)
 
             val dividends = dividendService.listDividends(ticker = "PETR4")
             dividends shouldHaveSize 1
@@ -202,27 +134,9 @@ class DividendServiceTest(
         }
 
         test("list dividends filtered by type") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                DividendEntity.new {
-                    assetId = "PETR4"
-                    type = "DIVIDENDO"
-                    date = LocalDate.of(2024, 3, 15)
-                    totalAmount = 50.0
-                    taxWithheld = 0.0
-                }
-                DividendEntity.new {
-                    assetId = "PETR4"
-                    type = "JCP"
-                    date = LocalDate.of(2024, 6, 15)
-                    totalAmount = 100.0
-                    taxWithheld = 15.0
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createDividend("PETR4", date = LocalDate.of(2024, 3, 15), totalAmount = 50.0)
+            createDividend("PETR4", type = "JCP", date = LocalDate.of(2024, 6, 15), totalAmount = 100.0, taxWithheld = 15.0)
 
             val dividends = dividendService.listDividends(type = "JCP")
             dividends shouldHaveSize 1
@@ -230,23 +144,9 @@ class DividendServiceTest(
         }
 
         test("delete dividend success") {
-            val dividendId =
-                transaction {
-                    AssetEntity.new("PETR4") {
-                        name = "Petrobras"
-                        type = "STOCK"
-                        currency = "BRL"
-                    }
-                    val d =
-                        DividendEntity.new {
-                            assetId = "PETR4"
-                            type = "DIVIDENDO"
-                            date = LocalDate.of(2024, 3, 15)
-                            totalAmount = 50.0
-                            taxWithheld = 0.0
-                        }
-                    d.id.value
-                }
+            createAsset("PETR4", name = "Petrobras")
+            val dividend = createDividend("PETR4", date = LocalDate.of(2024, 3, 15), totalAmount = 50.0)
+            val dividendId = transaction { dividend.id.value }
 
             dividendService.deleteDividend(dividendId)
 
@@ -264,39 +164,11 @@ class DividendServiceTest(
         }
 
         test("getDividendPnlByAsset returns net amounts grouped by ticker") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                AssetEntity.new("VALE3") {
-                    name = "Vale"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                DividendEntity.new {
-                    assetId = "PETR4"
-                    type = "DIVIDENDO"
-                    date = LocalDate.of(2024, 3, 15)
-                    totalAmount = 100.0
-                    taxWithheld = 0.0
-                }
-                DividendEntity.new {
-                    assetId = "PETR4"
-                    type = "JCP"
-                    date = LocalDate.of(2024, 6, 15)
-                    totalAmount = 200.0
-                    taxWithheld = 30.0
-                }
-                DividendEntity.new {
-                    assetId = "VALE3"
-                    type = "DIVIDENDO"
-                    date = LocalDate.of(2024, 6, 15)
-                    totalAmount = 50.0
-                    taxWithheld = 0.0
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createAsset("VALE3", name = "Vale")
+            createDividend("PETR4", date = LocalDate.of(2024, 3, 15), totalAmount = 100.0)
+            createDividend("PETR4", type = "JCP", date = LocalDate.of(2024, 6, 15), totalAmount = 200.0, taxWithheld = 30.0)
+            createDividend("VALE3", date = LocalDate.of(2024, 6, 15), totalAmount = 50.0)
 
             val pnl = dividendService.getDividendPnlByAsset()
             pnl shouldContainKey "PETR4"
@@ -311,27 +183,9 @@ class DividendServiceTest(
         }
 
         test("getDividendCashFlowsByAsset returns date-amount pairs grouped by ticker") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                DividendEntity.new {
-                    assetId = "PETR4"
-                    type = "DIVIDENDO"
-                    date = LocalDate.of(2024, 3, 15)
-                    totalAmount = 100.0
-                    taxWithheld = 10.0
-                }
-                DividendEntity.new {
-                    assetId = "PETR4"
-                    type = "JCP"
-                    date = LocalDate.of(2024, 6, 15)
-                    totalAmount = 200.0
-                    taxWithheld = 30.0
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createDividend("PETR4", date = LocalDate.of(2024, 3, 15), totalAmount = 100.0, taxWithheld = 10.0)
+            createDividend("PETR4", type = "JCP", date = LocalDate.of(2024, 6, 15), totalAmount = 200.0, taxWithheld = 30.0)
 
             val cashFlows = dividendService.getDividendCashFlowsByAsset()
             cashFlows shouldContainKey "PETR4"

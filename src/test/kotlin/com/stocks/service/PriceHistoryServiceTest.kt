@@ -1,10 +1,10 @@
 package com.stocks.service
 
 import com.ninjasquad.springmockk.MockkBean
-import com.stocks.model.AssetEntity
-import com.stocks.model.DividendEntity
+import com.stocks.clearAllData
+import com.stocks.createAsset
+import com.stocks.createTransaction
 import com.stocks.model.PriceHistories
-import com.stocks.model.TransactionEntity
 import io.kotest.core.extensions.ApplyExtension
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.extensions.spring.SpringExtension
@@ -14,7 +14,6 @@ import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.every
-import org.jetbrains.exposed.v1.jdbc.deleteAll
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.springframework.boot.test.context.SpringBootTest
@@ -146,25 +145,13 @@ class PriceHistoryServiceIntegrationTest(
 ) : FunSpec({
 
         beforeEach {
-            transaction {
-                // Clean up in correct order: prices -> transactions -> assets
-                PriceHistories.deleteAll()
-                DividendEntity.all().forEach { it.delete() }
-                TransactionEntity.all().forEach { it.delete() }
-                AssetEntity.all().forEach { it.delete() }
-            }
+            clearAllData()
         }
 
         // --- getLatestPrice ---
 
         test("getLatestPrice returns price") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
             priceHistoryService.upsertPrices(
                 listOf(
                     PriceRecord("PETR4", LocalDate.of(2024, 1, 1), 30.0),
@@ -175,26 +162,14 @@ class PriceHistoryServiceIntegrationTest(
         }
 
         test("getLatestPrice returns null when empty") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
             priceHistoryService.getLatestPrice("PETR4").shouldBeNull()
         }
 
         // --- getLastStoredDate ---
 
         test("getLastStoredDate returns date") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
             priceHistoryService.upsertPrices(
                 listOf(
                     PriceRecord("PETR4", LocalDate.of(2024, 1, 1), 30.0),
@@ -205,26 +180,14 @@ class PriceHistoryServiceIntegrationTest(
         }
 
         test("getLastStoredDate returns null when empty") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
             priceHistoryService.getLastStoredDate("PETR4").shouldBeNull()
         }
 
         // --- upsertPrices ---
 
         test("upsertPrices inserts new records") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
             priceHistoryService.upsertPrices(
                 listOf(
                     PriceRecord("PETR4", LocalDate.of(2024, 1, 1), 30.0),
@@ -236,13 +199,7 @@ class PriceHistoryServiceIntegrationTest(
         }
 
         test("upsertPrices updates existing records") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
             priceHistoryService.upsertPrices(
                 listOf(PriceRecord("PETR4", LocalDate.of(2024, 1, 1), 30.0)),
             )
@@ -260,19 +217,10 @@ class PriceHistoryServiceIntegrationTest(
             count shouldBe 0
         }
 
-        // --- runBackfill ---
-
         // --- generateDelistedPrices ---
 
         test("generateDelistedPrices with no transactions does nothing") {
-            transaction {
-                AssetEntity.new("DELIST1") {
-                    name = "Delisted Corp"
-                    type = "STOCK"
-                    currency = "BRL"
-                    delisted = true
-                }
-            }
+            createAsset("DELIST1", name = "Delisted Corp", delisted = true)
 
             priceHistoryService.generateDelistedPrices("DELIST1")
 
@@ -282,27 +230,12 @@ class PriceHistoryServiceIntegrationTest(
 
         test("generateDelistedPrices with one transaction repeats price") {
             val txDate = LocalDate.now().minusDays(3)
-            transaction {
-                AssetEntity.new("DELIST1") {
-                    name = "Delisted Corp"
-                    type = "STOCK"
-                    currency = "BRL"
-                    delisted = true
-                }
-                TransactionEntity.new {
-                    assetId = "DELIST1"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 25.0
-                    fees = 0.0
-                    date = txDate
-                }
-            }
+            createAsset("DELIST1", name = "Delisted Corp", delisted = true)
+            createTransaction("DELIST1", price = 25.0, date = txDate)
 
             priceHistoryService.generateDelistedPrices("DELIST1")
 
             val count = transaction { PriceHistories.selectAll().count() }
-            // txDate to today inclusive = 4 days
             count shouldBe 4
             priceHistoryService.getLatestPrice("DELIST1") shouldBe (25.0 plusOrMinus 0.001)
         }
@@ -310,84 +243,33 @@ class PriceHistoryServiceIntegrationTest(
         test("generateDelistedPrices with two transactions interpolates") {
             val dateA = LocalDate.of(2024, 1, 1)
             val dateB = LocalDate.of(2024, 1, 5)
-            transaction {
-                AssetEntity.new("DELIST2") {
-                    name = "Delisted Corp 2"
-                    type = "STOCK"
-                    currency = "BRL"
-                    delisted = true
-                }
-                TransactionEntity.new {
-                    assetId = "DELIST2"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 10.0
-                    fees = 0.0
-                    date = dateA
-                }
-                TransactionEntity.new {
-                    assetId = "DELIST2"
-                    type = "SELL"
-                    quantity = 10.0
-                    price = 20.0
-                    fees = 0.0
-                    date = dateB
-                }
-            }
+            createAsset("DELIST2", name = "Delisted Corp 2", delisted = true)
+            createTransaction("DELIST2", price = 10.0, date = dateA)
+            createTransaction("DELIST2", type = "SELL", quantity = 10.0, price = 20.0, date = dateB)
 
             priceHistoryService.generateDelistedPrices("DELIST2")
 
-            // Check interpolated price on Jan 3 (day 2 out of 4-day span): 10 + (20-10)*2/4 = 15.0
             val jan3Price =
                 priceHistoryService.getPricesForDate(listOf("DELIST2"), LocalDate.of(2024, 1, 3))
             jan3Price["DELIST2"] shouldBe (15.0 plusOrMinus 0.001)
 
-            // Price on dateB and after should be flat at 20.0
             val latestPrice = priceHistoryService.getLatestPrice("DELIST2")
             latestPrice shouldBe (20.0 plusOrMinus 0.001)
         }
 
         test("runBackfill processes delisted assets without calling Yahoo API") {
-            transaction {
-                AssetEntity.new("DELIST1") {
-                    name = "Delisted Corp"
-                    type = "STOCK"
-                    currency = "BRL"
-                    delisted = true
-                }
-                TransactionEntity.new {
-                    assetId = "DELIST1"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 25.0
-                    fees = 0.0
-                    date = LocalDate.now().minusDays(2)
-                }
-            }
+            createAsset("DELIST1", name = "Delisted Corp", delisted = true)
+            createTransaction("DELIST1", price = 25.0, date = LocalDate.now().minusDays(2))
 
-            // No mocking needed - delisted should not call quoteService
             priceHistoryService.runBackfill()
 
             val count = transaction { PriceHistories.selectAll().count() }
-            count shouldBe 3 // 3 days: today-2, today-1, today
+            count shouldBe 3
         }
 
         test("runBackfill stock asset fetches and stores prices") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 30.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 1, 1)
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", date = LocalDate.of(2024, 1, 1))
 
             every {
                 quoteService.fetchHistoricalQuotesBatch(any(), any())
@@ -407,22 +289,8 @@ class PriceHistoryServiceIntegrationTest(
         }
 
         test("runBackfill td asset fetches and stores prices") {
-            transaction {
-                AssetEntity.new("TD1") {
-                    name = "Tesouro Selic 2029"
-                    type = "TESOURO_DIRETO"
-                    yfTicker = "Tesouro Selic;01/03/2029"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "TD1"
-                    type = "BUY"
-                    quantity = 1.0
-                    price = 14000.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 1, 1)
-                }
-            }
+            createAsset("TD1", name = "Tesouro Selic 2029", type = "TESOURO_DIRETO", yfTicker = "Tesouro Selic;01/03/2029")
+            createTransaction("TD1", quantity = 1.0, price = 14000.0, date = LocalDate.of(2024, 1, 1))
 
             every {
                 quoteService.fetchTdHistoricalQuotesBatch(any())
@@ -442,13 +310,7 @@ class PriceHistoryServiceIntegrationTest(
         }
 
         test("runBackfill skips asset without transactions") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
 
             priceHistoryService.runBackfill()
 
@@ -457,21 +319,8 @@ class PriceHistoryServiceIntegrationTest(
         }
 
         test("runBackfill handles api error gracefully") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 30.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 1, 1)
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", date = LocalDate.of(2024, 1, 1))
 
             every {
                 quoteService.fetchHistoricalQuotesBatch(any(), any())
@@ -484,23 +333,9 @@ class PriceHistoryServiceIntegrationTest(
         }
 
         test("runBackfill uses lastStoredDate as start") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 30.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 1, 1)
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", date = LocalDate.of(2024, 1, 1))
 
-            // Insert an existing price record
             priceHistoryService.upsertPrices(
                 listOf(PriceRecord("PETR4", LocalDate.of(2024, 1, 1), 30.0)),
             )
@@ -519,7 +354,6 @@ class PriceHistoryServiceIntegrationTest(
 
             priceHistoryService.runBackfill()
 
-            // Should have the original + 2 new records (date >= Jan 2 because lastStored=Jan 1, start=Jan 2)
             val count = transaction { PriceHistories.selectAll().count() }
             count shouldBe 3
         }
@@ -528,21 +362,8 @@ class PriceHistoryServiceIntegrationTest(
 
         test("runDailyUpdate stock asset") {
             val today = LocalDate.now()
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 30.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 1, 1)
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", date = LocalDate.of(2024, 1, 1))
 
             every {
                 quoteService.fetchHistoricalQuotesBatch(any(), any())
@@ -557,13 +378,7 @@ class PriceHistoryServiceIntegrationTest(
         }
 
         test("runDailyUpdate skips asset without transactions") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
 
             priceHistoryService.runDailyUpdate()
 
@@ -572,21 +387,8 @@ class PriceHistoryServiceIntegrationTest(
         }
 
         test("runDailyUpdate handles api error gracefully") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 30.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 1, 1)
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", date = LocalDate.of(2024, 1, 1))
 
             every {
                 quoteService.fetchHistoricalQuotesBatch(any(), any())
