@@ -5,7 +5,12 @@
 <nav th:replace="~{base :: navbar}"></nav>
 
 <div class="container-fluid py-4 px-4">
-    <h2 class="mb-4"><i class="bi bi-cash-coin"></i> Proventos</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0"><i class="bi bi-cash-coin"></i> Proventos</h2>
+        <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#csvDivImportModal">
+            <i class="bi bi-filetype-csv"></i> Importar CSV
+        </button>
+    </div>
 
     <div class="row g-4">
         <!-- New dividend form -->
@@ -149,6 +154,39 @@
     </div>
 </div>
 
+<!-- CSV Import Modal -->
+<div class="modal fade" id="csvDivImportModal" tabindex="-1">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-filetype-csv"></i> Importar Proventos via CSV</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Cole os dados CSV (separado por tab)</label>
+                    <textarea id="divCsvTextarea" name="csv" class="form-control font-monospace" rows="6"
+                        placeholder="PETR4&#9;01/03/2026&#9;DIVIDENDO&#9;1,50&#9;0,00&#9;BRL&#9;XP&#9;&#9;Teste"></textarea>
+                    <div class="form-text">
+                        Colunas: ativo | data | tipo | valor | irrf | moeda | corretora | [ignorar] | observação
+                    </div>
+                </div>
+                <button type="button" class="btn btn-primary mb-3"
+                    hx-post="/dividends/parse-csv"
+                    hx-include="#divCsvTextarea"
+                    hx-target="#csv-div-preview-area"
+                    hx-indicator="#divCsvSpinner">
+                    <i class="bi bi-search"></i> Processar
+                </button>
+                <span id="divCsvSpinner" class="htmx-indicator">
+                    <span class="spinner-border spinner-border-sm"></span> Processando...
+                </span>
+                <div id="csv-div-preview-area"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Edit Dividend Modal -->
 <div class="modal fade" id="editDivModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
@@ -194,6 +232,7 @@
 </div>
 
 <th:block th:replace="~{base :: scripts}"></th:block>
+<script src="/js/dividends.js"></script>
 <script>
 function openEditDivModal(btn, returnTo) {
     document.getElementById('editDivForm').action = '/dividends/' + btn.dataset.divId + '/edit';

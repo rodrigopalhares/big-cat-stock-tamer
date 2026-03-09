@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="dividendCsvPreview">
+    <div th:if="${rows.isEmpty()}" class="alert alert-warning">
+        Nenhuma linha válida encontrada no CSV.
+    </div>
+
+    <div th:if="${!rows.isEmpty()}">
+        <div class="table-responsive" style="max-height: 60vh; overflow-y: auto;">
+            <table class="table table-sm table-bordered align-middle small" id="divCsvPreviewTable">
+                <thead class="table-light sticky-top">
+                    <tr>
+                        <th>#</th>
+                        <th>Ticker</th>
+                        <th>Data</th>
+                        <th>Tipo</th>
+                        <th class="text-end">Valor Bruto</th>
+                        <th class="text-end">IR Retido</th>
+                        <th>Moeda</th>
+                        <th>Corretora</th>
+                        <th>Notas</th>
+                        <th>Status</th>
+                        <th class="text-center">Ignorar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="row : ${rows}"
+                        th:classappend="${row.error != null} ? 'table-danger' : ''"
+                        th:data-has-error="${row.error != null}">
+                        <td>
+                            <span th:text="${row.rowIndex + 1}"></span>
+                            <span th:if="${row.error != null}" class="badge bg-danger ms-1"
+                                  th:title="${row.error}" th:text="${row.error}"></span>
+                        </td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm div-csv-field"
+                                   data-field="ticker" th:value="${row.ticker}"
+                                   style="width:80px">
+                        </td>
+                        <td>
+                            <input type="date" class="form-control form-control-sm div-csv-field"
+                                   data-field="date" th:value="${row.date}"
+                                   style="width:140px">
+                        </td>
+                        <td>
+                            <select class="form-select form-select-sm div-csv-field"
+                                    data-field="type" style="width:130px">
+                                <option th:each="t : ${dividendTypes}" th:value="${t}" th:text="${t}"
+                                        th:selected="${t == row.type}"></option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm div-csv-field text-end"
+                                   data-field="totalAmount" th:value="${row.totalAmount}" step="0.01"
+                                   style="width:100px">
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm div-csv-field text-end"
+                                   data-field="taxWithheld" th:value="${row.taxWithheld}" step="0.01"
+                                   style="width:90px">
+                        </td>
+                        <td>
+                            <select class="form-select form-select-sm div-csv-field"
+                                    data-field="currency" style="width:70px">
+                                <option th:each="c : ${currencies}" th:value="${c}" th:text="${c}"
+                                        th:selected="${c == row.currency}"></option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm div-csv-field"
+                                   data-field="broker" th:value="${row.broker}"
+                                   style="width:80px">
+                        </td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm div-csv-field"
+                                   data-field="notes" th:value="${row.notes}"
+                                   style="width:120px">
+                        </td>
+                        <td>
+                            <span th:if="${row.error != null}" class="badge bg-danger" th:text="${row.error}"></span>
+                            <span th:if="${row.error == null}" class="badge bg-success">OK</span>
+                        </td>
+                        <td class="text-center">
+                            <input type="checkbox"
+                                   class="form-check-input div-csv-ignore-check"
+                                   th:checked="${row.error != null}"
+                                   onchange="onDivCsvRowIgnoreToggle(this)">
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <span class="text-muted small">
+                <span th:text="${rows.size()}"></span> linhas processadas
+                <span th:if="${rows.?[error != null].size() > 0}" class="text-danger ms-2">
+                    (<span th:text="${rows.?[error != null].size()}"></span> com erro)
+                </span>
+            </span>
+            <button type="button" class="btn btn-primary" onclick="divBatchSubmit()"
+                    id="divCsvBatchSubmitBtn"
+                    th:disabled="${rows.?[error == null].isEmpty()}">
+                <i class="bi bi-check-lg"></i> Confirmar Importação
+                (<span id="divCsvBatchCount" th:text="${rows.?[error == null].size()}"></span> proventos)
+            </button>
+        </div>
+    </div>
+</div>
+</body>
+</html>

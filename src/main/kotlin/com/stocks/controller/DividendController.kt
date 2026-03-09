@@ -1,10 +1,13 @@
 package com.stocks.controller
 
 import com.stocks.dto.DIVIDEND_TYPES
+import com.stocks.dto.DividendBatchRequest
 import com.stocks.dto.DividendRequest
 import com.stocks.dto.DividendResponse
+import com.stocks.dto.VALID_CURRENCIES
 import com.stocks.model.AssetEntity
 import com.stocks.model.DividendEntity
+import com.stocks.service.DividendCsvParsingService
 import com.stocks.service.DividendService
 import com.stocks.service.TickerLookupStatus
 import com.stocks.service.TransactionService
@@ -21,6 +24,7 @@ import java.time.format.DateTimeFormatter
 @RequestMapping("/dividends")
 class DividendController(
     private val dividendService: DividendService,
+    private val dividendCsvParsingService: DividendCsvParsingService,
     private val transactionService: TransactionService,
 ) {
     // --- HTML Routes ---
@@ -142,6 +146,29 @@ class DividendController(
         return "redirect:${returnTo ?: "/dividends/"}"
     }
 
+    // --- CSV Import Routes ---
+
+    @PostMapping("/parse-csv")
+    fun parseDividendCsv(
+        @RequestParam csv: String,
+        model: Model,
+    ): String {
+        val rows = dividendCsvParsingService.parseDividendCsvRows(csv)
+        model.addAttribute("rows", rows)
+        model.addAttribute("dividendTypes", DIVIDEND_TYPES)
+        model.addAttribute("currencies", VALID_CURRENCIES)
+        return "fragments/dividend-csv-preview :: dividendCsvPreview"
+    }
+
+    @PostMapping("/batch")
+    @ResponseBody
+    fun batchImportDividends(
+        @RequestBody request: DividendBatchRequest,
+    ): ResponseEntity<Map<String, Int>> {
+        val inserted = dividendCsvParsingService.batchImportDividends(request)
+        return ResponseEntity.ok(mapOf("imported" to inserted))
+    }
+
     // --- JSON API Routes ---
 
     @GetMapping("/api")
@@ -169,6 +196,8 @@ class DividendController(
                 totalAmount = request.totalAmount,
                 taxWithheld = request.taxWithheld,
                 notes = request.notes,
+                broker = request.broker,
+                currency = request.currency ?: "BRL",
             )
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
@@ -194,6 +223,8 @@ class DividendController(
             totalAmount = totalAmount,
             taxWithheld = taxWithheld,
             netAmount = totalAmount - taxWithheld,
+            broker = broker,
+            currency = currency,
             notes = notes,
             createdAt = createdAt,
         )
@@ -206,6 +237,8 @@ class DividendController(
         val totalAmount: Double,
         val taxWithheld: Double,
         val netAmount: Double,
+        val broker: String?,
+        val currency: String,
         val notes: String?,
     )
 
@@ -218,6 +251,8 @@ class DividendController(
             totalAmount = totalAmount,
             taxWithheld = taxWithheld,
             netAmount = totalAmount - taxWithheld,
+            broker = broker,
+            currency = currency,
             notes = notes,
         )
 }

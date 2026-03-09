@@ -23,6 +23,8 @@ class DividendService(
         totalAmount: Double,
         taxWithheld: Double,
         notes: String?,
+        broker: String? = null,
+        currency: String = "BRL",
     ): DividendEntity {
         val normalized = ticker.uppercase().trim()
         return transaction {
@@ -33,6 +35,8 @@ class DividendService(
                 this.date = date
                 this.totalAmount = totalAmount
                 this.taxWithheld = taxWithheld
+                this.broker = broker?.ifBlank { null }
+                this.currency = currency.ifBlank { "BRL" }
                 this.notes = notes?.ifBlank { null }
             }
         }
@@ -64,6 +68,8 @@ class DividendService(
         totalAmount: Double,
         taxWithheld: Double,
         notes: String?,
+        broker: String? = null,
+        currency: String = "BRL",
     ) {
         transaction {
             val dividend =
@@ -73,6 +79,8 @@ class DividendService(
             dividend.date = date
             dividend.totalAmount = totalAmount
             dividend.taxWithheld = taxWithheld
+            dividend.broker = broker?.ifBlank { null }
+            dividend.currency = currency.ifBlank { "BRL" }
             dividend.notes = notes?.ifBlank { null }
         }
     }

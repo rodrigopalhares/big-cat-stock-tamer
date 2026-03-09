@@ -48,6 +48,8 @@ class DividendServiceTest(
                     totalAmount = 100.0,
                     taxWithheld = 0.0,
                     notes = "Dividendo trimestral",
+                    broker = "XP",
+                    currency = "BRL",
                 )
 
             transaction {
@@ -55,6 +57,8 @@ class DividendServiceTest(
                 dividend.type shouldBe "DIVIDENDO"
                 dividend.totalAmount shouldBe (100.0 plusOrMinus 0.001)
                 dividend.taxWithheld shouldBe (0.0 plusOrMinus 0.001)
+                dividend.broker shouldBe "XP"
+                dividend.currency shouldBe "BRL"
             }
         }
 
