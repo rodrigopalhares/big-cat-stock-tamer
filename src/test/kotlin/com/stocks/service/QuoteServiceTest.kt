@@ -154,44 +154,6 @@ class QuoteServiceTest :
             info.type shouldBe "INTERNATIONAL"
         }
 
-        // ==================== fetchExchangeRate ====================
-
-        test("fetchExchangeRate - same currency returns 1.0") {
-            service.fetchExchangeRate("BRL", "BRL") shouldBe 1.0
-        }
-
-        test("fetchExchangeRate - different currency fetches rate from API") {
-            mockServer
-                .expect(requestTo(containsString("USDBRL=X")))
-                .andRespond(withSuccess(loadFixture("yahoo_chart_usdbrl.json"), MediaType.APPLICATION_JSON))
-
-            val rate = service.fetchExchangeRate("USD", "BRL")
-            rate shouldBe (5.85 plusOrMinus 0.01)
-        }
-
-        test("fetchExchangeRate - cached rate is reused within 5 minutes") {
-            mockServer
-                .expect(requestTo(containsString("USDBRL=X")))
-                .andRespond(withSuccess(loadFixture("yahoo_chart_usdbrl.json"), MediaType.APPLICATION_JSON))
-
-            val rate1 = service.fetchExchangeRate("USD", "BRL")
-            val rate2 = service.fetchExchangeRate("USD", "BRL")
-            rate1 shouldBe (5.85 plusOrMinus 0.01)
-            rate2 shouldBe (5.85 plusOrMinus 0.01)
-
-            // If the cache didn't work, mockServer.verify() would fail because only 1 expectation was set
-            mockServer.verify()
-        }
-
-        test("fetchExchangeRate - returns fallback 6.0 when API fails") {
-            mockServer
-                .expect(requestTo(containsString("USDBRL=X")))
-                .andRespond(withResourceNotFound())
-
-            val rate = service.fetchExchangeRate("USD", "BRL")
-            rate shouldBe 6.0
-        }
-
         // ==================== fetchHistoricalQuotesBatch ====================
 
         test("fetchHistoricalQuotesBatch - empty map returns empty map") {

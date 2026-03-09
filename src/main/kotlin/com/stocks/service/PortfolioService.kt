@@ -13,6 +13,7 @@ class PortfolioService(
     private val quoteService: QuoteService,
     private val priceHistoryService: PriceHistoryService,
     private val dividendService: DividendService,
+    private val exchangeRateService: ExchangeRateService,
 ) {
     fun buildPositions(
         assets: List<AssetEntity>,
@@ -155,7 +156,7 @@ class PortfolioService(
             val irrMonthly = irrAnnual?.let { Math.pow(1 + it, 1.0 / 12.0) - 1 }
 
             val currency = asset.currency
-            val exchangeRate = if (currency != "BRL") quoteService.fetchExchangeRate(currency) else null
+            val exchangeRate = if (currency != "BRL") exchangeRateService.getRate(currency) else null
             val currentValueBrl =
                 if (exchangeRate != null && currentValue != null) {
                     currentValue * exchangeRate
