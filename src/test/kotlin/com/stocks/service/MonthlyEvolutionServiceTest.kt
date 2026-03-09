@@ -1,7 +1,12 @@
 package com.stocks.service
 
 import com.ninjasquad.springmockk.MockkBean
-import com.stocks.model.*
+import com.stocks.clearAllData
+import com.stocks.createAsset
+import com.stocks.createMonthlySnapshot
+import com.stocks.createPriceHistory
+import com.stocks.createTransaction
+import com.stocks.model.MonthlySnapshotEntity
 import io.kotest.core.extensions.ApplyExtension
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.extensions.spring.SpringExtension
@@ -31,13 +36,7 @@ class MonthlyEvolutionServiceTest(
         beforeEach {
             every { quoteService.fetchHistoricalQuotesBatch(any(), any()) } returns emptyMap()
             every { quoteService.fetchTdHistoricalQuotesBatch(any()) } returns emptyMap()
-            transaction {
-                MonthlySnapshotEntity.all().forEach { it.delete() }
-                DividendEntity.all().forEach { it.delete() }
-                TransactionEntity.all().forEach { it.delete() }
-                PriceHistoryEntity.all().forEach { it.delete() }
-                AssetEntity.all().forEach { it.delete() }
-            }
+            clearAllData()
         }
 
         // --- generateMonthRange ---
@@ -94,140 +93,56 @@ class MonthlyEvolutionServiceTest(
         }
 
         test("findFirstTransactionMonth returns correct month") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 10.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 3, 15)
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", price = 10.0, date = LocalDate.of(2024, 3, 15))
+
             monthlyEvolutionService.findFirstTransactionMonth() shouldBe YearMonth.of(2024, 3)
         }
 
         test("findFirstTransactionMonth returns earliest across assets") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                AssetEntity.new("VALE3") {
-                    name = "Vale"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 10.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 5, 1)
-                }
-                TransactionEntity.new {
-                    assetId = "VALE3"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 50.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 2, 10)
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createAsset("VALE3", name = "Vale")
+            createTransaction("PETR4", price = 10.0, date = LocalDate.of(2024, 5, 1))
+            createTransaction("VALE3", price = 50.0, date = LocalDate.of(2024, 2, 10))
+
             monthlyEvolutionService.findFirstTransactionMonth() shouldBe YearMonth.of(2024, 2)
         }
 
         // --- getMonthEndPrice ---
 
         test("getMonthEndPrice returns null when no prices") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+
             monthlyEvolutionService.getMonthEndPrice("PETR4", LocalDate.of(2024, 1, 31)).shouldBeNull()
         }
 
         test("getMonthEndPrice returns latest price on or before date") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                PriceHistoryEntity.new {
-                    assetId = "PETR4"
-                    date = LocalDate.of(2024, 1, 15)
-                    close = 30.0
-                }
-                PriceHistoryEntity.new {
-                    assetId = "PETR4"
-                    date = LocalDate.of(2024, 1, 30)
-                    close = 32.0
-                }
-                PriceHistoryEntity.new {
-                    assetId = "PETR4"
-                    date = LocalDate.of(2024, 2, 5)
-                    close = 35.0
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createPriceHistory("PETR4", LocalDate.of(2024, 1, 15), 30.0)
+            createPriceHistory("PETR4", LocalDate.of(2024, 1, 30), 32.0)
+            createPriceHistory("PETR4", LocalDate.of(2024, 2, 5), 35.0)
+
             monthlyEvolutionService.getMonthEndPrice("PETR4", LocalDate.of(2024, 1, 31)) shouldBe (32.0 plusOrMinus 0.001)
         }
 
         test("getMonthEndPrice ignores prices after date") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                PriceHistoryEntity.new {
-                    assetId = "PETR4"
-                    date = LocalDate.of(2024, 2, 5)
-                    close = 35.0
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createPriceHistory("PETR4", LocalDate.of(2024, 2, 5), 35.0)
+
             monthlyEvolutionService.getMonthEndPrice("PETR4", LocalDate.of(2024, 1, 31)).shouldBeNull()
         }
 
         // --- recalculate ---
 
         test("recalculate single asset single month") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 30.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 1, 15)
-                }
-                PriceHistoryEntity.new {
-                    assetId = "PETR4"
-                    date = LocalDate.of(2024, 1, 30)
-                    close = 32.0
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", price = 30.0, date = LocalDate.of(2024, 1, 15))
+            createPriceHistory("PETR4", LocalDate.of(2024, 1, 30), 32.0)
 
             monthlyEvolutionService.recalculate()
 
             val snapshots = transaction { MonthlySnapshotEntity.all().toList() }
             snapshots.shouldNotBeNull()
-            // At least the January 2024 snapshot should exist
             val janSnapshot =
                 snapshots.find {
                     it.assetId == "PETR4" && it.month == LocalDate.of(2024, 1, 1)
@@ -241,31 +156,10 @@ class MonthlyEvolutionServiceTest(
         }
 
         test("recalculate multiple months") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 30.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 1, 15)
-                }
-                PriceHistoryEntity.new {
-                    assetId = "PETR4"
-                    date = LocalDate.of(2024, 1, 30)
-                    close = 32.0
-                }
-                PriceHistoryEntity.new {
-                    assetId = "PETR4"
-                    date = LocalDate.of(2024, 2, 28)
-                    close = 35.0
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", price = 30.0, date = LocalDate.of(2024, 1, 15))
+            createPriceHistory("PETR4", LocalDate.of(2024, 1, 30), 32.0)
+            createPriceHistory("PETR4", LocalDate.of(2024, 2, 28), 35.0)
 
             monthlyEvolutionService.recalculate()
 
@@ -286,39 +180,11 @@ class MonthlyEvolutionServiceTest(
         }
 
         test("recalculate buy then sell reduces quantity") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 30.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 1, 15)
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "SELL"
-                    quantity = -5.0
-                    price = 35.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 2, 10)
-                }
-                PriceHistoryEntity.new {
-                    assetId = "PETR4"
-                    date = LocalDate.of(2024, 1, 30)
-                    close = 32.0
-                }
-                PriceHistoryEntity.new {
-                    assetId = "PETR4"
-                    date = LocalDate.of(2024, 2, 28)
-                    close = 36.0
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", price = 30.0, date = LocalDate.of(2024, 1, 15))
+            createTransaction("PETR4", type = "SELL", quantity = -5.0, price = 35.0, date = LocalDate.of(2024, 2, 10))
+            createPriceHistory("PETR4", LocalDate.of(2024, 1, 30), 32.0)
+            createPriceHistory("PETR4", LocalDate.of(2024, 2, 28), 36.0)
 
             monthlyEvolutionService.recalculate()
 
@@ -333,39 +199,11 @@ class MonthlyEvolutionServiceTest(
         }
 
         test("recalculate skips month when quantity is zero") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 30.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 1, 15)
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "SELL"
-                    quantity = -10.0
-                    price = 35.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 2, 10)
-                }
-                PriceHistoryEntity.new {
-                    assetId = "PETR4"
-                    date = LocalDate.of(2024, 1, 30)
-                    close = 32.0
-                }
-                PriceHistoryEntity.new {
-                    assetId = "PETR4"
-                    date = LocalDate.of(2024, 2, 28)
-                    close = 36.0
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", price = 30.0, date = LocalDate.of(2024, 1, 15))
+            createTransaction("PETR4", type = "SELL", quantity = -10.0, price = 35.0, date = LocalDate.of(2024, 2, 10))
+            createPriceHistory("PETR4", LocalDate.of(2024, 1, 30), 32.0)
+            createPriceHistory("PETR4", LocalDate.of(2024, 2, 28), 36.0)
 
             monthlyEvolutionService.recalculate()
 
@@ -379,22 +217,8 @@ class MonthlyEvolutionServiceTest(
         }
 
         test("recalculate skips month when no market price available") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 30.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 1, 15)
-                }
-                // No price history at all
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", price = 30.0, date = LocalDate.of(2024, 1, 15))
 
             monthlyEvolutionService.recalculate()
 
@@ -403,26 +227,9 @@ class MonthlyEvolutionServiceTest(
         }
 
         test("recalculate is idempotent") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 30.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 1, 15)
-                }
-                PriceHistoryEntity.new {
-                    assetId = "PETR4"
-                    date = LocalDate.of(2024, 1, 30)
-                    close = 32.0
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", price = 30.0, date = LocalDate.of(2024, 1, 15))
+            createPriceHistory("PETR4", LocalDate.of(2024, 1, 30), 32.0)
 
             monthlyEvolutionService.recalculate()
             val countFirst = transaction { MonthlySnapshotEntity.all().count() }
@@ -434,44 +241,12 @@ class MonthlyEvolutionServiceTest(
         }
 
         test("recalculate multiple assets") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                AssetEntity.new("VALE3") {
-                    name = "Vale"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 30.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 1, 15)
-                }
-                TransactionEntity.new {
-                    assetId = "VALE3"
-                    type = "BUY"
-                    quantity = 5.0
-                    price = 60.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 1, 20)
-                }
-                PriceHistoryEntity.new {
-                    assetId = "PETR4"
-                    date = LocalDate.of(2024, 1, 30)
-                    close = 32.0
-                }
-                PriceHistoryEntity.new {
-                    assetId = "VALE3"
-                    date = LocalDate.of(2024, 1, 30)
-                    close = 65.0
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createAsset("VALE3", name = "Vale")
+            createTransaction("PETR4", price = 30.0, date = LocalDate.of(2024, 1, 15))
+            createTransaction("VALE3", quantity = 5.0, price = 60.0, date = LocalDate.of(2024, 1, 20))
+            createPriceHistory("PETR4", LocalDate.of(2024, 1, 30), 32.0)
+            createPriceHistory("VALE3", LocalDate.of(2024, 1, 30), 65.0)
 
             monthlyEvolutionService.recalculate()
 
@@ -504,68 +279,26 @@ class MonthlyEvolutionServiceTest(
         }
 
         test("getEvolution fills month gaps with zero values") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                // Insert snapshots for Jan and Mar only — Feb is a gap
-                MonthlySnapshotEntity.new {
-                    assetId = "PETR4"
-                    month = LocalDate.of(2024, 1, 1)
-                    quantity = 10.0
-                    avgPrice = 30.0
-                    marketPrice = 32.0
-                    totalCost = 300.0
-                    marketValue = 320.0
-                }
-                MonthlySnapshotEntity.new {
-                    assetId = "PETR4"
-                    month = LocalDate.of(2024, 3, 1)
-                    quantity = 10.0
-                    avgPrice = 30.0
-                    marketPrice = 35.0
-                    totalCost = 300.0
-                    marketValue = 350.0
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createMonthlySnapshot("PETR4", LocalDate.of(2024, 1, 1), 10.0, 30.0, 32.0, 300.0, 320.0)
+            createMonthlySnapshot("PETR4", LocalDate.of(2024, 3, 1), 10.0, 30.0, 35.0, 300.0, 350.0)
 
             val result = monthlyEvolutionService.getEvolution()
 
-            // Should have Jan, Feb, Mar (continuous range with Feb filled as zero)
             result.months shouldHaveSize 3
             result.months[0].month shouldBe LocalDate.of(2024, 1, 1)
             result.months[1].month shouldBe LocalDate.of(2024, 2, 1)
             result.months[2].month shouldBe LocalDate.of(2024, 3, 1)
 
-            // Feb should have zero values
             result.months[1].snapshots.shouldBeEmpty()
             result.months[1].totalInvested shouldBe (0.0 plusOrMinus 0.001)
             result.months[1].totalMarketValue shouldBe (0.0 plusOrMinus 0.001)
         }
 
         test("getEvolution returns data after recalculate") {
-            transaction {
-                AssetEntity.new("PETR4") {
-                    name = "Petrobras"
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-                TransactionEntity.new {
-                    assetId = "PETR4"
-                    type = "BUY"
-                    quantity = 10.0
-                    price = 30.0
-                    fees = 0.0
-                    date = LocalDate.of(2024, 1, 15)
-                }
-                PriceHistoryEntity.new {
-                    assetId = "PETR4"
-                    date = LocalDate.of(2024, 1, 30)
-                    close = 32.0
-                }
-            }
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", price = 30.0, date = LocalDate.of(2024, 1, 15))
+            createPriceHistory("PETR4", LocalDate.of(2024, 1, 30), 32.0)
 
             monthlyEvolutionService.recalculate()
             val result = monthlyEvolutionService.getEvolution()

@@ -1,6 +1,5 @@
 package com.stocks.service
 
-import com.stocks.dto.BcbPtaxResponse
 import com.stocks.model.ExchangeRateEntity
 import com.stocks.model.ExchangeRates
 import com.stocks.model.Transactions
@@ -11,18 +10,13 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.upsert
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import org.springframework.web.client.RestClient
-import org.springframework.web.client.body
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 @Service
 class ExchangeRateService(
-    private val restClient: RestClient,
+    private val bcbClient: BcbPtaxClient,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
-
-    private val bcbDateFormatter = DateTimeFormatter.ofPattern("MM-dd-yyyy")
 
     fun getRate(
         fromCurrency: String,
@@ -79,7 +73,7 @@ class ExchangeRateService(
         val startDate = findOldestTransactionDate() ?: LocalDate.now()
         val endDate = LocalDate.now()
 
-        val quotes = fetchRangeFromBcb(startDate, endDate)
+        val quotes = bcbClient.fetchRange(startDate, endDate)
         if (quotes.isEmpty()) {
             logger.warn("BCB returned no quotes for $startDate to $endDate")
             return
@@ -104,43 +98,6 @@ class ExchangeRateService(
         }
 
         logger.info("Backfilled $fromCurrency/$toCurrency exchange rates from $startDate to $endDate")
-    }
-
-    internal fun fetchRangeFromBcb(
-        startDate: LocalDate,
-        endDate: LocalDate,
-    ): List<Pair<LocalDate, Pair<Double, Double>>> {
-        val start = bcbDateFormatter.format(startDate)
-        val end = bcbDateFormatter.format(endDate)
-        val url =
-            "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/" +
-                "CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)" +
-                "?@dataInicial='$start'&@dataFinalCotacao='$end'&\$format=json"
-
-        logger.info("Fetching BCB PTAX: $url")
-
-        return try {
-            val response =
-                restClient
-                    .get()
-                    .uri(url)
-                    .retrieve()
-                    .body<BcbPtaxResponse>() ?: return emptyList()
-
-            response.value.mapNotNull { quote ->
-                try {
-                    val dateStr = quote.dataHoraCotacao.substringBefore(" ")
-                    val quoteDate = LocalDate.parse(dateStr, DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-                    quoteDate to (quote.cotacaoCompra to quote.cotacaoVenda)
-                } catch (e: Exception) {
-                    logger.warn("Error parsing BCB quote date: ${quote.dataHoraCotacao}: ${e.message}")
-                    null
-                }
-            }
-        } catch (e: Exception) {
-            logger.error("Error fetching BCB PTAX rates: ${e.message}")
-            emptyList()
-        }
     }
 
     internal fun upsertRate(

@@ -1,10 +1,10 @@
 package com.stocks.service
 
+import com.stocks.clearAllData
+import com.stocks.createAsset
 import com.stocks.dto.DividendBatchRequest
 import com.stocks.dto.DividendBatchRowRequest
-import com.stocks.model.AssetEntity
 import com.stocks.model.DividendEntity
-import com.stocks.model.TransactionEntity
 import io.kotest.core.extensions.ApplyExtension
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.extensions.spring.SpringExtension
@@ -24,21 +24,7 @@ class DividendCsvParsingServiceTest(
 ) : FunSpec({
 
         beforeEach {
-            transaction {
-                DividendEntity.all().forEach { it.delete() }
-                TransactionEntity.all().forEach { it.delete() }
-                AssetEntity.all().forEach { it.delete() }
-            }
-        }
-
-        fun createAsset(ticker: String) {
-            transaction {
-                AssetEntity.new(ticker) {
-                    name = ticker
-                    type = "STOCK"
-                    currency = "BRL"
-                }
-            }
+            clearAllData()
         }
 
         test("parse valid dividend CSV rows") {
