@@ -11,7 +11,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
-import java.util.concurrent.ConcurrentHashMap
 
 private const val USER_AGENT =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
@@ -23,9 +22,7 @@ class QuoteService(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    private val rateCache = ConcurrentHashMap<String, Pair<Double, Long>>()
-
-    private val quoteCache = ConcurrentHashMap<String, Pair<Double, Long>>()
+    private val quoteCache = mutableMapOf<String, Pair<Double, Long>>()
 
     private companion object {
         const val QUOTE_CACHE_TTL_SECONDS = 4 * 3600L
@@ -112,34 +109,6 @@ class QuoteService(
             }
         }
         return results
-    }
-
-    fun fetchExchangeRate(
-        fromCurrency: String,
-        toCurrency: String = "BRL"
-    ): Double {
-        if (fromCurrency == toCurrency) return 1.0
-
-        val key = "${fromCurrency}_$toCurrency"
-        val now = Instant.now().epochSecond
-
-        val cached = rateCache[key]
-        if (cached != null && now - cached.second < 300) {
-            return cached.first
-        }
-
-        try {
-            val yfPair = "${fromCurrency}$toCurrency=X"
-            val price = fetchSingleQuote(yfPair)
-            if (price != null && price > 0) {
-                rateCache[key] = price to now
-                return price
-            }
-        } catch (e: Exception) {
-            logger.debug("Error fetching exchange rate $fromCurrency/$toCurrency: ${e.message}")
-        }
-
-        return rateCache[key]?.first ?: 6.0
     }
 
     // ---------- Historical quotes ----------
