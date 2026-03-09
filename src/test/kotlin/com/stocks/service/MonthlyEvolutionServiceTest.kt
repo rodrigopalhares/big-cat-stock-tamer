@@ -503,6 +503,48 @@ class MonthlyEvolutionServiceTest(
             result.tickers.shouldBeEmpty()
         }
 
+        test("getEvolution fills month gaps with zero values") {
+            transaction {
+                AssetEntity.new("PETR4") {
+                    name = "Petrobras"
+                    type = "STOCK"
+                    currency = "BRL"
+                }
+                // Insert snapshots for Jan and Mar only — Feb is a gap
+                MonthlySnapshotEntity.new {
+                    assetId = "PETR4"
+                    month = LocalDate.of(2024, 1, 1)
+                    quantity = 10.0
+                    avgPrice = 30.0
+                    marketPrice = 32.0
+                    totalCost = 300.0
+                    marketValue = 320.0
+                }
+                MonthlySnapshotEntity.new {
+                    assetId = "PETR4"
+                    month = LocalDate.of(2024, 3, 1)
+                    quantity = 10.0
+                    avgPrice = 30.0
+                    marketPrice = 35.0
+                    totalCost = 300.0
+                    marketValue = 350.0
+                }
+            }
+
+            val result = monthlyEvolutionService.getEvolution()
+
+            // Should have Jan, Feb, Mar (continuous range with Feb filled as zero)
+            result.months shouldHaveSize 3
+            result.months[0].month shouldBe LocalDate.of(2024, 1, 1)
+            result.months[1].month shouldBe LocalDate.of(2024, 2, 1)
+            result.months[2].month shouldBe LocalDate.of(2024, 3, 1)
+
+            // Feb should have zero values
+            result.months[1].snapshots.shouldBeEmpty()
+            result.months[1].totalInvested shouldBe (0.0 plusOrMinus 0.001)
+            result.months[1].totalMarketValue shouldBe (0.0 plusOrMinus 0.001)
+        }
+
         test("getEvolution returns data after recalculate") {
             transaction {
                 AssetEntity.new("PETR4") {

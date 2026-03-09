@@ -170,14 +170,33 @@ class MonthlyEvolutionService(
         val tickers = allSnapshots.map { it.assetId }.distinct().sorted()
         val grouped = allSnapshots.groupBy { it.month }
 
+        val firstMonth = YearMonth.from(allSnapshots.first().month)
+        val lastMonth = YearMonth.from(allSnapshots.last().month)
+        val allMonths = generateMonthRange(firstMonth, lastMonth)
+
+        val emptyRow = { month: LocalDate ->
+            MonthlyEvolutionRow(
+                month = month,
+                snapshots = emptyList(),
+                totalInvested = 0.0,
+                totalMarketValue = 0.0,
+            )
+        }
+
         val months =
-            grouped.entries.sortedBy { it.key }.map { (month, snapshots) ->
-                MonthlyEvolutionRow(
-                    month = month,
-                    snapshots = snapshots,
-                    totalInvested = snapshots.sumOf { it.totalCost },
-                    totalMarketValue = snapshots.sumOf { it.marketValue },
-                )
+            allMonths.map { ym ->
+                val monthDate = ym.atDay(1)
+                val snapshots = grouped[monthDate]
+                if (snapshots != null) {
+                    MonthlyEvolutionRow(
+                        month = monthDate,
+                        snapshots = snapshots,
+                        totalInvested = snapshots.sumOf { it.totalCost },
+                        totalMarketValue = snapshots.sumOf { it.marketValue },
+                    )
+                } else {
+                    emptyRow(monthDate)
+                }
             }
 
         return MonthlyEvolutionSummary(months = months, tickers = tickers)
