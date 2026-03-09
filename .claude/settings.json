@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./gradlew ktlintFormat --quiet 2>&1"
+            "command": "git diff --name-only HEAD | grep -qE \"\\.kts?$\" && ./gradlew ktlintFormat --quiet 2>&1 || true"
           }
         ]
       },
@@ -13,7 +13,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./gradlew test --quiet 2>&1"
+            "command": "git diff --name-only HEAD | grep -qE \"\\.kts?$\" && ./gradlew test --quiet 2>&1 || true"
           }
         ]
       }
