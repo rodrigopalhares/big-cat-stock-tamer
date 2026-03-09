@@ -252,7 +252,7 @@ class CsvParsingService(
             ticker = ticker,
             date = isoDate,
             type = type,
-            quantity = absQuantity,
+            quantity = if (type == "SELL") -absQuantity else absQuantity,
             price = price,
             fees = fees,
             broker = broker,

@@ -303,7 +303,7 @@ class MonthlyEvolutionServiceTest(
                 TransactionEntity.new {
                     assetId = "PETR4"
                     type = "SELL"
-                    quantity = 5.0
+                    quantity = -5.0
                     price = 35.0
                     fees = 0.0
                     date = LocalDate.of(2024, 2, 10)
@@ -350,7 +350,7 @@ class MonthlyEvolutionServiceTest(
                 TransactionEntity.new {
                     assetId = "PETR4"
                     type = "SELL"
-                    quantity = 10.0
+                    quantity = -10.0
                     price = 35.0
                     fees = 0.0
                     date = LocalDate.of(2024, 2, 10)
