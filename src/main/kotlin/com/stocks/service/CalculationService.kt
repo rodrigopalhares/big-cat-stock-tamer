@@ -3,6 +3,7 @@ package com.stocks.service
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import kotlin.math.abs
 
 data class PositionCalcResult(
     val quantity: Double,
@@ -21,18 +22,19 @@ class CalculationService {
         val cashFlows = mutableListOf<Pair<LocalDate, Double>>()
 
         for (t in transactions.sortedBy { it.date }) {
-            if (t.type == "BUY") {
-                val purchaseCost = t.quantity * t.price + t.fees
+            val absQty = abs(t.quantity)
+            if (t.quantity > 0) { // BUY
+                val purchaseCost = absQty * t.price + t.fees
                 accumulatedCost += purchaseCost
-                quantity += t.quantity
+                quantity += absQty
                 cashFlows.add(t.date to -purchaseCost)
-            } else if (t.type == "SELL" && quantity > 0) {
+            } else if (t.quantity < 0 && quantity > 0) { // SELL
                 val avgPrice = accumulatedCost / quantity
-                val saleProceeds = t.quantity * t.price - t.fees
-                val costOfSold = avgPrice * t.quantity
+                val saleProceeds = absQty * t.price - t.fees
+                val costOfSold = avgPrice * absQty
                 realizedPnl += saleProceeds - costOfSold
                 accumulatedCost -= costOfSold
-                quantity -= t.quantity
+                quantity -= absQty
                 cashFlows.add(t.date to saleProceeds)
             }
         }

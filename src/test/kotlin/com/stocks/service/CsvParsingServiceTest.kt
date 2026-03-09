@@ -101,12 +101,12 @@ class CsvParsingServiceTest :
                 rows[0].notes shouldBe "IRRF: 5,00"
             }
 
-            test("negative quantity converted to absolute value") {
+            test("negative quantity converted to absolute value then negated for SELL") {
                 val csv = "PETR4\t01/06/2024\tV\t-100\t30,00\t0\tXP\t0\tBRL\t"
                 val rows = service.parseCsvRows(csv, existingTickers, resolver)
 
                 rows shouldHaveSize 1
-                rows[0].quantity shouldBeExactly 100.0
+                rows[0].quantity shouldBeExactly -100.0
             }
 
             test("invalid date returns error row") {

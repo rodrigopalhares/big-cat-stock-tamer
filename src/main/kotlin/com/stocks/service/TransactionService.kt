@@ -102,7 +102,7 @@ class TransactionService(
             TransactionEntity.new {
                 assetId = normalized
                 this.type = type.uppercase()
-                this.quantity = quantity
+                this.quantity = if (type.uppercase() == "SELL") -quantity else quantity
                 this.price = price
                 this.fees = fees
                 this.date = date
@@ -134,7 +134,7 @@ class TransactionService(
             TransactionEntity.new {
                 this.assetId = asset.ticker.value
                 this.type = type.uppercase().trim()
-                this.quantity = quantity
+                this.quantity = if (type.uppercase().trim() == "SELL") -quantity else quantity
                 this.price = price
                 this.fees = fees
                 this.date = date
@@ -234,7 +234,7 @@ class TransactionService(
                 TransactionEntity.findById(id)
                     ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found")
             tx.type = type.uppercase()
-            tx.quantity = quantity
+            tx.quantity = if (type.uppercase() == "SELL") -quantity else quantity
             tx.price = price
             tx.fees = fees
             tx.date = date

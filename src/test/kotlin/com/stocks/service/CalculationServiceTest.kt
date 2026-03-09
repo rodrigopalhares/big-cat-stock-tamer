@@ -46,7 +46,7 @@ class CalculationServiceTest :
             val txs =
                 listOf(
                     TransactionData("BUY", 10.0, 10.0, 0.0, LocalDate.of(2024, 1, 1)),
-                    TransactionData("SELL", 10.0, 15.0, 0.0, LocalDate.of(2024, 1, 2)),
+                    TransactionData("SELL", -10.0, 15.0, 0.0, LocalDate.of(2024, 1, 2)),
                 )
             val result = service.calculatePosition(txs)
             result.realizedPnl shouldBe (50.0 plusOrMinus 0.001)
@@ -57,14 +57,14 @@ class CalculationServiceTest :
             val txs =
                 listOf(
                     TransactionData("BUY", 10.0, 10.0, 0.0, LocalDate.of(2024, 1, 1)),
-                    TransactionData("SELL", 10.0, 8.0, 0.0, LocalDate.of(2024, 1, 2)),
+                    TransactionData("SELL", -10.0, 8.0, 0.0, LocalDate.of(2024, 1, 2)),
                 )
             val result = service.calculatePosition(txs)
             result.realizedPnl shouldBe (-20.0 plusOrMinus 0.001)
         }
 
         test("sell without buy") {
-            val txs = listOf(TransactionData("SELL", 10.0, 15.0, 0.0, LocalDate.of(2024, 1, 1)))
+            val txs = listOf(TransactionData("SELL", -10.0, 15.0, 0.0, LocalDate.of(2024, 1, 1)))
             val result = service.calculatePosition(txs)
             result.quantity shouldBe (0.0 plusOrMinus 0.001)
             result.realizedPnl shouldBe (0.0 plusOrMinus 0.001)
@@ -82,7 +82,7 @@ class CalculationServiceTest :
             val txs =
                 listOf(
                     TransactionData("BUY", 10.0, 10.0, 0.0, LocalDate.of(2024, 1, 1)),
-                    TransactionData("SELL", 5.0, 15.0, 0.0, LocalDate.of(2024, 1, 2)),
+                    TransactionData("SELL", -5.0, 15.0, 0.0, LocalDate.of(2024, 1, 2)),
                 )
             val result = service.calculatePosition(txs)
             result.cashFlows.size shouldBe 2

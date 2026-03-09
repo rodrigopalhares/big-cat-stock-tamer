@@ -293,7 +293,7 @@ class TransactionControllerTest(
                 TransactionEntity.new {
                     assetId = "VALE3"
                     type = "SELL"
-                    quantity = 5.0
+                    quantity = -5.0
                     price = 70.0
                     fees = 0.0
                     date = LocalDate.of(2024, 2, 1)
@@ -342,7 +342,7 @@ class TransactionControllerTest(
                 TransactionEntity.new {
                     assetId = "VALE3"
                     type = "SELL"
-                    quantity = 5.0
+                    quantity = -5.0
                     price = 70.0
                     fees = 0.0
                     date = LocalDate.of(2024, 2, 1)
@@ -404,7 +404,7 @@ class TransactionControllerTest(
                 TransactionEntity.new {
                     assetId = "HGLG11"
                     type = "SELL"
-                    quantity = 50.0
+                    quantity = -50.0
                     price = 170.0
                     fees = 0.0
                     date = LocalDate.of(2024, 2, 1)
@@ -462,7 +462,7 @@ class TransactionControllerTest(
             transaction {
                 val tx = TransactionEntity.findById(txId)!!
                 tx.type shouldBe "SELL"
-                tx.quantity shouldBe 50.0
+                tx.quantity shouldBe -50.0
                 tx.price shouldBe 30.0
                 tx.fees shouldBe 5.0
                 tx.broker shouldBe "Clear"

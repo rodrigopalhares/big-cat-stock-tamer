@@ -21,6 +21,7 @@ import org.springframework.ui.Model
 import org.springframework.web.bind.annotation.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlin.math.abs
 
 @Controller
 @RequestMapping("/transactions")
@@ -266,7 +267,7 @@ class TransactionController(
             id = id.value,
             assetId = assetId,
             type = type,
-            quantity = quantity,
+            quantity = abs(quantity),
             price = price,
             fees = fees,
             date = date,
@@ -294,12 +295,12 @@ class TransactionController(
             id = id.value,
             assetTicker = assetId,
             type = type,
-            quantity = quantity,
+            quantity = abs(quantity),
             price = price,
             fees = fees,
             date = date,
             broker = broker,
             notes = notes,
-            total = if (type == "BUY") quantity * price + fees else quantity * price - fees,
+            total = if (type == "BUY") abs(quantity) * price + fees else abs(quantity) * price - fees,
         )
 }
