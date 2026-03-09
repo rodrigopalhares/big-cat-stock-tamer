@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', function() {
         pointRadius: 0,
         pointHitRadius: 10,
         order: 1,
+        yAxisID: 'yInvested',
     });
 
     new Chart(document.getElementById('evolutionChart'), {
@@ -54,6 +55,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     stacked: true,
                     ticks: {
                         callback: function(v) { return 'R$ ' + v.toLocaleString('pt-BR'); }
+                    }
+                },
+                yInvested: {
+                    display: false,
+                    stacked: false,
+                    afterBuildTicks: function(axis) {
+                        var yScale = axis.chart.scales.y;
+                        axis.min = yScale.min;
+                        axis.max = yScale.max;
                     }
                 }
             },
