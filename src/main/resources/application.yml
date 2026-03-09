@@ -24,5 +24,12 @@ spring:
   thymeleaf:
     cache: false
 
+exposed:
+  show-sql: true
+
+logging:
+  level:
+    Exposed: DEBUG
+
 server:
   port: 8000
