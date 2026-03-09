@@ -16,22 +16,22 @@ import kotlin.math.abs
 
 private val BR_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy")
 
+/**
+ * Parse a Brazilian number string like "1.234,56" into a Double.
+ * Handles both "1234,56" and "1.234,56" formats.
+ */
+fun parseBrazilianNumber(raw: String): Double? {
+    val trimmed = raw.trim()
+    if (trimmed.isBlank()) return 0.0
+    val normalized = trimmed.replace(".", "").replace(",", ".")
+    return normalized.toDoubleOrNull()
+}
+
 @Service
 class CsvParsingService(
     private val quoteService: QuoteService,
     private val transactionService: TransactionService,
 ) {
-    /**
-     * Parse a Brazilian number string like "1.234,56" into a Double.
-     * Handles both "1234,56" and "1.234,56" formats.
-     */
-    internal fun parseBrazilianNumber(raw: String): Double? {
-        val trimmed = raw.trim()
-        if (trimmed.isBlank()) return 0.0
-        val normalized = trimmed.replace(".", "").replace(",", ".")
-        return normalized.toDoubleOrNull()
-    }
-
     /**
      * Parse tab-separated CSV rows from a Brazilian brokerage spreadsheet.
      *

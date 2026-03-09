@@ -14,6 +14,8 @@ data class DividendRequest(
     @field:Positive
     val totalAmount: Double,
     val taxWithheld: Double = 0.0,
+    val broker: String? = null,
+    val currency: String? = "BRL",
     val notes: String? = null,
 ) {
     fun validate() {
@@ -32,6 +34,8 @@ data class DividendResponse(
     val totalAmount: Double,
     val taxWithheld: Double,
     val netAmount: Double,
+    val broker: String?,
+    val currency: String?,
     val notes: String?,
     val createdAt: LocalDateTime,
 )

@@ -53,3 +53,31 @@ data class BatchRowRequest(
     val notes: String,
     val currency: String,
 )
+
+data class DividendCsvRow(
+    val rowIndex: Int,
+    val ticker: String,
+    val date: String,
+    val type: String,
+    val totalAmount: Double,
+    val taxWithheld: Double,
+    val currency: String,
+    val broker: String,
+    val notes: String,
+    val error: String? = null,
+)
+
+data class DividendBatchRequest(
+    val rows: List<DividendBatchRowRequest>,
+)
+
+data class DividendBatchRowRequest(
+    val ticker: String,
+    val date: String,
+    val type: String,
+    val totalAmount: Double,
+    val taxWithheld: Double,
+    val currency: String,
+    val broker: String,
+    val notes: String,
+)

@@ -121,6 +121,8 @@ class AssetController(
                         totalAmount = d.totalAmount,
                         taxWithheld = d.taxWithheld,
                         netAmount = d.totalAmount - d.taxWithheld,
+                        broker = d.broker,
+                        currency = d.currency,
                         notes = d.notes,
                     )
                 }

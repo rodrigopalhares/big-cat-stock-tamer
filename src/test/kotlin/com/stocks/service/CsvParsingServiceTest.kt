@@ -19,36 +19,36 @@ class CsvParsingServiceTest :
 
         context("parseBrazilianNumber") {
             test("simple decimal with comma") {
-                service.parseBrazilianNumber("25,50") shouldBe 25.50
+                parseBrazilianNumber("25,50") shouldBe 25.50
             }
 
             test("thousands separator with dot") {
-                service.parseBrazilianNumber("1.234,56") shouldBe 1234.56
+                parseBrazilianNumber("1.234,56") shouldBe 1234.56
             }
 
             test("integer without separator") {
-                service.parseBrazilianNumber("100") shouldBe 100.0
+                parseBrazilianNumber("100") shouldBe 100.0
             }
 
             test("blank string returns zero") {
-                service.parseBrazilianNumber("") shouldBe 0.0
-                service.parseBrazilianNumber("   ") shouldBe 0.0
+                parseBrazilianNumber("") shouldBe 0.0
+                parseBrazilianNumber("   ") shouldBe 0.0
             }
 
             test("trims whitespace") {
-                service.parseBrazilianNumber("  25,50  ") shouldBe 25.50
+                parseBrazilianNumber("  25,50  ") shouldBe 25.50
             }
 
             test("invalid input returns null") {
-                service.parseBrazilianNumber("abc").shouldBeNull()
+                parseBrazilianNumber("abc").shouldBeNull()
             }
 
             test("negative number") {
-                service.parseBrazilianNumber("-100,50") shouldBe -100.50
+                parseBrazilianNumber("-100,50") shouldBe -100.50
             }
 
             test("large number with multiple thousands separators") {
-                service.parseBrazilianNumber("1.000.000,00") shouldBe 1000000.0
+                parseBrazilianNumber("1.000.000,00") shouldBe 1000000.0
             }
         }
 
