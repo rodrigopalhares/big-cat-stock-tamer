@@ -13,7 +13,14 @@ import java.time.LocalDate
  */
 data class ResolvedPrice(
     val price: Double,
-    val fees: Double
+    val fees: Double,
+)
+
+data class ConvertedPrices(
+    val price: Double,
+    val fees: Double,
+    val priceBrl: Double,
+    val feesBrl: Double,
 )
 
 /**
@@ -96,22 +103,22 @@ class TransactionService(
         date: LocalDate,
         broker: String?,
         notes: String?,
-        currency: String? = null,
+        inputCurrency: String? = null,
     ): TransactionEntity {
         val normalized = ticker.uppercase().trim()
         return transaction {
             val asset = findOrCreateAsset(normalized)
-            val effectiveCurrency = currency?.ifBlank { null } ?: asset.currency
-            val (pBrl, fBrl) = convertToBrl(price, fees, effectiveCurrency, date)
+            val effectiveInputCurrency = inputCurrency?.ifBlank { null } ?: asset.currency
+            val converted = convertPrices(price, fees, effectiveInputCurrency, asset.currency, date)
             TransactionEntity.new {
                 assetId = normalized
                 this.type = type.uppercase()
                 this.quantity = if (type.uppercase() == "SELL") -quantity else quantity
-                this.price = price
-                this.fees = fees
-                this.priceBrl = pBrl
-                this.feesBrl = fBrl
-                this.currency = effectiveCurrency
+                this.price = converted.price
+                this.fees = converted.fees
+                this.priceBrl = converted.priceBrl
+                this.feesBrl = converted.feesBrl
+                this.currency = asset.currency
                 this.date = date
                 this.broker = broker?.ifBlank { null }
                 this.notes = notes?.ifBlank { null }
@@ -132,24 +139,24 @@ class TransactionService(
         date: LocalDate,
         broker: String?,
         notes: String?,
-        currency: String? = null,
+        inputCurrency: String? = null,
     ): TransactionEntity =
         transaction {
             val asset =
                 AssetEntity.findById(assetId.uppercase())
                     ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found")
-            val effectiveCurrency = currency?.ifBlank { null } ?: asset.currency
-            val (pBrl, fBrl) = convertToBrl(price, fees, effectiveCurrency, date)
+            val effectiveInputCurrency = inputCurrency?.ifBlank { null } ?: asset.currency
+            val converted = convertPrices(price, fees, effectiveInputCurrency, asset.currency, date)
 
             TransactionEntity.new {
                 this.assetId = asset.ticker.value
                 this.type = type.uppercase().trim()
                 this.quantity = if (type.uppercase().trim() == "SELL") -quantity else quantity
-                this.price = price
-                this.fees = fees
-                this.priceBrl = pBrl
-                this.feesBrl = fBrl
-                this.currency = effectiveCurrency
+                this.price = converted.price
+                this.fees = converted.fees
+                this.priceBrl = converted.priceBrl
+                this.feesBrl = converted.feesBrl
+                this.currency = asset.currency
                 this.date = date
                 this.broker = broker
                 this.notes = notes
@@ -241,22 +248,23 @@ class TransactionService(
         date: LocalDate,
         broker: String?,
         notes: String?,
-        currency: String? = null,
+        inputCurrency: String? = null,
     ) {
         transaction {
             val tx =
                 TransactionEntity.findById(id)
                     ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found")
             val asset = AssetEntity.findById(tx.assetId)
-            val effectiveCurrency = currency?.ifBlank { null } ?: asset?.currency ?: "BRL"
-            val (pBrl, fBrl) = convertToBrl(price, fees, effectiveCurrency, date)
+            val assetCurrency = asset?.currency ?: "BRL"
+            val effectiveInputCurrency = inputCurrency?.ifBlank { null } ?: assetCurrency
+            val converted = convertPrices(price, fees, effectiveInputCurrency, assetCurrency, date)
             tx.type = type.uppercase()
             tx.quantity = if (type.uppercase() == "SELL") -quantity else quantity
-            tx.price = price
-            tx.fees = fees
-            tx.priceBrl = pBrl
-            tx.feesBrl = fBrl
-            tx.currency = effectiveCurrency
+            tx.price = converted.price
+            tx.fees = converted.fees
+            tx.priceBrl = converted.priceBrl
+            tx.feesBrl = converted.feesBrl
+            tx.currency = assetCurrency
             tx.date = date
             tx.broker = broker?.ifBlank { null }
             tx.notes = notes?.ifBlank { null }
@@ -276,17 +284,40 @@ class TransactionService(
     }
 
     /**
-     * Look up ticker info from the database or Yahoo Finance.
+     * Convert input prices to asset currency and BRL.
+     *
+     * The transaction always stores values in the asset's currency.
+     * If the user enters values in a different currency, this method converts them.
      */
-    private fun convertToBrl(
-        price: Double,
-        fees: Double,
-        currency: String,
+    internal fun convertPrices(
+        inputPrice: Double,
+        inputFees: Double,
+        inputCurrency: String,
+        assetCurrency: String,
         date: LocalDate,
-    ): Pair<Double, Double> {
-        if (currency == "BRL") return price to fees
-        val rate = exchangeRateService.getRate(currency, "BRL", date)
-        return (price * rate) to (fees * rate)
+    ): ConvertedPrices {
+        if (inputCurrency == assetCurrency) {
+            if (assetCurrency == "BRL") {
+                return ConvertedPrices(inputPrice, inputFees, inputPrice, inputFees)
+            }
+            val rate = exchangeRateService.getRate(assetCurrency, "BRL", date)
+            return ConvertedPrices(inputPrice, inputFees, inputPrice * rate, inputFees * rate)
+        }
+
+        if (inputCurrency == "BRL") {
+            // User typed BRL values for a foreign-currency asset (e.g., USD)
+            val rate = exchangeRateService.getRate(assetCurrency, "BRL", date)
+            return ConvertedPrices(inputPrice / rate, inputFees / rate, inputPrice, inputFees)
+        }
+
+        // User typed foreign currency values for a BRL asset
+        check(assetCurrency == "BRL") {
+            "Unsupported conversion: inputCurrency=$inputCurrency, assetCurrency=$assetCurrency"
+        }
+        val rate = exchangeRateService.getRate(inputCurrency, "BRL", date)
+        val pBrl = inputPrice * rate
+        val fBrl = inputFees * rate
+        return ConvertedPrices(pBrl, fBrl, pBrl, fBrl)
     }
 
     fun lookupTickerInfo(ticker: String): TickerLookupResult {
