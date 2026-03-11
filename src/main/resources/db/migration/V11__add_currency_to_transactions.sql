@@ -1,0 +1,1 @@
+ALTER TABLE transactions ADD COLUMN currency VARCHAR(3) DEFAULT 'BRL';

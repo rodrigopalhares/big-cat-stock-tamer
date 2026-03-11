@@ -16,6 +16,7 @@ object Transactions : IntIdTable("transactions") {
     val fees = double("fees").default(0.0)
     val priceBrl = double("price_brl").default(0.0)
     val feesBrl = double("fees_brl").default(0.0)
+    val currency = varchar("currency", 3).default("BRL")
     val date = date("date")
     val broker = varchar("broker", 255).nullable()
     val notes = text("notes").nullable()
@@ -34,6 +35,7 @@ class TransactionEntity(
     var fees by Transactions.fees
     var priceBrl by Transactions.priceBrl
     var feesBrl by Transactions.feesBrl
+    var currency by Transactions.currency
     var date by Transactions.date
     var broker by Transactions.broker
     var notes by Transactions.notes

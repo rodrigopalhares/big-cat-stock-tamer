@@ -96,11 +96,13 @@ class TransactionService(
         date: LocalDate,
         broker: String?,
         notes: String?,
+        currency: String? = null,
     ): TransactionEntity {
         val normalized = ticker.uppercase().trim()
         return transaction {
             val asset = findOrCreateAsset(normalized)
-            val (pBrl, fBrl) = convertToBrl(price, fees, asset.currency, date)
+            val effectiveCurrency = currency?.ifBlank { null } ?: asset.currency
+            val (pBrl, fBrl) = convertToBrl(price, fees, effectiveCurrency, date)
             TransactionEntity.new {
                 assetId = normalized
                 this.type = type.uppercase()
@@ -109,6 +111,7 @@ class TransactionService(
                 this.fees = fees
                 this.priceBrl = pBrl
                 this.feesBrl = fBrl
+                this.currency = effectiveCurrency
                 this.date = date
                 this.broker = broker?.ifBlank { null }
                 this.notes = notes?.ifBlank { null }
@@ -129,12 +132,14 @@ class TransactionService(
         date: LocalDate,
         broker: String?,
         notes: String?,
+        currency: String? = null,
     ): TransactionEntity =
         transaction {
             val asset =
                 AssetEntity.findById(assetId.uppercase())
                     ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found")
-            val (pBrl, fBrl) = convertToBrl(price, fees, asset.currency, date)
+            val effectiveCurrency = currency?.ifBlank { null } ?: asset.currency
+            val (pBrl, fBrl) = convertToBrl(price, fees, effectiveCurrency, date)
 
             TransactionEntity.new {
                 this.assetId = asset.ticker.value
@@ -144,6 +149,7 @@ class TransactionService(
                 this.fees = fees
                 this.priceBrl = pBrl
                 this.feesBrl = fBrl
+                this.currency = effectiveCurrency
                 this.date = date
                 this.broker = broker
                 this.notes = notes
@@ -235,20 +241,22 @@ class TransactionService(
         date: LocalDate,
         broker: String?,
         notes: String?,
+        currency: String? = null,
     ) {
         transaction {
             val tx =
                 TransactionEntity.findById(id)
                     ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found")
             val asset = AssetEntity.findById(tx.assetId)
-            val currency = asset?.currency ?: "BRL"
-            val (pBrl, fBrl) = convertToBrl(price, fees, currency, date)
+            val effectiveCurrency = currency?.ifBlank { null } ?: asset?.currency ?: "BRL"
+            val (pBrl, fBrl) = convertToBrl(price, fees, effectiveCurrency, date)
             tx.type = type.uppercase()
             tx.quantity = if (type.uppercase() == "SELL") -quantity else quantity
             tx.price = price
             tx.fees = fees
             tx.priceBrl = pBrl
             tx.feesBrl = fBrl
+            tx.currency = effectiveCurrency
             tx.date = date
             tx.broker = broker?.ifBlank { null }
             tx.notes = notes?.ifBlank { null }
