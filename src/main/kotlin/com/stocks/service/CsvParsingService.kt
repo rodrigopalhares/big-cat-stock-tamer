@@ -148,23 +148,25 @@ class CsvParsingService(
                 val normalized = row.ticker.uppercase().trim()
                 val asset = transactionService.findOrCreateAsset(normalized)
                 val txDate = LocalDate.parse(row.date)
-                val effectiveCurrency = row.currency.ifBlank { asset.currency }
-                val rate =
-                    if (effectiveCurrency != "BRL") {
-                        exchangeRateService.getRate(effectiveCurrency, "BRL", txDate)
-                    } else {
-                        1.0
-                    }
+                val inputCurrency = row.currency.ifBlank { asset.currency }
+                val converted =
+                    transactionService.convertPrices(
+                        row.price,
+                        row.fees,
+                        inputCurrency,
+                        asset.currency,
+                        txDate,
+                    )
 
                 TransactionEntity.new {
                     assetId = normalized
                     type = row.type.uppercase()
                     quantity = row.quantity
-                    price = row.price
-                    fees = row.fees
-                    priceBrl = row.price * rate
-                    feesBrl = row.fees * rate
-                    currency = effectiveCurrency
+                    price = converted.price
+                    fees = converted.fees
+                    priceBrl = converted.priceBrl
+                    feesBrl = converted.feesBrl
+                    currency = asset.currency
                     date = txDate
                     broker = row.broker.ifBlank { null }
                     notes = row.notes.ifBlank { null }

@@ -139,7 +139,7 @@ class TransactionController(
             date = parsedDate,
             broker = broker,
             notes = notes,
-            currency = currency,
+            inputCurrency = currency,
         )
 
         return "redirect:/transactions/"
@@ -167,7 +167,7 @@ class TransactionController(
             date = LocalDate.parse(date),
             broker = broker,
             notes = notes,
-            currency = currency,
+            inputCurrency = currency,
         )
         return "redirect:${returnTo ?: "/transactions/"}"
     }
