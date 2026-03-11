@@ -16,6 +16,7 @@ object MonthlySnapshots : IntIdTable("monthly_snapshots") {
     val marketPrice = double("market_price")
     val totalCost = double("total_cost")
     val marketValue = double("market_value")
+    val accumulatedNetDividends = double("accumulated_net_dividends").default(0.0)
     val createdAt = datetime("created_at").clientDefault { LocalDateTime.now() }
 
     init {
@@ -35,6 +36,7 @@ class MonthlySnapshotEntity(
     var marketPrice by MonthlySnapshots.marketPrice
     var totalCost by MonthlySnapshots.totalCost
     var marketValue by MonthlySnapshots.marketValue
+    var accumulatedNetDividends by MonthlySnapshots.accumulatedNetDividends
     var createdAt by MonthlySnapshots.createdAt
 
     var asset by AssetEntity referencedOn MonthlySnapshots.assetId

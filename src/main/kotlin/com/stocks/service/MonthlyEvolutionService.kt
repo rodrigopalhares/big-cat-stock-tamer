@@ -101,9 +101,19 @@ class MonthlyEvolutionService(
                     }.filter { it.value.isNotEmpty() }
             }
 
+        val assetDividends =
+            transaction {
+                DividendEntity.all().toList().groupBy(
+                    { it.assetId },
+                    { it.date to (it.totalAmount - it.taxWithheld) },
+                )
+            }
+
         val snapshots = mutableListOf<SnapshotRecord>()
 
         for ((ticker, txs) in assetTransactions) {
+            val dividends = assetDividends[ticker] ?: emptyList()
+
             for (month in months) {
                 val monthEnd = month.atEndOfMonth()
                 val position = computePositionAtDate(txs, monthEnd)
@@ -111,6 +121,8 @@ class MonthlyEvolutionService(
                 if (position.quantity <= 0) continue
 
                 val marketPrice = getMonthEndPrice(ticker, monthEnd) ?: continue
+
+                val accumulatedDividends = dividends.filter { it.first <= monthEnd }.sumOf { it.second }
 
                 snapshots.add(
                     SnapshotRecord(
@@ -121,6 +133,7 @@ class MonthlyEvolutionService(
                         marketPrice = marketPrice,
                         totalCost = position.totalCost,
                         marketValue = position.quantity * marketPrice,
+                        accumulatedNetDividends = accumulatedDividends,
                     ),
                 )
             }
@@ -136,6 +149,7 @@ class MonthlyEvolutionService(
                     marketPrice = record.marketPrice
                     totalCost = record.totalCost
                     marketValue = record.marketValue
+                    accumulatedNetDividends = record.accumulatedNetDividends
                 }
             }
         }
@@ -159,6 +173,7 @@ class MonthlyEvolutionService(
                             marketPrice = entity.marketPrice,
                             totalCost = entity.totalCost,
                             marketValue = entity.marketValue,
+                            accumulatedNetDividends = entity.accumulatedNetDividends,
                         )
                     }
             }
@@ -166,6 +181,11 @@ class MonthlyEvolutionService(
         if (allSnapshots.isEmpty()) {
             return MonthlyEvolutionSummary(months = emptyList(), tickers = emptyList())
         }
+
+        val allDividends =
+            transaction {
+                DividendEntity.all().toList().map { it.date to (it.totalAmount - it.taxWithheld) }
+            }
 
         val tickers = allSnapshots.map { it.assetId }.distinct().sorted()
         val grouped = allSnapshots.groupBy { it.month }
@@ -175,24 +195,30 @@ class MonthlyEvolutionService(
         val allMonths = generateMonthRange(firstMonth, lastMonth)
 
         val emptyRow = { month: LocalDate ->
+            val monthEnd = YearMonth.from(month).atEndOfMonth()
+            val totalDividends = allDividends.filter { it.first <= monthEnd }.sumOf { it.second }
             MonthlyEvolutionRow(
                 month = month,
                 snapshots = emptyList(),
                 totalInvested = 0.0,
                 totalMarketValue = 0.0,
+                totalAccumulatedNetDividends = totalDividends,
             )
         }
 
         val months =
             allMonths.map { ym ->
                 val monthDate = ym.atDay(1)
+                val monthEnd = ym.atEndOfMonth()
                 val snapshots = grouped[monthDate]
+                val totalDividends = allDividends.filter { it.first <= monthEnd }.sumOf { it.second }
                 if (snapshots != null) {
                     MonthlyEvolutionRow(
                         month = monthDate,
                         snapshots = snapshots,
                         totalInvested = snapshots.sumOf { it.totalCost },
                         totalMarketValue = snapshots.sumOf { it.marketValue },
+                        totalAccumulatedNetDividends = totalDividends,
                     )
                 } else {
                     emptyRow(monthDate)
@@ -211,4 +237,5 @@ private data class SnapshotRecord(
     val marketPrice: Double,
     val totalCost: Double,
     val marketValue: Double,
+    val accumulatedNetDividends: Double,
 )

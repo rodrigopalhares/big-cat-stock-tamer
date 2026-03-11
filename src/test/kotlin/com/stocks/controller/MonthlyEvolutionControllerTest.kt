@@ -105,6 +105,7 @@ class MonthlyEvolutionControllerTest(
                 .andExpect(jsonPath("$.tickers[0]").value("PETR4"))
                 .andExpect(jsonPath("$.months[0].totalInvested").value(300.0))
                 .andExpect(jsonPath("$.months[0].totalMarketValue").value(320.0))
+                .andExpect(jsonPath("$.months[0].totalAccumulatedNetDividends").value(0.0))
         }
 
         test("GET /evolution/ shows table after recalculate") {

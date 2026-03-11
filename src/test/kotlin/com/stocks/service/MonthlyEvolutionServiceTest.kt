@@ -3,6 +3,7 @@ package com.stocks.service
 import com.ninjasquad.springmockk.MockkBean
 import com.stocks.clearAllData
 import com.stocks.createAsset
+import com.stocks.createDividend
 import com.stocks.createMonthlySnapshot
 import com.stocks.createPriceHistory
 import com.stocks.createTransaction
@@ -293,6 +294,80 @@ class MonthlyEvolutionServiceTest(
             result.months[1].snapshots.shouldBeEmpty()
             result.months[1].totalInvested shouldBe (0.0 plusOrMinus 0.001)
             result.months[1].totalMarketValue shouldBe (0.0 plusOrMinus 0.001)
+        }
+
+        // --- recalculate with dividends ---
+
+        test("recalculate stores accumulated net dividends") {
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", price = 30.0, date = LocalDate.of(2024, 1, 15))
+            createPriceHistory("PETR4", LocalDate.of(2024, 1, 30), 32.0)
+            createDividend("PETR4", date = LocalDate.of(2024, 1, 20), totalAmount = 50.0, taxWithheld = 10.0)
+
+            monthlyEvolutionService.recalculate()
+
+            val snapshot =
+                transaction {
+                    MonthlySnapshotEntity.all().toList().find {
+                        it.assetId == "PETR4" && it.month == LocalDate.of(2024, 1, 1)
+                    }
+                }
+            snapshot.shouldNotBeNull()
+            snapshot.accumulatedNetDividends shouldBe (40.0 plusOrMinus 0.001)
+        }
+
+        test("recalculate accumulates dividends across months") {
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", price = 30.0, date = LocalDate.of(2024, 1, 15))
+            createPriceHistory("PETR4", LocalDate.of(2024, 1, 30), 32.0)
+            createPriceHistory("PETR4", LocalDate.of(2024, 2, 28), 35.0)
+            createDividend("PETR4", date = LocalDate.of(2024, 1, 20), totalAmount = 50.0, taxWithheld = 10.0)
+            createDividend("PETR4", date = LocalDate.of(2024, 2, 15), totalAmount = 30.0, taxWithheld = 0.0)
+
+            monthlyEvolutionService.recalculate()
+
+            val snapshots = transaction { MonthlySnapshotEntity.all().toList() }
+            val jan = snapshots.find { it.month == LocalDate.of(2024, 1, 1) }
+            val feb = snapshots.find { it.month == LocalDate.of(2024, 2, 1) }
+
+            jan.shouldNotBeNull()
+            jan.accumulatedNetDividends shouldBe (40.0 plusOrMinus 0.001)
+
+            feb.shouldNotBeNull()
+            feb.accumulatedNetDividends shouldBe (70.0 plusOrMinus 0.001)
+        }
+
+        // --- getEvolution with dividends ---
+
+        test("getEvolution includes totalAccumulatedNetDividends summing all assets") {
+            createAsset("PETR4", name = "Petrobras")
+            createAsset("VALE3", name = "Vale")
+            createTransaction("PETR4", price = 30.0, date = LocalDate.of(2024, 1, 15))
+            createTransaction("VALE3", quantity = 5.0, price = 60.0, date = LocalDate.of(2024, 1, 20))
+            createPriceHistory("PETR4", LocalDate.of(2024, 1, 30), 32.0)
+            createPriceHistory("VALE3", LocalDate.of(2024, 1, 30), 65.0)
+            createDividend("PETR4", date = LocalDate.of(2024, 1, 20), totalAmount = 50.0, taxWithheld = 10.0)
+            createDividend("VALE3", date = LocalDate.of(2024, 1, 25), totalAmount = 100.0, taxWithheld = 15.0)
+
+            monthlyEvolutionService.recalculate()
+            val result = monthlyEvolutionService.getEvolution()
+
+            val janRow = result.months.find { it.month == LocalDate.of(2024, 1, 1) }
+            janRow.shouldNotBeNull()
+            janRow.totalAccumulatedNetDividends shouldBe (125.0 plusOrMinus 0.001)
+        }
+
+        test("getEvolution returns zero totalAccumulatedNetDividends when no dividends") {
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", price = 30.0, date = LocalDate.of(2024, 1, 15))
+            createPriceHistory("PETR4", LocalDate.of(2024, 1, 30), 32.0)
+
+            monthlyEvolutionService.recalculate()
+            val result = monthlyEvolutionService.getEvolution()
+
+            val janRow = result.months.find { it.month == LocalDate.of(2024, 1, 1) }
+            janRow.shouldNotBeNull()
+            janRow.totalAccumulatedNetDividends shouldBe (0.0 plusOrMinus 0.001)
         }
 
         test("getEvolution returns data after recalculate") {
