@@ -89,6 +89,7 @@ fun createMonthlySnapshot(
     marketPrice: Double,
     totalCost: Double,
     marketValue: Double,
+    accumulatedNetDividends: Double = 0.0,
 ) = transaction {
     MonthlySnapshotEntity.new {
         this.assetId = ticker
@@ -98,6 +99,7 @@ fun createMonthlySnapshot(
         this.marketPrice = marketPrice
         this.totalCost = totalCost
         this.marketValue = marketValue
+        this.accumulatedNetDividends = accumulatedNetDividends
     }
 }
 

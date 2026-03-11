@@ -10,6 +10,7 @@ data class MonthlySnapshotResponse(
     val marketPrice: Double,
     val totalCost: Double,
     val marketValue: Double,
+    val accumulatedNetDividends: Double = 0.0,
 )
 
 data class MonthlyEvolutionRow(
@@ -17,6 +18,7 @@ data class MonthlyEvolutionRow(
     val snapshots: List<MonthlySnapshotResponse>,
     val totalInvested: Double,
     val totalMarketValue: Double,
+    val totalAccumulatedNetDividends: Double = 0.0,
 )
 
 data class MonthlyEvolutionSummary(
