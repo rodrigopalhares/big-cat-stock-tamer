@@ -184,12 +184,14 @@
                                             th:text="${t.type == 'BUY'} ? 'Compra' : 'Venda'"></span>
                                     </td>
                                     <td class="text-end" th:text="${#numbers.formatDecimal(t.quantity, 1, 4)}"></td>
-                                    <td class="text-end">R$ <span
-                                            th:text="${#numbers.formatDecimal(t.price, 1, 2)}"></span></td>
-                                    <td class="text-end text-muted">R$ <span
-                                            th:text="${#numbers.formatDecimal(t.fees, 1, 2)}"></span></td>
+                                    <td class="text-end">
+                                        <span th:text="${(t.currency == 'BRL' ? 'R$ ' : t.currency + ' ') + #numbers.formatDecimal(t.price, 1, 2)}"></span>
+                                    </td>
+                                    <td class="text-end text-muted">
+                                        <span th:text="${(t.currency == 'BRL' ? 'R$ ' : t.currency + ' ') + #numbers.formatDecimal(t.fees, 1, 2)}"></span>
+                                    </td>
                                     <td class="text-end fw-semibold">
-                                        R$ <span th:text="${#numbers.formatDecimal(t.total, 1, 2)}"></span>
+                                        <span th:text="${(t.currency == 'BRL' ? 'R$ ' : t.currency + ' ') + #numbers.formatDecimal(t.total, 1, 2)}"></span>
                                     </td>
                                     <td class="text-muted" th:text="${t.broker != null ? t.broker : '—'}"></td>
                                     <td class="text-center text-nowrap">

@@ -288,6 +288,7 @@ class TransactionController(
         val broker: String?,
         val notes: String?,
         val total: Double,
+        val currency: String = "BRL",
     )
 
     private fun TransactionEntity.toTemplateData() =
@@ -302,5 +303,6 @@ class TransactionController(
             broker = broker,
             notes = notes,
             total = if (type == "BUY") abs(quantity) * price + fees else abs(quantity) * price - fees,
+            currency = asset.currency,
         )
 }
