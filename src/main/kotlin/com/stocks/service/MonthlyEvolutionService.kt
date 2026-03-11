@@ -195,13 +195,20 @@ class MonthlyEvolutionService(
         val allMonths = generateMonthRange(firstMonth, lastMonth)
 
         val emptyRow = { month: LocalDate ->
-            val monthEnd = YearMonth.from(month).atEndOfMonth()
+            val ym = YearMonth.from(month)
+            val monthStart = ym.atDay(1)
+            val monthEnd = ym.atEndOfMonth()
             val totalDividends = allDividends.filter { it.first <= monthEnd }.sumOf { it.second }
+            val monthlyDividends =
+                allDividends
+                    .filter { it.first in monthStart..monthEnd }
+                    .sumOf { it.second }
             MonthlyEvolutionRow(
                 month = month,
                 snapshots = emptyList(),
                 totalInvested = 0.0,
                 totalMarketValue = 0.0,
+                totalMonthlyNetDividends = monthlyDividends,
                 totalAccumulatedNetDividends = totalDividends,
             )
         }
@@ -212,12 +219,17 @@ class MonthlyEvolutionService(
                 val monthEnd = ym.atEndOfMonth()
                 val snapshots = grouped[monthDate]
                 val totalDividends = allDividends.filter { it.first <= monthEnd }.sumOf { it.second }
+                val monthlyDividends =
+                    allDividends
+                        .filter { it.first in monthDate..monthEnd }
+                        .sumOf { it.second }
                 if (snapshots != null) {
                     MonthlyEvolutionRow(
                         month = monthDate,
                         snapshots = snapshots,
                         totalInvested = snapshots.sumOf { it.totalCost },
                         totalMarketValue = snapshots.sumOf { it.marketValue },
+                        totalMonthlyNetDividends = monthlyDividends,
                         totalAccumulatedNetDividends = totalDividends,
                     )
                 } else {

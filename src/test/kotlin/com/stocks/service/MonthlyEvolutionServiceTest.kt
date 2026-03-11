@@ -357,6 +357,42 @@ class MonthlyEvolutionServiceTest(
             janRow.totalAccumulatedNetDividends shouldBe (125.0 plusOrMinus 0.001)
         }
 
+        test("getEvolution includes totalMonthlyNetDividends for dividends in that month only") {
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", price = 30.0, date = LocalDate.of(2024, 1, 15))
+            createPriceHistory("PETR4", LocalDate.of(2024, 1, 30), 32.0)
+            createPriceHistory("PETR4", LocalDate.of(2024, 2, 28), 35.0)
+            createDividend("PETR4", date = LocalDate.of(2024, 1, 20), totalAmount = 50.0, taxWithheld = 10.0)
+            createDividend("PETR4", date = LocalDate.of(2024, 2, 15), totalAmount = 30.0, taxWithheld = 0.0)
+
+            monthlyEvolutionService.recalculate()
+            val result = monthlyEvolutionService.getEvolution()
+
+            val janRow = result.months.find { it.month == LocalDate.of(2024, 1, 1) }
+            janRow.shouldNotBeNull()
+            janRow.totalMonthlyNetDividends shouldBe (40.0 plusOrMinus 0.001)
+
+            val febRow = result.months.find { it.month == LocalDate.of(2024, 2, 1) }
+            febRow.shouldNotBeNull()
+            febRow.totalMonthlyNetDividends shouldBe (30.0 plusOrMinus 0.001)
+        }
+
+        test("getEvolution returns zero totalMonthlyNetDividends when no dividends in month") {
+            createAsset("PETR4", name = "Petrobras")
+            createTransaction("PETR4", price = 30.0, date = LocalDate.of(2024, 1, 15))
+            createPriceHistory("PETR4", LocalDate.of(2024, 1, 30), 32.0)
+            createPriceHistory("PETR4", LocalDate.of(2024, 2, 28), 35.0)
+            createDividend("PETR4", date = LocalDate.of(2024, 1, 20), totalAmount = 50.0, taxWithheld = 10.0)
+
+            monthlyEvolutionService.recalculate()
+            val result = monthlyEvolutionService.getEvolution()
+
+            val febRow = result.months.find { it.month == LocalDate.of(2024, 2, 1) }
+            febRow.shouldNotBeNull()
+            febRow.totalMonthlyNetDividends shouldBe (0.0 plusOrMinus 0.001)
+            febRow.totalAccumulatedNetDividends shouldBe (40.0 plusOrMinus 0.001)
+        }
+
         test("getEvolution returns zero totalAccumulatedNetDividends when no dividends") {
             createAsset("PETR4", name = "Petrobras")
             createTransaction("PETR4", price = 30.0, date = LocalDate.of(2024, 1, 15))
