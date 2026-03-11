@@ -180,8 +180,8 @@
                 <h5 class="modal-title"><i class="bi bi-filetype-csv"></i> Importar Proventos via CSV</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <div class="mb-3">
+            <div class="modal-body d-flex flex-column overflow-hidden">
+                <div class="flex-shrink-0 mb-3">
                     <label class="form-label">Cole os dados CSV (separado por tab)</label>
                     <textarea id="divCsvTextarea" name="csv" class="form-control font-monospace" rows="6"
                         placeholder="PETR4&#9;01/03/2026&#9;DIVIDENDO&#9;1,50&#9;0,00&#9;BRL&#9;XP&#9;&#9;Teste"></textarea>
@@ -189,17 +189,19 @@
                         Colunas: ativo | data | tipo | valor | irrf | moeda | corretora | [ignorar] | observação
                     </div>
                 </div>
-                <button type="button" class="btn btn-primary mb-3"
-                    hx-post="/dividends/parse-csv"
-                    hx-include="#divCsvTextarea"
-                    hx-target="#csv-div-preview-area"
-                    hx-indicator="#divCsvSpinner">
-                    <i class="bi bi-search"></i> Processar
-                </button>
-                <span id="divCsvSpinner" class="htmx-indicator">
-                    <span class="spinner-border spinner-border-sm"></span> Processando...
-                </span>
-                <div id="csv-div-preview-area"></div>
+                <div class="flex-shrink-0 mb-3">
+                    <button type="button" class="btn btn-primary"
+                        hx-post="/dividends/parse-csv"
+                        hx-include="#divCsvTextarea"
+                        hx-target="#csv-div-preview-area"
+                        hx-indicator="#divCsvSpinner">
+                        <i class="bi bi-search"></i> Processar
+                    </button>
+                    <span id="divCsvSpinner" class="htmx-indicator">
+                        <span class="spinner-border spinner-border-sm"></span> Processando...
+                    </span>
+                </div>
+                <div id="csv-div-preview-area" class="flex-grow-1 overflow-auto min-h-0"></div>
             </div>
         </div>
     </div>
