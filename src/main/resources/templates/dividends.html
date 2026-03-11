@@ -40,14 +40,21 @@
                                 <option th:each="t : ${dividendTypes}" th:value="${t}" th:text="${t}"></option>
                             </select>
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">Moeda</label>
+                            <select name="currency" id="newDivCurrency" class="form-select">
+                                <option value="BRL" selected>BRL</option>
+                                <option value="USD">USD</option>
+                            </select>
+                        </div>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
-                                <label class="form-label">Valor Bruto (R$) <span class="text-danger">*</span></label>
+                                <label class="form-label">Valor Bruto <span class="text-danger">*</span></label>
                                 <input type="number" name="total_amount" class="form-control" step="0.01"
                                     min="0.01" required>
                             </div>
                             <div class="col-6">
-                                <label class="form-label">IR Retido (R$)</label>
+                                <label class="form-label">IR Retido</label>
                                 <input type="number" name="tax_withheld" class="form-control" step="0.01"
                                     min="0" value="0">
                             </div>
@@ -139,6 +146,7 @@
                                                      data-div-total-amount=${d.totalAmount},
                                                      data-div-tax-withheld=${d.taxWithheld},
                                                      data-div-date=${d.date},
+                                                     data-div-currency=${d.currency},
                                                      data-div-notes=${d.notes != null ? d.notes : ''}"
                                             onclick="openEditDivModal(this)">
                                             <i class="bi bi-pencil"></i>
@@ -213,13 +221,20 @@
                             <option th:each="t : ${dividendTypes}" th:value="${t}" th:text="${t}"></option>
                         </select>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Moeda</label>
+                        <select id="editDivCurrency" name="currency" class="form-select">
+                            <option value="BRL">BRL</option>
+                            <option value="USD">USD</option>
+                        </select>
+                    </div>
                     <div class="row g-2 mb-3">
                         <div class="col-6">
-                            <label class="form-label">Valor Bruto (R$)</label>
+                            <label class="form-label">Valor Bruto</label>
                             <input type="number" id="editDivTotalAmount" name="total_amount" class="form-control" step="0.01" min="0.01" required>
                         </div>
                         <div class="col-6">
-                            <label class="form-label">IR Retido (R$)</label>
+                            <label class="form-label">IR Retido</label>
                             <input type="number" id="editDivTaxWithheld" name="tax_withheld" class="form-control" step="0.01" min="0" value="0">
                         </div>
                     </div>
@@ -251,6 +266,7 @@ function openEditDivModal(btn, returnTo) {
     document.getElementById('editDivTotalAmount').value = btn.dataset.divTotalAmount;
     document.getElementById('editDivTaxWithheld').value = btn.dataset.divTaxWithheld;
     document.getElementById('editDivDate').value = btn.dataset.divDate;
+    document.getElementById('editDivCurrency').value = btn.dataset.divCurrency || 'BRL';
     document.getElementById('editDivNotes').value = btn.dataset.divNotes;
     var existing = document.getElementById('editDivReturnTo');
     if (existing) existing.remove();

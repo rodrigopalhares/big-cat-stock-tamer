@@ -100,6 +100,7 @@ class DividendController(
         @RequestParam(name = "total_amount") totalAmount: Double,
         @RequestParam(name = "tax_withheld", defaultValue = "0.0") taxWithheld: Double,
         @RequestParam date: String,
+        @RequestParam(defaultValue = "BRL") currency: String,
         @RequestParam(defaultValue = "") notes: String,
     ): String {
         val parsedDate = LocalDate.parse(date)
@@ -111,6 +112,7 @@ class DividendController(
             totalAmount = totalAmount,
             taxWithheld = taxWithheld,
             notes = notes,
+            currency = currency,
         )
 
         return "redirect:/dividends/"
@@ -123,6 +125,7 @@ class DividendController(
         @RequestParam(name = "total_amount") totalAmount: Double,
         @RequestParam(name = "tax_withheld", defaultValue = "0.0") taxWithheld: Double,
         @RequestParam date: String,
+        @RequestParam(defaultValue = "BRL") currency: String,
         @RequestParam(defaultValue = "") notes: String,
         @RequestParam(name = "returnTo", required = false) returnTo: String?,
     ): String {
@@ -133,6 +136,7 @@ class DividendController(
             totalAmount = totalAmount,
             taxWithheld = taxWithheld,
             notes = notes,
+            currency = currency,
         )
         return "redirect:${returnTo ?: "/dividends/"}"
     }
