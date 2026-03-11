@@ -171,13 +171,24 @@
                             </span>
                             <span th:unless="${p.unrealizedPnl != null}">—</span>
                         </td>
-                        <td class="text-end"><span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.totalCost, 1, 2)}"></span></td>
+                        <td class="text-end">
+                            <span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.totalCost, 1, 2)}"></span>
+                            <br th:if="${p.exchangeRate != null}">
+                            <small th:if="${p.exchangeRate != null}" class="text-muted">
+                                ≈ R$ <span th:text="${#numbers.formatDecimal(p.totalCostBrl, 1, 2)}"></span>
+                            </small>
+                        </td>
                         <td class="text-end text-success">
-                            <span th:if="${p.dividendPnl > 0}"><span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.dividendPnl, 1, 2)}"></span></span>
+                            <span th:if="${p.dividendPnl > 0}">R$ <span th:text="${#numbers.formatDecimal(p.dividendPnl, 1, 2)}"></span></span>
                             <span th:unless="${p.dividendPnl > 0}">—</span>
                         </td>
                         <td class="text-end" th:classappend="${p.realizedPnl >= 0} ? 'text-success' : 'text-danger'">
                             <span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.realizedPnl, 1, 2)}"></span>
+                            <br th:if="${p.exchangeRate != null}">
+                            <small th:if="${p.exchangeRate != null}" class="text-muted"
+                                   th:classappend="${p.realizedPnlBrl >= 0} ? 'text-success' : 'text-danger'">
+                                ≈ R$ <span th:text="${#numbers.formatDecimal(p.realizedPnlBrl, 1, 2)}"></span>
+                            </small>
                         </td>
                         <td class="text-end"
                             th:classappend="${p.irrMonthly != null} ? (${p.irrMonthly >= 0} ? 'text-success' : 'text-danger') : ''">

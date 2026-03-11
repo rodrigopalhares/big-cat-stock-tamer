@@ -10,6 +10,7 @@ val DIVIDEND_TYPE_ALIASES =
         "DIVIDENDO" to "DIVIDENDO",
         "DIVIDENDOS" to "DIVIDENDO",
         "DIV" to "DIVIDENDO",
+        "REEMBOLSO(DIV)" to "DIVIDENDO",
         "JCP" to "JCP",
         "JSCP" to "JCP",
         "JUROS SOBRE CAPITAL PROPRIO" to "JCP",

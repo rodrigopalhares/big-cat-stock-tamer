@@ -41,18 +41,20 @@ class CalculationService {
                 cashFlowsBrl.add(t.date to -purchaseCostBrl)
             } else if (t.quantity < 0 && quantity > 0) { // SELL
                 val avgPrice = accumulatedCost / quantity
+                val avgPriceBrl = accumulatedCostBrl / quantity
+
                 val saleProceeds = absQty * t.price - t.fees
                 val costOfSold = avgPrice * absQty
                 realizedPnl += saleProceeds - costOfSold
                 accumulatedCost -= costOfSold
-                quantity -= absQty
-                cashFlows.add(t.date to saleProceeds)
 
-                val avgPriceBrl = accumulatedCostBrl / (quantity + absQty)
                 val saleProceedsBrl = absQty * t.priceBrl - t.feesBrl
                 val costOfSoldBrl = avgPriceBrl * absQty
                 realizedPnlBrl += saleProceedsBrl - costOfSoldBrl
                 accumulatedCostBrl -= costOfSoldBrl
+
+                quantity -= absQty
+                cashFlows.add(t.date to saleProceeds)
                 cashFlowsBrl.add(t.date to saleProceedsBrl)
             }
         }
