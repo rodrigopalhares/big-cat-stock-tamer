@@ -15,6 +15,7 @@ import java.time.LocalDate
 @Service
 class DividendService(
     private val transactionService: TransactionService,
+    private val exchangeRateService: ExchangeRateService,
 ) {
     fun createDividend(
         ticker: String,
@@ -27,6 +28,8 @@ class DividendService(
         currency: String = "BRL",
     ): DividendEntity {
         val normalized = ticker.uppercase().trim()
+        val effectiveCurrency = currency.ifBlank { "BRL" }
+        val (amountBrl, taxBrl) = convertToBrl(totalAmount, taxWithheld, effectiveCurrency, date)
         return transaction {
             transactionService.findOrCreateAsset(normalized)
             DividendEntity.new {
@@ -35,8 +38,10 @@ class DividendService(
                 this.date = date
                 this.totalAmount = totalAmount
                 this.taxWithheld = taxWithheld
+                this.totalAmountBrl = amountBrl
+                this.taxWithheldBrl = taxBrl
                 this.broker = broker?.ifBlank { null }
-                this.currency = currency.ifBlank { "BRL" }
+                this.currency = effectiveCurrency
                 this.notes = notes?.ifBlank { null }
             }
         }
@@ -71,6 +76,8 @@ class DividendService(
         broker: String? = null,
         currency: String = "BRL",
     ) {
+        val effectiveCurrency = currency.ifBlank { "BRL" }
+        val (amountBrl, taxBrl) = convertToBrl(totalAmount, taxWithheld, effectiveCurrency, date)
         transaction {
             val dividend =
                 DividendEntity.findById(id)
@@ -79,8 +86,10 @@ class DividendService(
             dividend.date = date
             dividend.totalAmount = totalAmount
             dividend.taxWithheld = taxWithheld
+            dividend.totalAmountBrl = amountBrl
+            dividend.taxWithheldBrl = taxBrl
             dividend.broker = broker?.ifBlank { null }
-            dividend.currency = currency.ifBlank { "BRL" }
+            dividend.currency = effectiveCurrency
             dividend.notes = notes?.ifBlank { null }
         }
     }
@@ -97,14 +106,25 @@ class DividendService(
     fun getDividendPnlByAsset(): Map<String, Double> =
         transaction {
             DividendEntity.all().toList().groupBy { it.assetId }.mapValues { (_, dividends) ->
-                dividends.sumOf { it.totalAmount - it.taxWithheld }
+                dividends.sumOf { it.totalAmountBrl - it.taxWithheldBrl }
             }
         }
 
     fun getDividendCashFlowsByAsset(): Map<String, List<Pair<LocalDate, Double>>> =
         transaction {
             DividendEntity.all().toList().groupBy { it.assetId }.mapValues { (_, dividends) ->
-                dividends.map { it.date to (it.totalAmount - it.taxWithheld) }
+                dividends.map { it.date to (it.totalAmountBrl - it.taxWithheldBrl) }
             }
         }
+
+    private fun convertToBrl(
+        totalAmount: Double,
+        taxWithheld: Double,
+        currency: String,
+        date: LocalDate,
+    ): Pair<Double, Double> {
+        if (currency == "BRL") return totalAmount to taxWithheld
+        val rate = exchangeRateService.getRate(currency, "BRL", date)
+        return (totalAmount * rate) to (taxWithheld * rate)
+    }
 }

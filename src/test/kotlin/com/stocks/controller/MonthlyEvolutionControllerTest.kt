@@ -88,6 +88,8 @@ class MonthlyEvolutionControllerTest(
                     quantity = 10.0
                     price = 30.0
                     fees = 0.0
+                    priceBrl = 30.0
+                    feesBrl = 0.0
                     date = LocalDate.of(2024, 1, 15)
                 }
                 PriceHistoryEntity.new {
@@ -122,6 +124,8 @@ class MonthlyEvolutionControllerTest(
                     quantity = 10.0
                     price = 30.0
                     fees = 0.0
+                    priceBrl = 30.0
+                    feesBrl = 0.0
                     date = LocalDate.of(2024, 1, 15)
                 }
                 PriceHistoryEntity.new {

@@ -111,6 +111,8 @@ class PortfolioService(
                         price = it.price,
                         fees = it.fees,
                         date = it.date,
+                        priceBrl = it.priceBrl,
+                        feesBrl = it.feesBrl,
                     )
                 }
 
@@ -178,10 +180,12 @@ class PortfolioService(
                     quantity = calc.quantity,
                     avgPrice = calc.avgPrice,
                     totalCost = calc.totalCost,
+                    totalCostBrl = calc.totalCostBrl,
                     currentPrice = currentPrice,
                     currentValue = currentValue,
                     unrealizedPnl = unrealizedPnl,
                     realizedPnl = calc.realizedPnl,
+                    realizedPnlBrl = calc.realizedPnlBrl,
                     dividendPnl = dividendPnl,
                     irr = irr,
                     irrAnnual = irrAnnual,
@@ -199,23 +203,13 @@ class PortfolioService(
     }
 
     fun aggregatePositions(positions: List<AssetPosition>): PortfolioSummary {
-        val totalInvested =
-            positions.sumOf { p ->
-                if (p.exchangeRate != null) p.totalCost * p.exchangeRate else p.totalCost
-            }
-        val realizedPnl =
-            positions.sumOf { p ->
-                if (p.exchangeRate != null) p.realizedPnl * p.exchangeRate else p.realizedPnl
-            }
+        val totalInvested = positions.sumOf { it.totalCostBrl }
+        val realizedPnl = positions.sumOf { it.realizedPnlBrl }
         val valuesBrl = positions.mapNotNull { it.currentValueBrl }
         val currentValue = if (valuesBrl.isNotEmpty()) valuesBrl.sum() else null
         val unrealizedBrl = positions.mapNotNull { it.unrealizedPnlBrl }
         val unrealizedPnl = if (unrealizedBrl.isNotEmpty()) unrealizedBrl.sum() else null
-
-        val dividendPnl =
-            positions.sumOf { p ->
-                if (p.exchangeRate != null) p.dividendPnl * p.exchangeRate else p.dividendPnl
-            }
+        val dividendPnl = positions.sumOf { it.dividendPnl }
 
         return PortfolioSummary(
             totalInvested = totalInvested,

@@ -13,7 +13,7 @@ import io.mockk.mockk
 class CsvParsingServiceTest :
     FunSpec({
 
-        val service = CsvParsingService(mockk(), mockk())
+        val service = CsvParsingService(mockk(), mockk(), mockk())
         val existingTickers = setOf("PETR4", "VALE3")
         val resolver: (String) -> AssetStatus = { AssetStatus.WILL_CREATE }
 

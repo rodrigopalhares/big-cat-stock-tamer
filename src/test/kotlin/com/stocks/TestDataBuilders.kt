@@ -35,6 +35,8 @@ fun createTransaction(
     fees: Double = 0.0,
     date: LocalDate = LocalDate.of(2024, 1, 15),
     broker: String? = null,
+    priceBrl: Double? = null,
+    feesBrl: Double? = null,
 ) = transaction {
     TransactionEntity.new {
         this.assetId = ticker
@@ -42,6 +44,8 @@ fun createTransaction(
         this.quantity = quantity
         this.price = price
         this.fees = fees
+        this.priceBrl = priceBrl ?: price
+        this.feesBrl = feesBrl ?: fees
         this.date = date
         this.broker = broker
     }
@@ -56,6 +60,8 @@ fun createDividend(
     broker: String? = null,
     currency: String? = null,
     notes: String? = null,
+    totalAmountBrl: Double? = null,
+    taxWithheldBrl: Double? = null,
 ) = transaction {
     DividendEntity.new {
         this.assetId = ticker
@@ -63,6 +69,8 @@ fun createDividend(
         this.date = date
         this.totalAmount = totalAmount
         this.taxWithheld = taxWithheld
+        this.totalAmountBrl = totalAmountBrl ?: totalAmount
+        this.taxWithheldBrl = taxWithheldBrl ?: taxWithheld
         this.broker = broker
         if (currency != null) this.currency = currency
         this.notes = notes

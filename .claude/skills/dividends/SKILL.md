@@ -19,8 +19,9 @@ so you can make targeted changes without exploring the codebase.
 
 - **Dividend types**: DIVIDENDO, JCP, RENDIMENTO, BONIFICACAO, BTC (defined in `Constants.kt`)
 - **Net amount**: `totalAmount - taxWithheld` (the effective amount the investor receives)
-- **Dividend PnL**: sum of net amounts per asset, shown as a separate column in the dashboard
-- **XIRR integration**: dividend cash flows (date + net amount) are merged with transaction
+- **BRL conversion**: Dividends and transactions store converted BRL values (`totalAmountBrl`, `taxWithheldBrl` for dividends; `priceBrl`, `feesBrl` for transactions). For BRL assets, these equal the original values. For USD assets, conversion happens at creation/update time using the exchange rate on the dividend/transaction date.
+- **Dividend PnL**: sum of `totalAmountBrl - taxWithheldBrl` per asset (always in BRL), shown as a separate column in the dashboard
+- **XIRR integration**: dividend cash flows (date + net amount in BRL) are merged with transaction
   cash flows to compute a combined XIRR that reflects total return including income
 
 ## File Map
@@ -65,14 +66,18 @@ so you can make targeted changes without exploring the codebase.
 
 ```sql
 CREATE TABLE dividends (
-    id           INT AUTO_INCREMENT PRIMARY KEY,
-    asset_id     VARCHAR(50) NOT NULL,       -- FK to assets(ticker)
-    "type"       VARCHAR(20) NOT NULL,       -- DIVIDENDO, JCP, RENDIMENTO, BONIFICACAO, BTC
-    "date"       DATE        NOT NULL,
-    total_amount DOUBLE      NOT NULL,       -- gross amount
-    tax_withheld DOUBLE      NOT NULL DEFAULT 0.0,  -- IR retido
-    notes        CLOB,
-    created_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id                INT AUTO_INCREMENT PRIMARY KEY,
+    asset_id          VARCHAR(50) NOT NULL,       -- FK to assets(ticker)
+    "type"            VARCHAR(20) NOT NULL,       -- DIVIDENDO, JCP, RENDIMENTO, BONIFICACAO, BTC
+    "date"            DATE        NOT NULL,
+    total_amount      DOUBLE      NOT NULL,       -- gross amount (original currency)
+    tax_withheld      DOUBLE      NOT NULL DEFAULT 0.0,  -- IR retido (original currency)
+    total_amount_brl  DOUBLE      NOT NULL DEFAULT 0.0,  -- gross amount in BRL
+    tax_withheld_brl  DOUBLE      NOT NULL DEFAULT 0.0,  -- IR retido in BRL
+    broker            VARCHAR(100),
+    currency          VARCHAR(10) DEFAULT 'BRL',
+    notes             CLOB,
+    created_at        TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_dividend_asset FOREIGN KEY (asset_id) REFERENCES assets(ticker) ON DELETE CASCADE
 );
 ```
@@ -80,12 +85,14 @@ CREATE TABLE dividends (
 ## Service Methods
 
 ```kotlin
-class DividendService {
-    fun createDividend(ticker, type, date, totalAmount, taxWithheld, notes): DividendEntity
+class DividendService(transactionService, exchangeRateService) {
+    fun createDividend(ticker, type, date, totalAmount, taxWithheld, notes, broker?, currency): DividendEntity
+    // Auto-converts to BRL using ExchangeRateService when currency != BRL
+    fun updateDividend(id, type, date, totalAmount, taxWithheld, notes, broker?, currency)
     fun listDividends(ticker?, type?): List<DividendEntity>  // filtered, ordered by date DESC
     fun deleteDividend(id)                                    // throws 404 if not found
-    fun getDividendPnlByAsset(): Map<String, Double>          // ticker -> sum(netAmount)
-    fun getDividendCashFlowsByAsset(): Map<String, List<Pair<LocalDate, Double>>>  // for XIRR
+    fun getDividendPnlByAsset(): Map<String, Double>          // ticker -> sum(totalAmountBrl - taxWithheldBrl)
+    fun getDividendCashFlowsByAsset(): Map<String, List<Pair<LocalDate, Double>>>  // BRL values for XIRR
 }
 ```
 
@@ -114,6 +121,11 @@ data class DividendTemplateData(
     val totalAmount: Double,
     val taxWithheld: Double,
     val netAmount: Double,       // computed: totalAmount - taxWithheld
+    val totalAmountBrl: Double,  // BRL converted value
+    val taxWithheldBrl: Double,  // BRL converted value
+    val netAmountBrl: Double,    // computed: totalAmountBrl - taxWithheldBrl
+    val broker: String?,
+    val currency: String,
     val notes: String?,
 )
 ```
@@ -132,8 +144,8 @@ In `PortfolioService.buildPositions()`:
 1. Pre-loads `dividendPnlByAsset` and `dividendCashFlowsByAsset` from `DividendService`
 2. For each asset: sets `dividendPnl` on the position and merges dividend cash flows into
    `allCashFlows` (sorted by date) before computing XIRR
-3. In `aggregatePositions()`: sums `dividendPnl` across all positions (converting by exchange
-   rate for USD assets)
+3. In `aggregatePositions()`: sums `dividendPnl` directly (already in BRL), uses `totalCostBrl`
+   and `realizedPnlBrl` for portfolio totals — no double-conversion needed
 
 ## Common Modification Patterns
 

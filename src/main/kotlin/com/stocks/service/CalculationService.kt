@@ -11,6 +11,9 @@ data class PositionCalcResult(
     val totalCost: Double,
     val realizedPnl: Double,
     val cashFlows: List<Pair<LocalDate, Double>>,
+    val totalCostBrl: Double = totalCost,
+    val realizedPnlBrl: Double = realizedPnl,
+    val cashFlowsBrl: List<Pair<LocalDate, Double>> = cashFlows,
 )
 
 @Service
@@ -21,6 +24,10 @@ class CalculationService {
         var realizedPnl = 0.0
         val cashFlows = mutableListOf<Pair<LocalDate, Double>>()
 
+        var accumulatedCostBrl = 0.0
+        var realizedPnlBrl = 0.0
+        val cashFlowsBrl = mutableListOf<Pair<LocalDate, Double>>()
+
         for (t in transactions.sortedBy { it.date }) {
             val absQty = abs(t.quantity)
             if (t.quantity > 0) { // BUY
@@ -28,6 +35,10 @@ class CalculationService {
                 accumulatedCost += purchaseCost
                 quantity += absQty
                 cashFlows.add(t.date to -purchaseCost)
+
+                val purchaseCostBrl = absQty * t.priceBrl + t.feesBrl
+                accumulatedCostBrl += purchaseCostBrl
+                cashFlowsBrl.add(t.date to -purchaseCostBrl)
             } else if (t.quantity < 0 && quantity > 0) { // SELL
                 val avgPrice = accumulatedCost / quantity
                 val saleProceeds = absQty * t.price - t.fees
@@ -36,6 +47,13 @@ class CalculationService {
                 accumulatedCost -= costOfSold
                 quantity -= absQty
                 cashFlows.add(t.date to saleProceeds)
+
+                val avgPriceBrl = accumulatedCostBrl / (quantity + absQty)
+                val saleProceedsBrl = absQty * t.priceBrl - t.feesBrl
+                val costOfSoldBrl = avgPriceBrl * absQty
+                realizedPnlBrl += saleProceedsBrl - costOfSoldBrl
+                accumulatedCostBrl -= costOfSoldBrl
+                cashFlowsBrl.add(t.date to saleProceedsBrl)
             }
         }
 
@@ -48,6 +66,9 @@ class CalculationService {
             totalCost = accumulatedCost,
             realizedPnl = realizedPnl,
             cashFlows = cashFlows,
+            totalCostBrl = accumulatedCostBrl,
+            realizedPnlBrl = realizedPnlBrl,
+            cashFlowsBrl = cashFlowsBrl,
         )
     }
 
@@ -165,4 +186,6 @@ data class TransactionData(
     val price: Double,
     val fees: Double,
     val date: LocalDate,
+    val priceBrl: Double = price,
+    val feesBrl: Double = fees,
 )

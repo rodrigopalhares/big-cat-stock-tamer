@@ -20,6 +20,7 @@ import java.time.YearMonth
 class MonthlyEvolutionService(
     private val calculationService: CalculationService,
     private val priceHistoryService: PriceHistoryService,
+    private val exchangeRateService: ExchangeRateService,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -82,11 +83,13 @@ class MonthlyEvolutionService(
         val firstMonth = findFirstTransactionMonth() ?: return
         val months = generateMonthRange(firstMonth, YearMonth.now())
 
+        val assetCurrencies = mutableMapOf<String, String>()
         val assetTransactions =
             transaction {
                 val assets = AssetEntity.all().toList()
                 assets
                     .associate { asset ->
+                        assetCurrencies[asset.ticker.value] = asset.currency
                         val txs =
                             asset.transactions.toList().map { tx ->
                                 TransactionData(
@@ -95,6 +98,8 @@ class MonthlyEvolutionService(
                                     price = tx.price,
                                     fees = tx.fees,
                                     date = tx.date,
+                                    priceBrl = tx.priceBrl,
+                                    feesBrl = tx.feesBrl,
                                 )
                             }
                         asset.ticker.value to txs
@@ -105,7 +110,7 @@ class MonthlyEvolutionService(
             transaction {
                 DividendEntity.all().toList().groupBy(
                     { it.assetId },
-                    { it.date to (it.totalAmount - it.taxWithheld) },
+                    { it.date to (it.totalAmountBrl - it.taxWithheldBrl) },
                 )
             }
 
@@ -124,6 +129,14 @@ class MonthlyEvolutionService(
 
                 val accumulatedDividends = dividends.filter { it.first <= monthEnd }.sumOf { it.second }
 
+                val currency = assetCurrencies[ticker] ?: "BRL"
+                val monthEndRate =
+                    if (currency != "BRL") {
+                        exchangeRateService.getRate(currency, "BRL", monthEnd)
+                    } else {
+                        1.0
+                    }
+
                 snapshots.add(
                     SnapshotRecord(
                         assetId = ticker,
@@ -131,8 +144,8 @@ class MonthlyEvolutionService(
                         quantity = position.quantity,
                         avgPrice = position.avgPrice,
                         marketPrice = marketPrice,
-                        totalCost = position.totalCost,
-                        marketValue = position.quantity * marketPrice,
+                        totalCost = position.totalCostBrl,
+                        marketValue = position.quantity * marketPrice * monthEndRate,
                         accumulatedNetDividends = accumulatedDividends,
                     ),
                 )
@@ -184,7 +197,7 @@ class MonthlyEvolutionService(
 
         val allDividends =
             transaction {
-                DividendEntity.all().toList().map { it.date to (it.totalAmount - it.taxWithheld) }
+                DividendEntity.all().toList().map { it.date to (it.totalAmountBrl - it.taxWithheldBrl) }
             }
 
         val tickers = allSnapshots.map { it.assetId }.distinct().sorted()

@@ -12,7 +12,7 @@ import org.springframework.web.server.ResponseStatusException
 
 class ResolvePriceTest :
     FunSpec({
-        val service = TransactionService(mockk(), mockk())
+        val service = TransactionService(mockk(), mockk(), mockk())
 
         test("price and fees provided directly") {
             val result = service.resolvePrice(price = 10.0, totalPrice = null, fees = 1.0, quantity = 5.0)
@@ -51,7 +51,7 @@ class LookupTickerInfoTest :
     FunSpec({
         test("ticker too short returns NOT_FOUND") {
             val quoteService = mockk<QuoteService>()
-            val service = TransactionService(quoteService, mockk())
+            val service = TransactionService(quoteService, mockk(), mockk())
             val result = service.lookupTickerInfo("AB")
             result.status shouldBe TickerLookupStatus.NOT_FOUND
             result.name.shouldBeNull()

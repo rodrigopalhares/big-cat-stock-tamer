@@ -369,6 +369,8 @@ class DividendControllerTest(
                     quantity = 10.0
                     price = 25.0
                     fees = 0.0
+                    priceBrl = 25.0
+                    feesBrl = 0.0
                     date = LocalDate.of(2024, 1, 1)
                 }
                 DividendEntity.new {
@@ -377,6 +379,8 @@ class DividendControllerTest(
                     date = LocalDate.of(2024, 6, 15)
                     totalAmount = 50.0
                     taxWithheld = 0.0
+                    totalAmountBrl = 50.0
+                    taxWithheldBrl = 0.0
                 }
             }
 
@@ -400,6 +404,8 @@ class DividendControllerTest(
                     quantity = 10.0
                     price = 25.0
                     fees = 0.0
+                    priceBrl = 25.0
+                    feesBrl = 0.0
                     date = LocalDate.of(2024, 1, 1)
                 }
             }
