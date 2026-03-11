@@ -293,20 +293,28 @@ class TransactionController(
         val notes: String?,
         val total: Double,
         val currency: String = "BRL",
+        val priceBrl: Double = 0.0,
+        val feesBrl: Double = 0.0,
+        val totalBrl: Double = 0.0,
     )
 
-    private fun TransactionEntity.toTemplateData() =
-        TransactionTemplateData(
+    private fun TransactionEntity.toTemplateData(): TransactionTemplateData {
+        val absQty = abs(quantity)
+        return TransactionTemplateData(
             id = id.value,
             assetTicker = assetId,
             type = type,
-            quantity = abs(quantity),
+            quantity = absQty,
             price = price,
             fees = fees,
             date = date,
             broker = broker,
             notes = notes,
-            total = if (type == "BUY") abs(quantity) * price + fees else abs(quantity) * price - fees,
+            total = if (type == "BUY") absQty * price + fees else absQty * price - fees,
             currency = currency,
+            priceBrl = priceBrl,
+            feesBrl = feesBrl,
+            totalBrl = if (type == "BUY") absQty * priceBrl + feesBrl else absQty * priceBrl - feesBrl,
         )
+    }
 }

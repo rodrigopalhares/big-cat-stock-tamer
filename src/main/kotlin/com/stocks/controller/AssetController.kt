@@ -107,6 +107,9 @@ class AssetController(
                         notes = tx.notes,
                         total = if (tx.type == "BUY") tx.quantity * tx.price + tx.fees else tx.quantity * tx.price - tx.fees,
                         currency = tx.currency,
+                        priceBrl = tx.priceBrl,
+                        feesBrl = tx.feesBrl,
+                        totalBrl = if (tx.type == "BUY") tx.quantity * tx.priceBrl + tx.feesBrl else tx.quantity * tx.priceBrl - tx.feesBrl,
                     )
                 }
             }

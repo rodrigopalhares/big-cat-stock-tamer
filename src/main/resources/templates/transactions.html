@@ -193,12 +193,15 @@
                                     <td class="text-end" th:text="${#numbers.formatDecimal(t.quantity, 1, 4)}"></td>
                                     <td class="text-end">
                                         <span th:text="${(t.currency == 'BRL' ? 'R$ ' : t.currency + ' ') + #numbers.formatDecimal(t.price, 1, 2)}"></span>
+                                        <div th:if="${t.currency != 'BRL'}" class="text-muted small">R$ <span th:text="${#numbers.formatDecimal(t.priceBrl, 1, 2)}"></span></div>
                                     </td>
                                     <td class="text-end text-muted">
                                         <span th:text="${(t.currency == 'BRL' ? 'R$ ' : t.currency + ' ') + #numbers.formatDecimal(t.fees, 1, 2)}"></span>
+                                        <div th:if="${t.currency != 'BRL'}" class="small">R$ <span th:text="${#numbers.formatDecimal(t.feesBrl, 1, 2)}"></span></div>
                                     </td>
                                     <td class="text-end fw-semibold">
                                         <span th:text="${(t.currency == 'BRL' ? 'R$ ' : t.currency + ' ') + #numbers.formatDecimal(t.total, 1, 2)}"></span>
+                                        <div th:if="${t.currency != 'BRL'}" class="text-muted small">R$ <span th:text="${#numbers.formatDecimal(t.totalBrl, 1, 2)}"></span></div>
                                     </td>
                                     <td class="text-muted" th:text="${t.broker != null ? t.broker : '—'}"></td>
                                     <td class="text-center text-nowrap">
