@@ -14,6 +14,8 @@ object Dividends : IntIdTable("dividends") {
     val date = date("date")
     val totalAmount = double("total_amount")
     val taxWithheld = double("tax_withheld").default(0.0)
+    val totalAmountBrl = double("total_amount_brl").default(0.0)
+    val taxWithheldBrl = double("tax_withheld_brl").default(0.0)
     val broker = varchar("broker", 100).nullable()
     val currency = varchar("currency", 10).default("BRL")
     val notes = text("notes").nullable()
@@ -30,6 +32,8 @@ class DividendEntity(
     var date by Dividends.date
     var totalAmount by Dividends.totalAmount
     var taxWithheld by Dividends.taxWithheld
+    var totalAmountBrl by Dividends.totalAmountBrl
+    var taxWithheldBrl by Dividends.taxWithheldBrl
     var broker by Dividends.broker
     var currency by Dividends.currency
     var notes by Dividends.notes

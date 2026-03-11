@@ -118,9 +118,19 @@
                                     <td>
                                         <span th:replace="~{fragments/badge :: dividendBadge(${d.type})}"></span>
                                     </td>
-                                    <td class="text-end">R$ <span th:text="${#numbers.formatDecimal(d.totalAmount, 1, 2)}"></span></td>
-                                    <td class="text-end text-muted">R$ <span th:text="${#numbers.formatDecimal(d.taxWithheld, 1, 2)}"></span></td>
-                                    <td class="text-end fw-semibold text-success">R$ <span th:text="${#numbers.formatDecimal(d.netAmount, 1, 2)}"></span></td>
+                                    <td class="text-end">
+                                        <span th:if="${d.currency != 'BRL'}" class="text-muted small" th:text="${d.currency + ' '}"></span>
+                                        <span th:text="${(d.currency == 'BRL' ? 'R$ ' : '') + #numbers.formatDecimal(d.totalAmount, 1, 2)}"></span>
+                                        <div th:if="${d.currency != 'BRL'}" class="text-muted small">R$ <span th:text="${#numbers.formatDecimal(d.totalAmountBrl, 1, 2)}"></span></div>
+                                    </td>
+                                    <td class="text-end text-muted">
+                                        <span th:text="${(d.currency == 'BRL' ? 'R$ ' : '') + #numbers.formatDecimal(d.taxWithheld, 1, 2)}"></span>
+                                        <div th:if="${d.currency != 'BRL'}" class="small">R$ <span th:text="${#numbers.formatDecimal(d.taxWithheldBrl, 1, 2)}"></span></div>
+                                    </td>
+                                    <td class="text-end fw-semibold text-success">
+                                        <span th:text="${(d.currency == 'BRL' ? 'R$ ' : '') + #numbers.formatDecimal(d.netAmount, 1, 2)}"></span>
+                                        <div th:if="${d.currency != 'BRL'}" class="small">R$ <span th:text="${#numbers.formatDecimal(d.netAmountBrl, 1, 2)}"></span></div>
+                                    </td>
                                     <td class="text-center text-nowrap">
                                         <button type="button" class="btn btn-sm btn-outline-primary border-0"
                                             title="Editar"

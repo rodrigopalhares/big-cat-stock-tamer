@@ -31,6 +31,7 @@ fun parseBrazilianNumber(raw: String): Double? {
 class CsvParsingService(
     private val quoteService: QuoteService,
     private val transactionService: TransactionService,
+    private val exchangeRateService: ExchangeRateService,
 ) {
     /**
      * Parse tab-separated CSV rows from a Brazilian brokerage spreadsheet.
@@ -145,7 +146,14 @@ class CsvParsingService(
 
             for (row in request.rows) {
                 val normalized = row.ticker.uppercase().trim()
-                transactionService.findOrCreateAsset(normalized)
+                val asset = transactionService.findOrCreateAsset(normalized)
+                val txDate = LocalDate.parse(row.date)
+                val rate =
+                    if (asset.currency != "BRL") {
+                        exchangeRateService.getRate(asset.currency, "BRL", txDate)
+                    } else {
+                        1.0
+                    }
 
                 TransactionEntity.new {
                     assetId = normalized
@@ -153,7 +161,9 @@ class CsvParsingService(
                     quantity = row.quantity
                     price = row.price
                     fees = row.fees
-                    date = LocalDate.parse(row.date)
+                    priceBrl = row.price * rate
+                    feesBrl = row.fees * rate
+                    date = txDate
                     broker = row.broker.ifBlank { null }
                     notes = row.notes.ifBlank { null }
                 }

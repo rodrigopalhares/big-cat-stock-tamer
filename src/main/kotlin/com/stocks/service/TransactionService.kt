@@ -36,6 +36,7 @@ enum class TickerLookupStatus {
 class TransactionService(
     private val quoteService: QuoteService,
     private val calculationService: CalculationService,
+    private val exchangeRateService: ExchangeRateService,
 ) {
     /**
      * Find an existing asset or auto-create it by fetching info from Yahoo Finance.
@@ -98,13 +99,16 @@ class TransactionService(
     ): TransactionEntity {
         val normalized = ticker.uppercase().trim()
         return transaction {
-            findOrCreateAsset(normalized)
+            val asset = findOrCreateAsset(normalized)
+            val (pBrl, fBrl) = convertToBrl(price, fees, asset.currency, date)
             TransactionEntity.new {
                 assetId = normalized
                 this.type = type.uppercase()
                 this.quantity = if (type.uppercase() == "SELL") -quantity else quantity
                 this.price = price
                 this.fees = fees
+                this.priceBrl = pBrl
+                this.feesBrl = fBrl
                 this.date = date
                 this.broker = broker?.ifBlank { null }
                 this.notes = notes?.ifBlank { null }
@@ -130,6 +134,7 @@ class TransactionService(
             val asset =
                 AssetEntity.findById(assetId.uppercase())
                     ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found")
+            val (pBrl, fBrl) = convertToBrl(price, fees, asset.currency, date)
 
             TransactionEntity.new {
                 this.assetId = asset.ticker.value
@@ -137,6 +142,8 @@ class TransactionService(
                 this.quantity = if (type.uppercase().trim() == "SELL") -quantity else quantity
                 this.price = price
                 this.fees = fees
+                this.priceBrl = pBrl
+                this.feesBrl = fBrl
                 this.date = date
                 this.broker = broker
                 this.notes = notes
@@ -233,10 +240,15 @@ class TransactionService(
             val tx =
                 TransactionEntity.findById(id)
                     ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found")
+            val asset = AssetEntity.findById(tx.assetId)
+            val currency = asset?.currency ?: "BRL"
+            val (pBrl, fBrl) = convertToBrl(price, fees, currency, date)
             tx.type = type.uppercase()
             tx.quantity = if (type.uppercase() == "SELL") -quantity else quantity
             tx.price = price
             tx.fees = fees
+            tx.priceBrl = pBrl
+            tx.feesBrl = fBrl
             tx.date = date
             tx.broker = broker?.ifBlank { null }
             tx.notes = notes?.ifBlank { null }
@@ -258,6 +270,17 @@ class TransactionService(
     /**
      * Look up ticker info from the database or Yahoo Finance.
      */
+    private fun convertToBrl(
+        price: Double,
+        fees: Double,
+        currency: String,
+        date: LocalDate,
+    ): Pair<Double, Double> {
+        if (currency == "BRL") return price to fees
+        val rate = exchangeRateService.getRate(currency, "BRL", date)
+        return (price * rate) to (fees * rate)
+    }
+
     fun lookupTickerInfo(ticker: String): TickerLookupResult {
         val normalized = ticker.uppercase().trim()
         if (normalized.length < 3) {
