@@ -123,6 +123,7 @@ class TransactionController(
         @RequestParam(name = "total_price", required = false) totalPrice: Double?,
         @RequestParam(defaultValue = "0.0") fees: Double,
         @RequestParam date: String,
+        @RequestParam(defaultValue = "BRL") currency: String,
         @RequestParam(defaultValue = "") broker: String,
         @RequestParam(defaultValue = "") notes: String,
     ): String {
@@ -138,6 +139,7 @@ class TransactionController(
             date = parsedDate,
             broker = broker,
             notes = notes,
+            currency = currency,
         )
 
         return "redirect:/transactions/"
@@ -151,6 +153,7 @@ class TransactionController(
         @RequestParam price: Double,
         @RequestParam(defaultValue = "0.0") fees: Double,
         @RequestParam date: String,
+        @RequestParam(defaultValue = "BRL") currency: String,
         @RequestParam(defaultValue = "") broker: String,
         @RequestParam(defaultValue = "") notes: String,
         @RequestParam(name = "returnTo", required = false) returnTo: String?,
@@ -164,6 +167,7 @@ class TransactionController(
             date = LocalDate.parse(date),
             broker = broker,
             notes = notes,
+            currency = currency,
         )
         return "redirect:${returnTo ?: "/transactions/"}"
     }
@@ -303,6 +307,6 @@ class TransactionController(
             broker = broker,
             notes = notes,
             total = if (type == "BUY") abs(quantity) * price + fees else abs(quantity) * price - fees,
-            currency = asset.currency,
+            currency = currency,
         )
 }

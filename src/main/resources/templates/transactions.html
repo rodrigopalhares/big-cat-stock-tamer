@@ -85,6 +85,13 @@
                                 </label>
                             </div>
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">Moeda</label>
+                            <select name="currency" id="txCurrency" class="form-select">
+                                <option value="BRL" selected>BRL</option>
+                                <option value="USD">USD</option>
+                            </select>
+                        </div>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
                                 <label class="form-label">Quantidade <span class="text-danger">*</span></label>
@@ -92,19 +99,19 @@
                                     min="0.0001" required oninput="txOnQtyInput()">
                             </div>
                             <div class="col-6">
-                                <label class="form-label">Preço Unit. (R$)</label>
+                                <label class="form-label">Preço Unit.</label>
                                 <input type="number" id="txPrice" name="price" class="form-control" step="0.0001"
                                     min="0" placeholder="ou informe o total" oninput="txOnPriceInput()">
                             </div>
                         </div>
                         <div class="row g-2 mb-3">
                             <div class="col-6">
-                                <label class="form-label">Valor Total (R$)</label>
+                                <label class="form-label">Valor Total</label>
                                 <input type="number" id="txTotal" name="total_price" class="form-control"
                                     step="0.01" min="0" placeholder="opcional" oninput="txOnTotalInput()">
                             </div>
                             <div class="col-6">
-                                <label class="form-label">Taxas (R$)</label>
+                                <label class="form-label">Taxas</label>
                                 <input type="number" id="txFees" name="fees" class="form-control" step="0.01"
                                     min="0" value="0" oninput="txOnFeesInput()">
                             </div>
@@ -203,6 +210,7 @@
                                                      data-tx-price=${t.price},
                                                      data-tx-fees=${t.fees},
                                                      data-tx-date=${t.date},
+                                                     data-tx-currency=${t.currency},
                                                      data-tx-broker=${t.broker != null ? t.broker : ''},
                                                      data-tx-notes=${t.notes != null ? t.notes : ''}"
                                             onclick="openEditTxModal(this)">
@@ -252,19 +260,26 @@
                             </label>
                         </div>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Moeda</label>
+                        <select id="editTxCurrency" name="currency" class="form-select">
+                            <option value="BRL">BRL</option>
+                            <option value="USD">USD</option>
+                        </select>
+                    </div>
                     <div class="row g-2 mb-3">
                         <div class="col-6">
                             <label class="form-label">Quantidade</label>
                             <input type="number" id="editTxQty" name="quantity" class="form-control" step="0.0001" min="0.0001" required>
                         </div>
                         <div class="col-6">
-                            <label class="form-label">Preço Unit. (R$)</label>
+                            <label class="form-label">Preço Unit.</label>
                             <input type="number" id="editTxPrice" name="price" class="form-control" step="0.0001" min="0" required>
                         </div>
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col-6">
-                            <label class="form-label">Taxas (R$)</label>
+                            <label class="form-label">Taxas</label>
                             <input type="number" id="editTxFees" name="fees" class="form-control" step="0.01" min="0" value="0">
                         </div>
                         <div class="col-6">
@@ -297,6 +312,7 @@ function openEditTxModal(btn, returnTo) {
     document.getElementById('editTxForm').action = '/transactions/' + btn.dataset.txId + '/edit';
     document.getElementById('editTxTypeBuy').checked = btn.dataset.txType === 'BUY';
     document.getElementById('editTxTypeSell').checked = btn.dataset.txType === 'SELL';
+    document.getElementById('editTxCurrency').value = btn.dataset.txCurrency || 'BRL';
     document.getElementById('editTxQty').value = btn.dataset.txQuantity;
     document.getElementById('editTxPrice').value = btn.dataset.txPrice;
     document.getElementById('editTxFees').value = btn.dataset.txFees;
