@@ -33,6 +33,7 @@
                         <th class="text-end">Total Investido</th>
                         <th class="text-end">Valor de Mercado</th>
                         <th class="text-end">Resultado</th>
+                        <th class="text-end">Dividendos no Mês</th>
                         <th class="text-end">Dividendos Acumulados</th>
                         <th th:each="ticker : ${tickers}" class="text-end" th:text="${ticker}"></th>
                     </tr>
@@ -52,6 +53,9 @@
                             th:with="result=${row.totalMarketValue - row.totalInvested}"
                             th:classappend="${result >= 0} ? 'text-success' : 'text-danger'">
                             R$ <span th:text="${#numbers.formatDecimal(result, 1, 2)}"></span>
+                        </td>
+                        <td class="text-end">
+                            R$ <span th:text="${#numbers.formatDecimal(row.totalMonthlyNetDividends, 1, 2)}"></span>
                         </td>
                         <td class="text-end">
                             R$ <span th:text="${#numbers.formatDecimal(row.totalAccumulatedNetDividends, 1, 2)}"></span>
