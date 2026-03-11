@@ -2,6 +2,10 @@ body {
     background-color: #f8f9fa;
 }
 
+[data-bs-theme="dark"] body {
+    background-color: #1a1d21;
+}
+
 .navbar-brand {
     font-size: 1.1rem;
     letter-spacing: 0.02em;
@@ -25,3 +29,24 @@ body {
 
 .text-success { color: #198754 !important; }
 .text-danger  { color: #dc3545 !important; }
+
+[data-bs-theme="dark"] .text-success { color: #75b798 !important; }
+[data-bs-theme="dark"] .text-danger  { color: #ea868f !important; }
+
+[data-bs-theme="dark"] .card-header.bg-white {
+    background-color: var(--bs-card-bg) !important;
+}
+
+[data-bs-theme="dark"] .badge.bg-light {
+    background-color: var(--bs-tertiary-bg) !important;
+    color: var(--bs-body-color) !important;
+}
+
+#themeToggle {
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.75) !important;
+}
+
+#themeToggle:hover {
+    color: #fff !important;
+}
