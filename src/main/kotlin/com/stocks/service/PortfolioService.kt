@@ -159,6 +159,12 @@ class PortfolioService(
 
             val currency = asset.currency
             val exchangeRate = if (currency != "BRL") exchangeRateService.getRate(currency) else null
+            val currentPriceBrl =
+                if (exchangeRate != null && currentPrice != null) {
+                    currentPrice * exchangeRate
+                } else {
+                    currentPrice
+                }
             val currentValueBrl =
                 if (exchangeRate != null && currentValue != null) {
                     currentValue * exchangeRate
@@ -179,9 +185,11 @@ class PortfolioService(
                     type = asset.type,
                     quantity = calc.quantity,
                     avgPrice = calc.avgPrice,
+                    avgPriceBrl = calc.avgPriceBrl,
                     totalCost = calc.totalCost,
                     totalCostBrl = calc.totalCostBrl,
                     currentPrice = currentPrice,
+                    currentPriceBrl = currentPriceBrl,
                     currentValue = currentValue,
                     unrealizedPnl = unrealizedPnl,
                     realizedPnl = calc.realizedPnl,

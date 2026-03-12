@@ -78,6 +78,18 @@ class CalculationServiceTest :
             result.realizedPnl shouldBe 0.0
         }
 
+        test("avgPriceBrl uses priceBrl values") {
+            val txs =
+                listOf(
+                    TransactionData("BUY", 10.0, 10.0, 0.0, LocalDate.of(2024, 1, 1), priceBrl = 50.0),
+                    TransactionData("BUY", 10.0, 20.0, 0.0, LocalDate.of(2024, 1, 2), priceBrl = 110.0),
+                )
+            val result = service.calculatePosition(txs)
+            result.avgPrice shouldBe (15.0 plusOrMinus 0.001)
+            result.avgPriceBrl shouldBe (80.0 plusOrMinus 0.001) // (500 + 1100) / 20
+            result.totalCostBrl shouldBe (1600.0 plusOrMinus 0.001)
+        }
+
         test("cash flows signs") {
             val txs =
                 listOf(
