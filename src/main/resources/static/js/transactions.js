@@ -267,6 +267,18 @@ function csvNextStep() {
         });
 }
 
+function toggleCsvErrorsOnly(showErrorsOnly) {
+    var table = document.getElementById('csvPreviewTable');
+    if (!table) return;
+    table.querySelectorAll('tbody tr').forEach(function (tr) {
+        if (showErrorsOnly && tr.dataset.hasError !== 'true') {
+            tr.style.display = 'none';
+        } else {
+            tr.style.display = '';
+        }
+    });
+}
+
 function batchSubmit() {
     const table = document.getElementById('csvPreviewTable');
     if (!table) return;

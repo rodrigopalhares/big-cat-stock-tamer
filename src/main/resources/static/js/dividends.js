@@ -24,6 +24,18 @@ function updateDivBatchCount() {
     if (btn) btn.disabled = (total === 0);
 }
 
+function toggleDivCsvErrorsOnly(showErrorsOnly) {
+    var table = document.getElementById('divCsvPreviewTable');
+    if (!table) return;
+    table.querySelectorAll('tbody tr').forEach(function (tr) {
+        if (showErrorsOnly && tr.dataset.hasError !== 'true') {
+            tr.style.display = 'none';
+        } else {
+            tr.style.display = '';
+        }
+    });
+}
+
 function divBatchSubmit() {
     var table = document.getElementById('divCsvPreviewTable');
     if (!table) return;

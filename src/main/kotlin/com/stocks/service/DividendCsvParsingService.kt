@@ -52,46 +52,62 @@ class DividendCsvParsingService(
     ): DividendCsvRow {
         val cols = line.split("\t")
 
-        val errorRow = { msg: String ->
-            DividendCsvRow(
+        if (cols.size < 7) {
+            return DividendCsvRow(
                 rowIndex = index,
                 ticker = cols.getOrElse(0) { "" }.trim().uppercase(),
                 date = cols.getOrElse(1) { "" }.trim(),
                 type = cols.getOrElse(2) { "" }.trim().uppercase(),
                 totalAmount = 0.0,
                 taxWithheld = 0.0,
-                currency = cols.getOrElse(5) { "BRL" }.trim().uppercase(),
-                broker = cols.getOrElse(6) { "" }.trim(),
-                notes = cols.getOrElse(8) { "" }.trim(),
-                error = msg,
+                currency = "BRL",
+                broker = "",
+                notes = "",
+                error = "Colunas insuficientes (esperado pelo menos 7, encontrado ${cols.size})",
             )
         }
 
-        if (cols.size < 7) {
-            return errorRow("Colunas insuficientes (esperado pelo menos 7, encontrado ${cols.size})")
+        val ticker = cols[0].trim().uppercase()
+        if (ticker.isBlank()) {
+            return DividendCsvRow(
+                rowIndex = index,
+                ticker = "",
+                date = cols[1].trim(),
+                type = cols[2].trim().uppercase(),
+                totalAmount = 0.0,
+                taxWithheld = 0.0,
+                currency = cols.getOrElse(5) { "BRL" }.trim().uppercase(),
+                broker = cols.getOrElse(6) { "" }.trim(),
+                notes = cols.getOrElse(8) { "" }.trim(),
+                error = "Ticker vazio",
+            )
         }
 
-        val ticker = cols[0].trim().uppercase()
-        if (ticker.isBlank()) return errorRow("Ticker vazio")
+        val errors = mutableListOf<String>()
 
         val dateStr = cols[1].trim()
         val isoDate =
             try {
                 LocalDate.parse(dateStr, BR_DATE_FORMAT_DIV).format(DateTimeFormatter.ISO_LOCAL_DATE)
             } catch (e: Exception) {
-                return errorRow("Data inválida: $dateStr")
+                errors.add("Data inválida: $dateStr")
+                dateStr
             }
 
         val rawType = cols[2].trim().uppercase()
         val type =
             DIVIDEND_TYPE_ALIASES[rawType]
-                ?: return errorRow("Tipo desconhecido: ${cols[2].trim()}")
+                ?: run {
+                    errors.add("Tipo desconhecido: ${cols[2].trim()}")
+                    rawType
+                }
 
-        val totalAmount = parseBrazilianNumber(cols[3]) ?: return errorRow("Valor inválido: ${cols[3]}")
-        if (totalAmount <= 0) return errorRow("Valor deve ser > 0")
+        val totalAmount = parseBrazilianNumber(cols[3])
+        if (totalAmount == null) errors.add("Valor inválido: ${cols[3]}")
+        if (totalAmount != null && totalAmount <= 0) errors.add("Valor deve ser > 0")
 
         val taxWithheld = parseBrazilianNumber(cols[4]) ?: 0.0
-        if (taxWithheld < 0) return errorRow("IR Retido não pode ser negativo")
+        if (taxWithheld < 0) errors.add("IR Retido não pode ser negativo")
 
         val currency =
             cols[5]
@@ -105,7 +121,7 @@ class DividendCsvParsingService(
         val notes = cols.getOrElse(8) { "" }.trim()
 
         if (ticker !in existingTickers) {
-            return errorRow("Ativo não cadastrado: $ticker")
+            errors.add("Ativo não cadastrado: $ticker")
         }
 
         return DividendCsvRow(
@@ -113,11 +129,12 @@ class DividendCsvParsingService(
             ticker = ticker,
             date = isoDate,
             type = type,
-            totalAmount = totalAmount,
+            totalAmount = totalAmount ?: 0.0,
             taxWithheld = taxWithheld,
             currency = currency,
             broker = broker,
             notes = notes,
+            error = if (errors.isNotEmpty()) errors.joinToString("; ") else null,
         )
     }
 }
