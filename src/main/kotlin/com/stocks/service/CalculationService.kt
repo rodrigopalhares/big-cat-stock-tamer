@@ -14,6 +14,7 @@ data class PositionCalcResult(
     val totalCostBrl: Double = totalCost,
     val realizedPnlBrl: Double = realizedPnl,
     val cashFlowsBrl: List<Pair<LocalDate, Double>> = cashFlows,
+    val avgPriceBrl: Double = avgPrice,
 )
 
 @Service
@@ -61,6 +62,7 @@ class CalculationService {
 
         if (quantity < 0) quantity = 0.0
         val avgPrice = if (quantity > 0) accumulatedCost / quantity else 0.0
+        val avgPriceBrl = if (quantity > 0) accumulatedCostBrl / quantity else 0.0
 
         return PositionCalcResult(
             quantity = quantity,
@@ -71,6 +73,7 @@ class CalculationService {
             totalCostBrl = accumulatedCostBrl,
             realizedPnlBrl = realizedPnlBrl,
             cashFlowsBrl = cashFlowsBrl,
+            avgPriceBrl = avgPriceBrl,
         )
     }
 
