@@ -82,13 +82,16 @@ class DividendCsvParsingServiceTest(
             rows[0].error shouldContain "Data inválida"
         }
 
-        test("error when type is unknown") {
+        test("error when type is unknown but valid fields are filled") {
             createAsset("PETR4")
             val csv = "PETR4\t01/03/2026\tUNKNOWN_TYPE\t1,50\t0,00\tBRL\tXP"
 
             val rows = dividendCsvParsingService.parseDividendCsvRows(csv)
             rows shouldHaveSize 1
             rows[0].error shouldContain "Tipo desconhecido"
+            rows[0].date shouldBe "2026-03-01"
+            rows[0].totalAmount shouldBe (1.50 plusOrMinus 0.001)
+            rows[0].ticker shouldBe "PETR4"
         }
 
         test("error when totalAmount is zero or negative") {
@@ -100,12 +103,29 @@ class DividendCsvParsingServiceTest(
             rows[0].error shouldContain "Valor deve ser > 0"
         }
 
-        test("error when asset does not exist") {
+        test("error when asset does not exist but valid fields are filled") {
             val csv = "XXXX9\t01/03/2026\tDIVIDENDO\t1,00\t0,00\tBRL\tXP"
 
             val rows = dividendCsvParsingService.parseDividendCsvRows(csv)
             rows shouldHaveSize 1
             rows[0].error shouldContain "Ativo não cadastrado"
+            rows[0].date shouldBe "2026-03-01"
+            rows[0].type shouldBe "DIVIDENDO"
+            rows[0].totalAmount shouldBe (1.0 plusOrMinus 0.001)
+        }
+
+        test("multiple errors accumulated in same row") {
+            val csv = "XXXX9\t99/99/9999\tUNKNOWN\tabc\t0,00\tBRL\tXP"
+
+            val rows = dividendCsvParsingService.parseDividendCsvRows(csv)
+            rows shouldHaveSize 1
+            val row = rows[0]
+            row.error shouldContain "Data inválida"
+            row.error shouldContain "Tipo desconhecido"
+            row.error shouldContain "Valor inválido"
+            row.error shouldContain "Ativo não cadastrado"
+            row.ticker shouldBe "XXXX9"
+            row.broker shouldBe "XP"
         }
 
         test("type aliases are resolved case-insensitively") {
