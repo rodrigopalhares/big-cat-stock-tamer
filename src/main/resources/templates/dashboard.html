@@ -183,6 +183,7 @@
                             th:classappend="${p.unrealizedPnl != null} ? (${p.unrealizedPnl >= 0} ? 'text-success' : 'text-danger') : ''">
                             <span th:if="${p.unrealizedPnl != null}">
                                 <span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.unrealizedPnl, 1, 2)}"></span>
+                                <small th:if="${p.totalCost != 0}" class="ms-1" th:text="${'(' + #numbers.formatDecimal(p.unrealizedPnl / p.totalCost * 100, 1, 0) + '%)'}"></small>
                                 <br th:if="${p.exchangeRate != null and p.unrealizedPnlBrl != null}">
                                 <small th:if="${p.exchangeRate != null and p.unrealizedPnlBrl != null}" class="text-muted">
                                     ≈ R$ <span th:text="${#numbers.formatDecimal(p.unrealizedPnlBrl, 1, 2)}"></span>
