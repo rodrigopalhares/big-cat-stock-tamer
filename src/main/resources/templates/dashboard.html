@@ -121,9 +121,9 @@
                         <th class="text-end" data-sort="num">Qtd<span class="sort-arrow"></span></th>
                         <th class="text-end" data-sort="num">Preço Médio<span class="sort-arrow"></span></th>
                         <th class="text-end" data-sort="num">Cotação<span class="sort-arrow"></span></th>
+                        <th class="text-end" data-sort="num">Custo Total<span class="sort-arrow"></span></th>
                         <th class="text-end" data-sort="num">Valor Atual<span class="sort-arrow"></span></th>
                         <th class="text-end" data-sort="num">Lucro Não Real.<span class="sort-arrow"></span></th>
-                        <th class="text-end" data-sort="num">Custo Total<span class="sort-arrow"></span></th>
                         <th class="text-end" data-sort="num">Proventos<span class="sort-arrow"></span></th>
                         <th class="text-end" data-sort="num">Lucro Realizado<span class="sort-arrow"></span></th>
                         <th class="text-end" data-sort="num">TIR/mês<span class="sort-arrow"></span></th>
@@ -163,6 +163,13 @@
                             <span th:unless="${p.currentPrice != null}">—</span>
                         </td>
                         <td class="text-end">
+                            <span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.totalCost, 1, 2)}"></span>
+                            <br th:if="${p.exchangeRate != null}">
+                            <small th:if="${p.exchangeRate != null}" class="text-muted">
+                                ≈ R$ <span th:text="${#numbers.formatDecimal(p.totalCostBrl, 1, 2)}"></span>
+                            </small>
+                        </td>
+                        <td class="text-end">
                             <span th:if="${p.currentValue != null}">
                                 <span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.currentValue, 1, 2)}"></span>
                                 <br th:if="${p.exchangeRate != null and p.currentValueBrl != null}">
@@ -182,13 +189,6 @@
                                 </small>
                             </span>
                             <span th:unless="${p.unrealizedPnl != null}">—</span>
-                        </td>
-                        <td class="text-end">
-                            <span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.totalCost, 1, 2)}"></span>
-                            <br th:if="${p.exchangeRate != null}">
-                            <small th:if="${p.exchangeRate != null}" class="text-muted">
-                                ≈ R$ <span th:text="${#numbers.formatDecimal(p.totalCostBrl, 1, 2)}"></span>
-                            </small>
                         </td>
                         <td class="text-end text-success">
                             <span th:if="${p.dividendPnl > 0}">R$ <span th:text="${#numbers.formatDecimal(p.dividendPnl, 1, 2)}"></span></span>
