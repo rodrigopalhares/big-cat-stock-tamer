@@ -48,6 +48,8 @@ class PortfolioController(
         model.addAttribute("currentValue", summary.currentValue)
         model.addAttribute("unrealizedPnl", summary.unrealizedPnl)
         model.addAttribute("dividendPnl", summary.dividendPnl)
+        model.addAttribute("irrAnnual", summary.irrAnnual)
+        model.addAttribute("irrMonthly", summary.irrMonthly)
 
         val usdRate = positions.firstOrNull { it.currency == "USD" && it.exchangeRate != null }?.exchangeRate
         val hasUsd = positions.any { it.currency == "USD" }

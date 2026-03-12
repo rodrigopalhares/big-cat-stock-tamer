@@ -1,5 +1,7 @@
 package com.stocks.dto
 
+import java.time.LocalDate
+
 data class AssetPosition(
     val ticker: String,
     val name: String?,
@@ -24,6 +26,7 @@ data class AssetPosition(
     val currentValueBrl: Double? = null,
     val unrealizedPnlBrl: Double? = null,
     val delisted: Boolean = false,
+    val allCashFlowsBrl: List<Pair<LocalDate, Double>> = emptyList(),
 )
 
 data class PortfolioSummary(
@@ -32,5 +35,7 @@ data class PortfolioSummary(
     val realizedPnl: Double,
     val unrealizedPnl: Double?,
     val dividendPnl: Double = 0.0,
+    val irrAnnual: Double? = null,
+    val irrMonthly: Double? = null,
     val positions: List<AssetPosition>,
 )

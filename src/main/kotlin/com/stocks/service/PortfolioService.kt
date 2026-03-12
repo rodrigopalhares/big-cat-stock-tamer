@@ -152,6 +152,7 @@ class PortfolioService(
             val dividendPnl = dividendPnlByAsset[ticker] ?: 0.0
             val dividendCashFlows = dividendCashFlowsByAsset[ticker] ?: emptyList()
             val allCashFlows = (calc.cashFlows + dividendCashFlows).sortedBy { it.first }
+            val allCashFlowsBrl = (calc.cashFlowsBrl + dividendCashFlows).sortedBy { it.first }
 
             val irr = calculationService.calculateIrr(allCashFlows, currentValue)
             val irrAnnual = calculationService.calculateXirr(allCashFlows, currentValue)
@@ -203,6 +204,7 @@ class PortfolioService(
                     currentValueBrl = currentValueBrl,
                     unrealizedPnlBrl = unrealizedPnlBrl,
                     delisted = asset.delisted,
+                    allCashFlowsBrl = allCashFlowsBrl,
                 )
             )
         }
@@ -219,12 +221,18 @@ class PortfolioService(
         val unrealizedPnl = if (unrealizedBrl.isNotEmpty()) unrealizedBrl.sum() else null
         val dividendPnl = positions.sumOf { it.dividendPnl }
 
+        val allCashFlowsBrl = positions.flatMap { it.allCashFlowsBrl }.sortedBy { it.first }
+        val irrAnnual = calculationService.calculateXirr(allCashFlowsBrl, currentValue)
+        val irrMonthly = irrAnnual?.let { Math.pow(1 + it, 1.0 / 12.0) - 1 }
+
         return PortfolioSummary(
             totalInvested = totalInvested,
             currentValue = currentValue,
             realizedPnl = realizedPnl,
             unrealizedPnl = unrealizedPnl,
             dividendPnl = dividendPnl,
+            irrAnnual = irrAnnual,
+            irrMonthly = irrMonthly,
             positions = positions,
         )
     }
