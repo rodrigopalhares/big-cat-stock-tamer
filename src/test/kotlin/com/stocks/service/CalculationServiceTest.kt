@@ -63,6 +63,17 @@ class CalculationServiceTest :
             result.realizedPnl shouldBe (-20.0 plusOrMinus 0.001)
         }
 
+        test("multiple buys then full sell zeroes quantity despite floating point") {
+            val txs =
+                listOf(
+                    TransactionData("BUY", 0.1298, 100.0, 0.0, LocalDate.of(2024, 1, 1)),
+                    TransactionData("BUY", 0.1014, 100.0, 0.0, LocalDate.of(2024, 1, 2)),
+                    TransactionData("SELL", -0.2312, 120.0, 0.0, LocalDate.of(2024, 1, 3)),
+                )
+            val result = service.calculatePosition(txs)
+            result.quantity shouldBe 0.0
+        }
+
         test("sell without buy") {
             val txs = listOf(TransactionData("SELL", -10.0, 15.0, 0.0, LocalDate.of(2024, 1, 1)))
             val result = service.calculatePosition(txs)
