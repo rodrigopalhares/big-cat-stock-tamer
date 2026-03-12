@@ -185,8 +185,8 @@ class CsvParsingService(
     ): CsvRow {
         val cols = line.split("\t")
 
-        val errorRow = { msg: String ->
-            CsvRow(
+        if (cols.size < 7) {
+            return CsvRow(
                 rowIndex = index,
                 ticker = cols.getOrElse(0) { "" }.trim().uppercase(),
                 date = cols.getOrElse(1) { "" }.trim(),
@@ -194,27 +194,41 @@ class CsvParsingService(
                 quantity = 0.0,
                 price = 0.0,
                 fees = 0.0,
+                broker = "",
+                notes = "",
+                currency = "BRL",
+                assetStatus = AssetStatus.UNKNOWN,
+                error = "Colunas insuficientes (esperado pelo menos 7, encontrado ${cols.size})",
+            )
+        }
+
+        val ticker = cols[0].trim().uppercase()
+        if (ticker.isBlank()) {
+            return CsvRow(
+                rowIndex = index,
+                ticker = "",
+                date = cols[1].trim(),
+                type = cols[2].trim().uppercase(),
+                quantity = 0.0,
+                price = 0.0,
+                fees = 0.0,
                 broker = cols.getOrElse(6) { "" }.trim(),
                 notes = cols.getOrElse(9) { "" }.trim(),
                 currency = cols.getOrElse(8) { "BRL" }.trim().uppercase(),
                 assetStatus = AssetStatus.UNKNOWN,
-                error = msg,
+                error = "Ticker vazio",
             )
         }
 
-        if (cols.size < 7) {
-            return errorRow("Colunas insuficientes (esperado pelo menos 7, encontrado ${cols.size})")
-        }
-
-        val ticker = cols[0].trim().uppercase()
-        if (ticker.isBlank()) return errorRow("Ticker vazio")
+        val errors = mutableListOf<String>()
 
         val dateStr = cols[1].trim()
         val isoDate =
             try {
                 LocalDate.parse(dateStr, BR_DATE_FORMAT).format(DateTimeFormatter.ISO_LOCAL_DATE)
             } catch (e: Exception) {
-                return errorRow("Data inválida: $dateStr")
+                errors.add("Data inválida: $dateStr")
+                dateStr
             }
 
         val rawType = cols[2].trim().uppercase()
@@ -224,15 +238,20 @@ class CsvParsingService(
                 "V" -> "SELL"
                 "BUY" -> "BUY"
                 "SELL" -> "SELL"
-                else -> return errorRow("Tipo inválido: $rawType (esperado C ou V)")
+                else -> {
+                    errors.add("Tipo inválido: $rawType (esperado C ou V)")
+                    rawType
+                }
             }
 
-        val quantity = parseBrazilianNumber(cols[3]) ?: return errorRow("Quantidade inválida: ${cols[3]}")
-        val absQuantity = abs(quantity)
-        if (absQuantity <= 0) return errorRow("Quantidade deve ser > 0")
+        val quantity = parseBrazilianNumber(cols[3])
+        if (quantity == null) errors.add("Quantidade inválida: ${cols[3]}")
+        val absQuantity = abs(quantity ?: 0.0)
+        if (quantity != null && absQuantity <= 0) errors.add("Quantidade deve ser > 0")
 
-        val price = parseBrazilianNumber(cols[4]) ?: return errorRow("Preço inválido: ${cols[4]}")
-        if (price <= 0) return errorRow("Preço deve ser > 0")
+        val price = parseBrazilianNumber(cols[4])
+        if (price == null) errors.add("Preço inválido: ${cols[4]}")
+        if (price != null && price < 0) errors.add("Preço deve ser >= 0")
 
         val taxes = parseBrazilianNumber(cols[5]) ?: 0.0
         val broker = cols.getOrElse(6) { "" }.trim()
@@ -261,18 +280,25 @@ class CsvParsingService(
                 else -> resolvedStatuses[ticker] ?: AssetStatus.UNKNOWN
             }
 
+        val finalQuantity =
+            when {
+                type == "SELL" -> -absQuantity
+                else -> absQuantity
+            }
+
         return CsvRow(
             rowIndex = index,
             ticker = ticker,
             date = isoDate,
             type = type,
-            quantity = if (type == "SELL") -absQuantity else absQuantity,
-            price = price,
+            quantity = finalQuantity,
+            price = price ?: 0.0,
             fees = fees,
             broker = broker,
             notes = notes,
             currency = currency,
             assetStatus = assetStatus,
+            error = if (errors.isNotEmpty()) errors.joinToString("; ") else null,
         )
     }
 }

@@ -171,12 +171,16 @@ class CsvParsingServiceTest :
                 rows[0].error shouldContain "Colunas insuficientes"
             }
 
-            test("invalid type returns error") {
+            test("invalid type returns error with valid fields filled") {
                 val csv = "PETR4\t01/06/2024\tX\t100\t25,50\t0\tXP\t0\tBRL\t"
                 val rows = service.parseCsvRows(csv, existingTickers, resolver)
 
                 rows shouldHaveSize 1
-                rows[0].error shouldContain "Tipo inválido"
+                val row = rows[0]
+                row.error shouldContain "Tipo inválido"
+                row.date shouldBe "2024-06-01"
+                row.quantity shouldBeExactly 100.0
+                row.price shouldBeExactly 25.50
             }
 
             test("empty csv returns empty list") {
@@ -200,12 +204,33 @@ class CsvParsingServiceTest :
                 rows[0].error shouldContain "Quantidade deve ser > 0"
             }
 
-            test("zero price returns error row") {
+            test("zero price is accepted") {
                 val csv = "PETR4\t01/06/2024\tC\t100\t0\t0\tXP\t0\tBRL\t"
                 val rows = service.parseCsvRows(csv, existingTickers, resolver)
 
                 rows shouldHaveSize 1
-                rows[0].error shouldContain "Preço deve ser > 0"
+                rows[0].error.shouldBeNull()
+                rows[0].price shouldBeExactly 0.0
+            }
+
+            test("negative price returns error row") {
+                val csv = "PETR4\t01/06/2024\tC\t100\t-5,00\t0\tXP\t0\tBRL\t"
+                val rows = service.parseCsvRows(csv, existingTickers, resolver)
+
+                rows shouldHaveSize 1
+                rows[0].error shouldContain "Preço deve ser >= 0"
+            }
+
+            test("multiple errors accumulated in same row") {
+                val csv = "PETR4\t01/06/2024\tX\tabc\t25,50\t0\tXP\t0\tBRL\t"
+                val rows = service.parseCsvRows(csv, existingTickers, resolver)
+
+                rows shouldHaveSize 1
+                val row = rows[0]
+                row.error shouldContain "Tipo inválido"
+                row.error shouldContain "Quantidade inválida"
+                row.date shouldBe "2024-06-01"
+                row.price shouldBeExactly 25.50
             }
 
             test("invalid currency defaults to BRL") {
