@@ -216,6 +216,41 @@
                         </th:block>
                     </tr>
                 </tbody>
+                <tfoot class="table-light fw-bold">
+                    <tr>
+                        <td colspan="6">Total</td>
+                        <td class="text-end">R$ <span th:text="${#numbers.formatDecimal(totalInvested, 1, 0)}"></span></td>
+                        <td class="text-end">
+                            <span th:if="${currentValue != null}">R$ <span th:text="${#numbers.formatDecimal(currentValue, 1, 0)}"></span></span>
+                            <span th:unless="${currentValue != null}">—</span>
+                        </td>
+                        <td class="text-end"
+                            th:classappend="${unrealizedPnl != null} ? (${unrealizedPnl >= 0} ? 'text-success' : 'text-danger') : ''">
+                            <span th:if="${unrealizedPnl != null}">
+                                R$ <span th:text="${#numbers.formatDecimal(unrealizedPnl, 1, 0)}"></span>
+                                <small th:if="${totalInvested != 0}" class="ms-1" th:text="${'(' + #numbers.formatDecimal(unrealizedPnl / totalInvested * 100, 1, 0) + '%)'}"></small>
+                            </span>
+                            <span th:unless="${unrealizedPnl != null}">—</span>
+                        </td>
+                        <td class="text-end text-success">
+                            <span th:if="${dividendPnl > 0}">R$ <span th:text="${#numbers.formatDecimal(dividendPnl, 1, 0)}"></span></span>
+                            <span th:unless="${dividendPnl > 0}">—</span>
+                        </td>
+                        <td class="text-end" th:classappend="${realizedPnl >= 0} ? 'text-success' : 'text-danger'">
+                            R$ <span th:text="${#numbers.formatDecimal(realizedPnl, 1, 0)}"></span>
+                        </td>
+                        <td class="text-end"
+                            th:classappend="${irrMonthly != null} ? (${irrMonthly >= 0} ? 'text-success' : 'text-danger') : ''">
+                            <span th:if="${irrMonthly != null}" th:text="${#numbers.formatDecimal(irrMonthly * 100, 1, 2) + '%'}"></span>
+                            <span th:unless="${irrMonthly != null}">—</span>
+                        </td>
+                        <td class="text-end"
+                            th:classappend="${irrAnnual != null} ? (${irrAnnual >= 0} ? 'text-success' : 'text-danger') : ''">
+                            <span th:if="${irrAnnual != null}" th:text="${#numbers.formatDecimal(irrAnnual * 100, 1, 2) + '%'}"></span>
+                            <span th:unless="${irrAnnual != null}">—</span>
+                        </td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
         <div th:if="${positions.isEmpty()}" class="text-center py-5 text-muted">
