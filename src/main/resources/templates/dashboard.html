@@ -144,23 +144,29 @@
                         <td>
                             <span class="badge bg-light text-dark border" th:text="${p.currency}"></span>
                         </td>
-                        <td class="text-end" th:text="${T(java.lang.Math).abs(p.quantity - T(java.lang.Math).round(p.quantity)) < 0.0001} ? ${#numbers.formatDecimal(p.quantity, 1, 0)} : ${#numbers.formatDecimal(p.quantity, 1, 4)}"></td>
                         <td class="text-end">
-                            <span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.avgPrice, 1, 2)}"></span>
-                            <br th:if="${p.exchangeRate != null}">
-                            <small th:if="${p.exchangeRate != null}" class="text-muted">
-                                ≈ R$ <span th:text="${#numbers.formatDecimal(p.avgPriceBrl, 1, 2)}"></span>
-                            </small>
+                            <span th:if="${p.quantity > 0}" th:text="${T(java.lang.Math).abs(p.quantity - T(java.lang.Math).round(p.quantity)) < 0.0001} ? ${#numbers.formatDecimal(p.quantity, 1, 0)} : ${#numbers.formatDecimal(p.quantity, 1, 4)}"></span>
+                            <span th:unless="${p.quantity > 0}">—</span>
                         </td>
                         <td class="text-end">
-                            <span th:if="${p.currentPrice != null}">
+                            <span th:if="${p.quantity > 0}">
+                                <span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.avgPrice, 1, 2)}"></span>
+                                <br th:if="${p.exchangeRate != null}">
+                                <small th:if="${p.exchangeRate != null}" class="text-muted">
+                                    ≈ R$ <span th:text="${#numbers.formatDecimal(p.avgPriceBrl, 1, 2)}"></span>
+                                </small>
+                            </span>
+                            <span th:unless="${p.quantity > 0}">—</span>
+                        </td>
+                        <td class="text-end">
+                            <span th:if="${p.quantity > 0 and p.currentPrice != null}">
                                 <span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.currentPrice, 1, 2)}"></span>
                                 <br th:if="${p.exchangeRate != null and p.currentPriceBrl != null}">
                                 <small th:if="${p.exchangeRate != null and p.currentPriceBrl != null}" class="text-muted">
                                     ≈ R$ <span th:text="${#numbers.formatDecimal(p.currentPriceBrl, 1, 2)}"></span>
                                 </small>
                             </span>
-                            <span th:unless="${p.currentPrice != null}">—</span>
+                            <span th:unless="${p.quantity > 0 and p.currentPrice != null}">—</span>
                         </td>
                         <td class="text-end">
                             <span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.totalCost, 1, 0)}"></span>
@@ -170,14 +176,14 @@
                             </small>
                         </td>
                         <td class="text-end">
-                            <span th:if="${p.currentValue != null}">
+                            <span th:if="${p.quantity > 0 and p.currentValue != null}">
                                 <span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.currentValue, 1, 0)}"></span>
                                 <br th:if="${p.exchangeRate != null and p.currentValueBrl != null}">
                                 <small th:if="${p.exchangeRate != null and p.currentValueBrl != null}" class="text-muted">
                                     ≈ R$ <span th:text="${#numbers.formatDecimal(p.currentValueBrl, 1, 0)}"></span>
                                 </small>
                             </span>
-                            <span th:unless="${p.currentValue != null}">—</span>
+                            <span th:unless="${p.quantity > 0 and p.currentValue != null}">—</span>
                         </td>
                         <td class="text-end"
                             th:classappend="${p.unrealizedPnl != null} ? (${p.unrealizedPnl >= 0} ? 'text-success' : 'text-danger') : ''">
