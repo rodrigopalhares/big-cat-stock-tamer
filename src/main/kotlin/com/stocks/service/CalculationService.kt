@@ -1,5 +1,6 @@
 package com.stocks.service
 
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -19,6 +20,8 @@ data class PositionCalcResult(
 
 @Service
 class CalculationService {
+    private val logger = LoggerFactory.getLogger(this.javaClass)
+
     fun calculatePosition(transactions: List<TransactionData>): PositionCalcResult {
         var quantity = 0.0
         var accumulatedCost = 0.0
@@ -60,7 +63,7 @@ class CalculationService {
             }
         }
 
-        if (quantity < 0) quantity = 0.0
+        if (quantity < 1e-8) quantity = 0.0
         val avgPrice = if (quantity > 0) accumulatedCost / quantity else 0.0
         val avgPriceBrl = if (quantity > 0) accumulatedCostBrl / quantity else 0.0
 
@@ -125,7 +128,8 @@ class CalculationService {
         return try {
             xirr(flows)
         } catch (e: Exception) {
-            null
+            logger.error("Error computing XIRR", e)
+            return null
         }
     }
 
