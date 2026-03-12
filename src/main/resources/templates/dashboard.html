@@ -144,7 +144,7 @@
                         <td>
                             <span class="badge bg-light text-dark border" th:text="${p.currency}"></span>
                         </td>
-                        <td class="text-end" th:text="${p.quantity == T(java.lang.Math).floor(p.quantity)} ? ${#numbers.formatDecimal(p.quantity, 1, 0)} : ${#numbers.formatDecimal(p.quantity, 1, 4)}"></td>
+                        <td class="text-end" th:text="${T(java.lang.Math).abs(p.quantity - T(java.lang.Math).round(p.quantity)) < 0.0001} ? ${#numbers.formatDecimal(p.quantity, 1, 0)} : ${#numbers.formatDecimal(p.quantity, 1, 4)}"></td>
                         <td class="text-end">
                             <span th:text="${sym}"></span> <span th:text="${#numbers.formatDecimal(p.avgPrice, 1, 2)}"></span>
                             <br th:if="${p.exchangeRate != null}">
