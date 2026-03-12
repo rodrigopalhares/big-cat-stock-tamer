@@ -53,8 +53,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 x: { grid: { display: false } },
                 y: {
                     stacked: true,
+                    position: 'right',
                     ticks: {
-                        callback: function(v) { return 'R$ ' + v.toLocaleString('pt-BR'); }
+                        callback: function(v) { return 'R$ ' + v.toLocaleString('pt-BR', { maximumFractionDigits: 0 }); }
                     }
                 },
                 yInvested: {
@@ -69,9 +70,14 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             plugins: {
                 tooltip: {
+                    bodyAlign: 'right',
                     callbacks: {
                         label: function(ctx) {
-                            return ctx.dataset.label + ': R$ ' + ctx.parsed.y.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                            return ctx.dataset.label + ': R$ ' + ctx.parsed.y.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                        },
+                        afterBody: function(items) {
+                            var total = items.reduce(function(sum, item) { return sum + item.parsed.y; }, 0);
+                            return ['\nTotal: R$ ' + total.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })];
                         }
                     }
                 },
