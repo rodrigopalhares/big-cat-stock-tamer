@@ -47,6 +47,12 @@ class PortfolioControllerTest(
                     name = "Petrobras"
                     type = "STOCK"
                     currency = "BRL"
+                    hasPosition = true
+                    quantity = 10.0
+                    avgPrice = 10.0
+                    avgPriceBrl = 10.0
+                    totalCost = 100.0
+                    totalCostBrl = 100.0
                 }
                 TransactionEntity.new {
                     assetId = "PETR4"

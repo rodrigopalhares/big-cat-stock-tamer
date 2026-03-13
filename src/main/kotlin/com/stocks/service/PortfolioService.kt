@@ -100,24 +100,7 @@ class PortfolioService(
 
         for (asset in assets) {
             val ticker = asset.ticker.value
-            val txList = asset.transactions.toList()
-            if (txList.isEmpty()) continue
-
-            val transactionData =
-                txList.map {
-                    TransactionData(
-                        type = it.type,
-                        quantity = it.quantity,
-                        price = it.price,
-                        fees = it.fees,
-                        date = it.date,
-                        priceBrl = it.priceBrl,
-                        feesBrl = it.feesBrl,
-                    )
-                }
-
-            val calc = calculationService.calculatePosition(transactionData)
-            if (calc.quantity <= 0 && calc.realizedPnl == 0.0) continue
+            if (!asset.hasPosition && asset.realizedPnl == 0.0) continue
 
             // Resolve current price: when fetching quotes, prefer live/today's price; otherwise use latest from DB
             val currentPrice: Double? =
@@ -136,23 +119,26 @@ class PortfolioService(
                 }
 
             val unrealizedPnl =
-                if (currentPrice != null && calc.quantity > 0) {
-                    calculationService.calculateUnrealizedPnl(calc.quantity, calc.avgPrice, currentPrice)
+                if (currentPrice != null && asset.hasPosition) {
+                    calculationService.calculateUnrealizedPnl(asset.quantity, asset.avgPrice, currentPrice)
                 } else {
                     null
                 }
 
             val currentValue =
-                if (currentPrice != null && calc.quantity > 0) {
-                    currentPrice * calc.quantity
+                if (currentPrice != null && asset.hasPosition) {
+                    currentPrice * asset.quantity
                 } else {
                     null
                 }
 
             val dividendPnl = dividendPnlByAsset[ticker] ?: 0.0
             val dividendCashFlows = dividendCashFlowsByAsset[ticker] ?: emptyList()
-            val allCashFlows = (calc.cashFlows + dividendCashFlows).sortedBy { it.first }
-            val allCashFlowsBrl = (calc.cashFlowsBrl + dividendCashFlows).sortedBy { it.first }
+
+            // Cash flows still needed from transactions for XIRR calculation
+            val txCashFlows = calculationService.buildCashFlows(asset.transactions.toList())
+            val allCashFlows = (txCashFlows.cashFlows + dividendCashFlows).sortedBy { it.first }
+            val allCashFlowsBrl = (txCashFlows.cashFlowsBrl + dividendCashFlows).sortedBy { it.first }
 
             val irr = calculationService.calculateIrr(allCashFlows, currentValue)
             val irrAnnual = calculationService.calculateXirr(allCashFlows, currentValue)
@@ -184,17 +170,17 @@ class PortfolioService(
                     ticker = ticker,
                     name = asset.name,
                     type = asset.type,
-                    quantity = calc.quantity,
-                    avgPrice = calc.avgPrice,
-                    avgPriceBrl = calc.avgPriceBrl,
-                    totalCost = calc.totalCost,
-                    totalCostBrl = calc.totalCostBrl,
+                    quantity = asset.quantity,
+                    avgPrice = asset.avgPrice,
+                    avgPriceBrl = asset.avgPriceBrl,
+                    totalCost = asset.totalCost,
+                    totalCostBrl = asset.totalCostBrl,
                     currentPrice = currentPrice,
                     currentPriceBrl = currentPriceBrl,
                     currentValue = currentValue,
                     unrealizedPnl = unrealizedPnl,
-                    realizedPnl = calc.realizedPnl,
-                    realizedPnlBrl = calc.realizedPnlBrl,
+                    realizedPnl = asset.realizedPnl,
+                    realizedPnlBrl = asset.realizedPnlBrl,
                     dividendPnl = dividendPnl,
                     irr = irr,
                     irrAnnual = irrAnnual,

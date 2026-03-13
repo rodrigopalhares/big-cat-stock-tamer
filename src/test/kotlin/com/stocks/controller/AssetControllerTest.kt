@@ -197,6 +197,7 @@ class AssetControllerTest(
                     name = "Petrobras"
                     type = "STOCK"
                     currency = "BRL"
+                    hasPosition = true
                 }
                 AssetEntity.new("VALE3") {
                     name = "Vale"
@@ -230,6 +231,7 @@ class AssetControllerTest(
                     name = "Petrobras"
                     type = "STOCK"
                     currency = "BRL"
+                    hasPosition = true
                 }
                 AssetEntity.new("VALE3") {
                     name = "Vale"
@@ -263,11 +265,13 @@ class AssetControllerTest(
                     name = "Petrobras"
                     type = "STOCK"
                     currency = "BRL"
+                    hasPosition = true
                 }
                 AssetEntity.new("MXRF11") {
                     name = "Maxi Renda"
                     type = "REIT"
                     currency = "BRL"
+                    hasPosition = true
                 }
                 AssetEntity.new("HGLG11") {
                     name = "CSHG Log"
