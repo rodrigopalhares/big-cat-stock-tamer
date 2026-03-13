@@ -21,6 +21,7 @@ class MonthlyEvolutionService(
     private val calculationService: CalculationService,
     private val priceHistoryService: PriceHistoryService,
     private val exchangeRateService: ExchangeRateService,
+    private val assetService: AssetService,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -166,6 +167,8 @@ class MonthlyEvolutionService(
                 }
             }
         }
+
+        assetService.refreshAllPositionFields()
 
         logger.info("Recalculated ${snapshots.size} monthly snapshots")
     }

@@ -9,6 +9,7 @@ import com.stocks.dto.TransactionRequest
 import com.stocks.dto.TransactionResponse
 import com.stocks.model.AssetEntity
 import com.stocks.model.TransactionEntity
+import com.stocks.service.AssetService
 import com.stocks.service.CsvParsingService
 import com.stocks.service.QuoteService
 import com.stocks.service.TickerLookupStatus
@@ -29,6 +30,7 @@ class TransactionController(
     private val transactionService: TransactionService,
     private val csvParsingService: CsvParsingService,
     private val quoteService: QuoteService,
+    private val assetService: AssetService,
 ) {
     // --- HTML Routes ---
 
@@ -141,6 +143,7 @@ class TransactionController(
             notes = notes,
             inputCurrency = currency,
         )
+        assetService.refreshPositionFields(ticker)
 
         return "redirect:/transactions/"
     }
@@ -158,17 +161,19 @@ class TransactionController(
         @RequestParam(defaultValue = "") notes: String,
         @RequestParam(name = "returnTo", required = false) returnTo: String?,
     ): String {
-        transactionService.updateTransaction(
-            id = transactionId,
-            type = type,
-            quantity = quantity,
-            price = price,
-            fees = fees,
-            date = LocalDate.parse(date),
-            broker = broker,
-            notes = notes,
-            inputCurrency = currency,
-        )
+        val assetId =
+            transactionService.updateTransaction(
+                id = transactionId,
+                type = type,
+                quantity = quantity,
+                price = price,
+                fees = fees,
+                date = LocalDate.parse(date),
+                broker = broker,
+                notes = notes,
+                inputCurrency = currency,
+            )
+        assetService.refreshPositionFields(assetId)
         return "redirect:${returnTo ?: "/transactions/"}"
     }
 
@@ -177,7 +182,8 @@ class TransactionController(
         @PathVariable transactionId: Int,
         @RequestParam(name = "returnTo", required = false) returnTo: String?,
     ): String {
-        transactionService.deleteTransaction(transactionId)
+        val assetId = transactionService.deleteTransaction(transactionId)
+        assetService.refreshPositionFields(assetId)
         return "redirect:${returnTo ?: "/transactions/"}"
     }
 
@@ -214,6 +220,8 @@ class TransactionController(
     ): ResponseEntity<Map<String, Int>> {
         val batchRequest = BatchRequest(rows = request.rows)
         val inserted = csvParsingService.batchImport(batchRequest, request.assets ?: emptyList())
+        val affectedTickers = request.rows.map { it.ticker.uppercase().trim() }.distinct()
+        affectedTickers.forEach { assetService.refreshPositionFields(it) }
         return ResponseEntity.ok(mapOf("inserted" to inserted))
     }
 
@@ -251,6 +259,7 @@ class TransactionController(
                 broker = request.broker,
                 notes = request.notes,
             )
+        assetService.refreshPositionFields(request.assetId)
 
         return ResponseEntity.status(HttpStatus.CREATED).body(
             transaction { tx.toResponse() },
@@ -262,7 +271,8 @@ class TransactionController(
     fun deleteTransactionApi(
         @PathVariable transactionId: Int,
     ): ResponseEntity<Unit> {
-        transactionService.deleteTransaction(transactionId)
+        val assetId = transactionService.deleteTransaction(transactionId)
+        assetService.refreshPositionFields(assetId)
         return ResponseEntity.noContent().build()
     }
 

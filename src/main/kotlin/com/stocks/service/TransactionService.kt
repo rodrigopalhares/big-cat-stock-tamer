@@ -42,7 +42,6 @@ enum class TickerLookupStatus {
 @Service
 class TransactionService(
     private val quoteService: QuoteService,
-    private val calculationService: CalculationService,
     private val exchangeRateService: ExchangeRateService,
 ) {
     /**
@@ -206,28 +205,10 @@ class TransactionService(
             }
 
             if (hasPositionFilter) {
-                val allTxByAsset =
-                    TransactionEntity.all().toList().groupBy { it.assetId }
-                val tickersWithPosition =
-                    allTxByAsset
-                        .filter { (_, txs) ->
-                            val data =
-                                txs.map {
-                                    TransactionData(
-                                        type = it.type,
-                                        quantity = it.quantity,
-                                        price = it.price,
-                                        fees = it.fees,
-                                        date = it.date,
-                                    )
-                                }
-                            calculationService.calculatePosition(data).quantity > 0
-                        }.keys
-
                 assets =
                     when (position) {
-                        "with" -> assets.filter { it.ticker.value in tickersWithPosition }
-                        "without" -> assets.filter { it.ticker.value !in tickersWithPosition }
+                        "with" -> assets.filter { it.hasPosition }
+                        "without" -> assets.filter { !it.hasPosition }
                         else -> assets
                     }
             }
@@ -249,7 +230,7 @@ class TransactionService(
         broker: String?,
         notes: String?,
         inputCurrency: String? = null,
-    ) {
+    ): String =
         transaction {
             val tx =
                 TransactionEntity.findById(id)
@@ -268,20 +249,21 @@ class TransactionService(
             tx.date = date
             tx.broker = broker?.ifBlank { null }
             tx.notes = notes?.ifBlank { null }
+            tx.assetId
         }
-    }
 
     /**
      * Delete a transaction by ID. Throws 404 if not found.
      */
-    fun deleteTransaction(id: Int) {
+    fun deleteTransaction(id: Int): String =
         transaction {
             val tx =
                 TransactionEntity.findById(id)
                     ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found")
+            val assetId = tx.assetId
             tx.delete()
+            assetId
         }
-    }
 
     /**
      * Convert input prices to asset currency and BRL.

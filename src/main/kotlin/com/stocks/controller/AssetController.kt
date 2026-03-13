@@ -155,7 +155,6 @@ class AssetController(
         model.addAttribute("selectedType", type ?: "")
         model.addAttribute("selectedPosition", position ?: "")
         model.addAttribute("selectedDelisted", delisted ?: "")
-        model.addAttribute("tickersWithPosition", transaction { assetService.computeTickersWithPosition() })
         return "assets"
     }
 
@@ -176,7 +175,6 @@ class AssetController(
             model.addAttribute("selectedType", "")
             model.addAttribute("selectedPosition", "")
             model.addAttribute("selectedDelisted", "")
-            model.addAttribute("tickersWithPosition", transaction { assetService.computeTickersWithPosition() })
             model.addAttribute("error", "Ativo '$normalizedTicker' já cadastrado.")
             return "assets"
         }

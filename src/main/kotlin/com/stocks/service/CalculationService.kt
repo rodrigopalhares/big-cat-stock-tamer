@@ -1,10 +1,16 @@
 package com.stocks.service
 
+import com.stocks.model.TransactionEntity
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import kotlin.math.abs
+
+data class CashFlowsResult(
+    val cashFlows: List<Pair<LocalDate, Double>>,
+    val cashFlowsBrl: List<Pair<LocalDate, Double>>,
+)
 
 data class PositionCalcResult(
     val quantity: Double,
@@ -78,6 +84,44 @@ class CalculationService {
             cashFlowsBrl = cashFlowsBrl,
             avgPriceBrl = avgPriceBrl,
         )
+    }
+
+    fun buildCashFlows(transactions: List<TransactionEntity>): CashFlowsResult {
+        val sorted = transactions.sortedBy { it.date }
+        val cashFlows = mutableListOf<Pair<LocalDate, Double>>()
+        val cashFlowsBrl = mutableListOf<Pair<LocalDate, Double>>()
+        var quantity = 0.0
+        var accumulatedCost = 0.0
+        var accumulatedCostBrl = 0.0
+
+        for (t in sorted) {
+            val absQty = abs(t.quantity)
+            if (t.quantity > 0) { // BUY
+                val purchaseCost = absQty * t.price + t.fees
+                accumulatedCost += purchaseCost
+                quantity += absQty
+                cashFlows.add(t.date to -purchaseCost)
+
+                val purchaseCostBrl = absQty * t.priceBrl + t.feesBrl
+                accumulatedCostBrl += purchaseCostBrl
+                cashFlowsBrl.add(t.date to -purchaseCostBrl)
+            } else if (t.quantity < 0 && quantity > 0) { // SELL
+                val avgPrice = accumulatedCost / quantity
+                val avgPriceBrl = accumulatedCostBrl / quantity
+
+                val saleProceeds = absQty * t.price - t.fees
+                accumulatedCost -= avgPrice * absQty
+                cashFlows.add(t.date to saleProceeds)
+
+                val saleProceedsBrl = absQty * t.priceBrl - t.feesBrl
+                accumulatedCostBrl -= avgPriceBrl * absQty
+                cashFlowsBrl.add(t.date to saleProceedsBrl)
+
+                quantity -= absQty
+            }
+        }
+
+        return CashFlowsResult(cashFlows, cashFlowsBrl)
     }
 
     fun calculateIrr(

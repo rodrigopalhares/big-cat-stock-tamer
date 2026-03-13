@@ -29,6 +29,7 @@ data class AssetResponse(
     val type: String?,
     val currency: String,
     val delisted: Boolean,
+    val hasPosition: Boolean,
     val createdAt: LocalDateTime,
 )
 
@@ -47,5 +48,6 @@ fun AssetEntity.toResponse() =
         type = type,
         currency = currency,
         delisted = delisted,
+        hasPosition = hasPosition,
         createdAt = createdAt,
     )

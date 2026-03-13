@@ -150,24 +150,22 @@ class RiskMetricsService(
             transaction {
                 val tickers = entities.map { it.ticker }
                 tickers.associateWith { ticker ->
-                    val latestPrice =
-                        PriceHistories
-                            .select(PriceHistories.close)
-                            .where { PriceHistories.assetId eq ticker }
-                            .orderBy(PriceHistories.date, SortOrder.DESC)
-                            .limit(1)
-                            .firstOrNull()
-                            ?.get(PriceHistories.close)
+                    val asset = AssetEntity.findById(ticker)
+                    val qty = asset?.quantity ?: 0.0
 
-                    val qty =
-                        TransactionEntity
-                            .find { Transactions.assetId eq ticker }
-                            .toList()
-                            .sumOf { tx ->
-                                if (tx.type == "BUY") tx.quantity else -tx.quantity
-                            }
-
-                    if (latestPrice != null && qty > 0) qty * latestPrice else 0.0
+                    if (!asset?.hasPosition!! || qty <= 0) {
+                        0.0
+                    } else {
+                        val latestPrice =
+                            PriceHistories
+                                .select(PriceHistories.close)
+                                .where { PriceHistories.assetId eq ticker }
+                                .orderBy(PriceHistories.date, SortOrder.DESC)
+                                .limit(1)
+                                .firstOrNull()
+                                ?.get(PriceHistories.close)
+                        if (latestPrice != null) qty * latestPrice else 0.0
+                    }
                 }
             }
 

@@ -362,6 +362,12 @@ class DividendControllerTest(
                     name = "Petrobras"
                     type = "STOCK"
                     currency = "BRL"
+                    hasPosition = true
+                    quantity = 10.0
+                    avgPrice = 25.0
+                    avgPriceBrl = 25.0
+                    totalCost = 250.0
+                    totalCostBrl = 250.0
                 }
                 TransactionEntity.new {
                     assetId = "PETR4"
@@ -397,6 +403,12 @@ class DividendControllerTest(
                     name = "Petrobras"
                     type = "STOCK"
                     currency = "BRL"
+                    hasPosition = true
+                    quantity = 10.0
+                    avgPrice = 25.0
+                    avgPriceBrl = 25.0
+                    totalCost = 250.0
+                    totalCostBrl = 250.0
                 }
                 TransactionEntity.new {
                     assetId = "PETR4"

@@ -4,6 +4,9 @@ import com.stocks.dto.AssetRequest
 import com.stocks.dto.AssetResponse
 import com.stocks.dto.toResponse
 import com.stocks.model.AssetEntity
+import com.stocks.model.TransactionEntity
+import com.stocks.model.Transactions
+import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -31,11 +34,10 @@ class AssetService(
             }
 
             if (!position.isNullOrBlank() && position != "all") {
-                val tickersWithPosition = computeTickersWithPosition()
                 assets =
                     when (position) {
-                        "with" -> assets.filter { it.ticker.value in tickersWithPosition }
-                        "without" -> assets.filter { it.ticker.value !in tickersWithPosition }
+                        "with" -> assets.filter { it.hasPosition }
+                        "without" -> assets.filter { !it.hasPosition }
                         else -> assets
                     }
             }
@@ -52,28 +54,15 @@ class AssetService(
             assets.map { it.toResponse() }
         }
 
-    fun computeTickersWithPosition(): Set<String> {
-        val allTransactions =
-            com.stocks.model.TransactionEntity
+    fun computeTickersWithPosition(): Set<String> =
+        transaction {
+            AssetEntity
                 .all()
                 .toList()
-                .groupBy { it.assetId }
-
-        return allTransactions
-            .filter { (_, txs) ->
-                val data =
-                    txs.map {
-                        TransactionData(
-                            type = it.type,
-                            quantity = it.quantity,
-                            price = it.price,
-                            fees = it.fees,
-                            date = it.date,
-                        )
-                    }
-                calculationService.calculatePosition(data).quantity > 0
-            }.keys
-    }
+                .filter { it.hasPosition }
+                .map { it.ticker.value }
+                .toSet()
+        }
 
     fun findById(ticker: String): AssetResponse? =
         transaction {
@@ -133,4 +122,95 @@ class AssetService(
         transaction {
             AssetEntity.findById(ticker.uppercase()) != null
         }
+
+    fun refreshPositionFields(assetId: String) {
+        transaction {
+            val asset =
+                AssetEntity.findById(assetId.uppercase()) ?: return@transaction
+
+            val txs =
+                TransactionEntity
+                    .find { Transactions.assetId eq assetId.uppercase() }
+                    .toList()
+
+            if (txs.isEmpty()) {
+                asset.hasPosition = false
+                asset.quantity = 0.0
+                asset.avgPrice = 0.0
+                asset.avgPriceBrl = 0.0
+                asset.totalCost = 0.0
+                asset.totalCostBrl = 0.0
+                asset.realizedPnl = 0.0
+                asset.realizedPnlBrl = 0.0
+                return@transaction
+            }
+
+            val data =
+                txs.map {
+                    TransactionData(
+                        type = it.type,
+                        quantity = it.quantity,
+                        price = it.price,
+                        fees = it.fees,
+                        date = it.date,
+                        priceBrl = it.priceBrl,
+                        feesBrl = it.feesBrl,
+                    )
+                }
+
+            val calc = calculationService.calculatePosition(data)
+            asset.hasPosition = calc.quantity > 0
+            asset.quantity = calc.quantity
+            asset.avgPrice = calc.avgPrice
+            asset.avgPriceBrl = calc.avgPriceBrl
+            asset.totalCost = calc.totalCost
+            asset.totalCostBrl = calc.totalCostBrl
+            asset.realizedPnl = calc.realizedPnl
+            asset.realizedPnlBrl = calc.realizedPnlBrl
+        }
+    }
+
+    fun refreshAllPositionFields() {
+        transaction {
+            val assets = AssetEntity.all().toList()
+            for (asset in assets) {
+                val txs = asset.transactions.toList()
+
+                if (txs.isEmpty()) {
+                    asset.hasPosition = false
+                    asset.quantity = 0.0
+                    asset.avgPrice = 0.0
+                    asset.avgPriceBrl = 0.0
+                    asset.totalCost = 0.0
+                    asset.totalCostBrl = 0.0
+                    asset.realizedPnl = 0.0
+                    asset.realizedPnlBrl = 0.0
+                    continue
+                }
+
+                val data =
+                    txs.map {
+                        TransactionData(
+                            type = it.type,
+                            quantity = it.quantity,
+                            price = it.price,
+                            fees = it.fees,
+                            date = it.date,
+                            priceBrl = it.priceBrl,
+                            feesBrl = it.feesBrl,
+                        )
+                    }
+
+                val calc = calculationService.calculatePosition(data)
+                asset.hasPosition = calc.quantity > 0
+                asset.quantity = calc.quantity
+                asset.avgPrice = calc.avgPrice
+                asset.avgPriceBrl = calc.avgPriceBrl
+                asset.totalCost = calc.totalCost
+                asset.totalCostBrl = calc.totalCostBrl
+                asset.realizedPnl = calc.realizedPnl
+                asset.realizedPnlBrl = calc.realizedPnlBrl
+            }
+        }
+    }
 }

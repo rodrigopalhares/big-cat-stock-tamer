@@ -17,6 +17,11 @@ fun createAsset(
     currency: String = "BRL",
     yfTicker: String? = null,
     delisted: Boolean = false,
+    hasPosition: Boolean = false,
+    quantity: Double = 0.0,
+    avgPrice: Double = 0.0,
+    totalCost: Double = 0.0,
+    realizedPnl: Double = 0.0,
 ) = transaction {
     AssetEntity.new(ticker) {
         this.name = name
@@ -24,6 +29,11 @@ fun createAsset(
         this.currency = currency
         this.yfTicker = yfTicker
         this.delisted = delisted
+        this.hasPosition = hasPosition
+        this.quantity = quantity
+        this.avgPrice = avgPrice
+        this.totalCost = totalCost
+        this.realizedPnl = realizedPnl
     }
 }
 

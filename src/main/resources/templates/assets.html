@@ -108,7 +108,7 @@
                         </thead>
                         <tbody>
                             <tr th:each="asset : ${assets}"
-                                th:style="${!#sets.contains(tickersWithPosition, asset.ticker)} ? 'opacity: 0.55' : ''">
+                                th:style="${!asset.hasPosition} ? 'opacity: 0.55' : ''">
                                 <td class="fw-bold">
                                     <a th:href="'/assets/' + ${asset.ticker}" class="text-decoration-none" th:text="${asset.ticker}"></a>
                                     <i th:if="${asset.delisted}" class="bi bi-x-circle text-secondary ms-1" title="Deslistado" style="font-size: 0.8em"></i>

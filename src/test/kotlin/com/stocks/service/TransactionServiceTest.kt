@@ -14,7 +14,7 @@ import java.time.LocalDate
 
 class ResolvePriceTest :
     FunSpec({
-        val service = TransactionService(mockk(), mockk(), mockk())
+        val service = TransactionService(mockk(), mockk())
 
         test("price and fees provided directly") {
             val result = service.resolvePrice(price = 10.0, totalPrice = null, fees = 1.0, quantity = 5.0)
@@ -52,7 +52,7 @@ class ResolvePriceTest :
 class ConvertPricesTest :
     FunSpec({
         val exchangeRateService = mockk<ExchangeRateService>()
-        val service = TransactionService(mockk(), mockk(), exchangeRateService)
+        val service = TransactionService(mockk(), exchangeRateService)
         val date = LocalDate.of(2024, 6, 1)
 
         beforeEach {
@@ -100,7 +100,7 @@ class LookupTickerInfoTest :
     FunSpec({
         test("ticker too short returns NOT_FOUND") {
             val quoteService = mockk<QuoteService>()
-            val service = TransactionService(quoteService, mockk(), mockk())
+            val service = TransactionService(quoteService, mockk())
             val result = service.lookupTickerInfo("AB")
             result.status shouldBe TickerLookupStatus.NOT_FOUND
             result.name.shouldBeNull()

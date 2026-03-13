@@ -15,6 +15,14 @@ object Assets : IdTable<String>("assets") {
     val type = varchar("type", 50).nullable()
     val currency = varchar("currency", 10).default("BRL")
     val delisted = bool("delisted").default(false)
+    val hasPosition = bool("has_position").default(false)
+    val quantity = double("quantity").default(0.0)
+    val avgPrice = double("avg_price").default(0.0)
+    val avgPriceBrl = double("avg_price_brl").default(0.0)
+    val totalCost = double("total_cost").default(0.0)
+    val totalCostBrl = double("total_cost_brl").default(0.0)
+    val realizedPnl = double("realized_pnl").default(0.0)
+    val realizedPnlBrl = double("realized_pnl_brl").default(0.0)
     val createdAt = datetime("created_at").clientDefault { LocalDateTime.now() }
 
     override val primaryKey = PrimaryKey(id)
@@ -31,6 +39,14 @@ class AssetEntity(
     var type by Assets.type
     var currency by Assets.currency
     var delisted by Assets.delisted
+    var hasPosition by Assets.hasPosition
+    var quantity by Assets.quantity
+    var avgPrice by Assets.avgPrice
+    var avgPriceBrl by Assets.avgPriceBrl
+    var totalCost by Assets.totalCost
+    var totalCostBrl by Assets.totalCostBrl
+    var realizedPnl by Assets.realizedPnl
+    var realizedPnlBrl by Assets.realizedPnlBrl
     var createdAt by Assets.createdAt
 
     val transactions by TransactionEntity referrersOn Transactions.assetId
