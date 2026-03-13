@@ -29,7 +29,7 @@ exposed:
 
 logging:
   level:
-    Exposed: DEBUG
+    Exposed: INFO
 
 server:
   port: 8000
