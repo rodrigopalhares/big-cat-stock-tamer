@@ -3,6 +3,7 @@ package com.stocks.controller
 import com.stocks.dto.AssetPosition
 import com.stocks.dto.PortfolioSummary
 import com.stocks.model.AssetEntity
+import com.stocks.service.BenchmarkService
 import com.stocks.service.MonthlyEvolutionService
 import com.stocks.service.PortfolioService
 import com.stocks.service.PriceHistoryService
@@ -13,7 +14,9 @@ import org.springframework.ui.Model
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.server.ResponseStatusException
 import tools.jackson.databind.ObjectMapper
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlin.math.pow
 
 @Controller
 @RequestMapping("/portfolio")
@@ -21,6 +24,7 @@ class PortfolioController(
     private val portfolioService: PortfolioService,
     private val monthlyEvolutionService: MonthlyEvolutionService,
     private val priceHistoryService: PriceHistoryService,
+    private val benchmarkService: BenchmarkService,
     private val objectMapper: ObjectMapper,
 ) {
     private val monthFormatter = DateTimeFormatter.ofPattern("MM/yyyy")
@@ -80,9 +84,17 @@ class PortfolioController(
 
         val investedLine = evolution.months.map { it.totalInvested }
 
+        // IBOV benchmark line: normalized to first month's totalInvested
+        val ibovLine = buildIbovChartLine(evolution.months.map { it.month }, investedLine)
+
+        // CDI benchmark line: compound monthly CDI from first invested month
+        val cdiLine = buildCdiChartLine(investedLine)
+
         model.addAttribute("chartLabels", objectMapper.writeValueAsString(chartLabels))
         model.addAttribute("chartDatasets", objectMapper.writeValueAsString(chartDatasets))
         model.addAttribute("chartInvestedLine", objectMapper.writeValueAsString(investedLine))
+        model.addAttribute("chartIbovLine", objectMapper.writeValueAsString(ibovLine))
+        model.addAttribute("chartCdiLine", objectMapper.writeValueAsString(cdiLine))
         model.addAttribute("hasEvolutionData", evolution.months.isNotEmpty())
 
         return "dashboard"
@@ -125,4 +137,53 @@ class PortfolioController(
             }
             positions[0]
         }
+
+    private fun buildCdiChartLine(investedLine: List<Double>): List<Double?> {
+        if (investedLine.isEmpty()) return emptyList()
+
+        val cdiAnnual = benchmarkService.fetchCdiAnnualRate() ?: return investedLine.map { null }
+        val cdiMonthly = (1 + cdiAnnual).pow(1.0 / 12.0) - 1
+
+        val firstIdx = investedLine.indexOfFirst { it > 0 }
+        if (firstIdx < 0) return investedLine.map { null }
+
+        val firstInvested = investedLine[firstIdx]
+
+        return investedLine.mapIndexed { idx, _ ->
+            if (idx < firstIdx) {
+                null
+            } else {
+                val monthsElapsed = idx - firstIdx
+                firstInvested * (1 + cdiMonthly).pow(monthsElapsed)
+            }
+        }
+    }
+
+    private fun buildIbovChartLine(
+        months: List<LocalDate>,
+        investedLine: List<Double>,
+    ): List<Double?> {
+        if (months.isEmpty() || investedLine.isEmpty()) return emptyList()
+
+        val ibovPrices = benchmarkService.getMonthlyPricesMap()
+        if (ibovPrices.isEmpty()) return months.map { null }
+
+        val firstInvested = investedLine.firstOrNull { it > 0 } ?: return months.map { null }
+
+        // Find the IBOV price at the first month with investment
+        val firstMonthIdx = investedLine.indexOfFirst { it > 0 }
+        if (firstMonthIdx < 0) return months.map { null }
+
+        val firstMonthDate = months[firstMonthIdx]
+        val ibovAtStart = ibovPrices[firstMonthDate] ?: return months.map { null }
+
+        return months.mapIndexed { idx, month ->
+            if (idx < firstMonthIdx) {
+                null
+            } else {
+                val ibovPrice = ibovPrices[month]
+                ibovPrice?.let { firstInvested * (it / ibovAtStart) }
+            }
+        }
+    }
 }
