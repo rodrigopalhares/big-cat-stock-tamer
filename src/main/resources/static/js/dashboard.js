@@ -5,6 +5,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var chartLabels = JSON.parse(dataEl.dataset.labels);
     var rawDatasets = JSON.parse(dataEl.dataset.datasets);
     var investedData = JSON.parse(dataEl.dataset.invested);
+    var ibovData = dataEl.dataset.ibov ? JSON.parse(dataEl.dataset.ibov) : null;
+    var cdiData = dataEl.dataset.cdi ? JSON.parse(dataEl.dataset.cdi) : null;
 
     var typeColors = {
         'BDR':            { bg: 'rgba(255, 159, 64, 0.6)',  border: 'rgb(255, 159, 64)' },
@@ -42,6 +44,38 @@ document.addEventListener('DOMContentLoaded', function() {
         order: 1,
         yAxisID: 'yInvested',
     });
+
+    if (ibovData && ibovData.some(function(v) { return v !== null; })) {
+        areaDatasets.push({
+            label: 'IBOVESPA',
+            data: ibovData,
+            fill: false,
+            backgroundColor: 'transparent',
+            borderColor: 'rgb(40, 167, 69)',
+            borderWidth: 2,
+            borderDash: [6, 3],
+            pointRadius: 0,
+            pointHitRadius: 10,
+            order: 1,
+            yAxisID: 'yInvested',
+        });
+    }
+
+    if (cdiData && cdiData.some(function(v) { return v !== null; })) {
+        areaDatasets.push({
+            label: 'CDI',
+            data: cdiData,
+            fill: false,
+            backgroundColor: 'transparent',
+            borderColor: 'rgb(255, 193, 7)',
+            borderWidth: 2,
+            borderDash: [6, 3],
+            pointRadius: 0,
+            pointHitRadius: 10,
+            order: 1,
+            yAxisID: 'yInvested',
+        });
+    }
 
     new Chart(document.getElementById('evolutionChart'), {
         type: 'line',

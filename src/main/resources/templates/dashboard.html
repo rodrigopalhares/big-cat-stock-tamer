@@ -287,7 +287,7 @@
 <th:block th:replace="~{base :: scripts}"></th:block>
 
 <div th:if="${hasEvolutionData}" id="evolution-data" hidden
-     th:attr="data-labels=${chartLabels},data-datasets=${chartDatasets},data-invested=${chartInvestedLine}"></div>
+     th:attr="data-labels=${chartLabels},data-datasets=${chartDatasets},data-invested=${chartInvestedLine},data-ibov=${chartIbovLine},data-cdi=${chartCdiLine}"></div>
 <script th:if="${hasEvolutionData}" src="/js/dashboard.js"></script>
 <script src="/js/dashboard-table.js"></script>
 
