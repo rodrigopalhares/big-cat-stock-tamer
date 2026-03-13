@@ -66,9 +66,15 @@
                     <tr>
                         <th>Ativo</th>
                         <th>Tipo</th>
-                        <th class="text-end">Beta</th>
-                        <th class="text-end">Alpha (a.a.)</th>
-                        <th class="text-end">R&sup2;</th>
+                        <th class="text-end" data-bs-toggle="tooltip" data-bs-placement="top"
+                            title="Beta mede a sensibilidade do ativo em relação ao IBOVESPA. Beta = 1.0 significa que o ativo se move igual ao mercado. Beta > 1.0 indica maior volatilidade (ex: small caps). Beta < 1.0 indica menor volatilidade (ex: utilities). Beta negativo indica movimento contrário ao mercado."
+                            style="cursor: help;">Beta <i class="bi bi-question-circle small text-muted"></i></th>
+                        <th class="text-end" data-bs-toggle="tooltip" data-bs-placement="top"
+                            title="Alpha de Jensen mede o retorno anualizado acima (ou abaixo) do que o modelo CAPM prevê dado o risco (beta) do ativo. Alpha > 0% significa que o ativo superou o mercado ajustado ao risco. Alpha < 0% significa desempenho abaixo do esperado. É calculado como o intercepto da regressão dos retornos excedentes (acima do CDI) do ativo contra os do IBOVESPA."
+                            style="cursor: help;">Alpha (a.a.) <i class="bi bi-question-circle small text-muted"></i></th>
+                        <th class="text-end" data-bs-toggle="tooltip" data-bs-placement="top"
+                            title="R² (coeficiente de determinação) indica quanto da variação dos retornos do ativo é explicada pelo movimento do IBOVESPA. R² = 1.0 significa correlação perfeita com o mercado. R² = 0.0 significa que o mercado não explica nada dos retornos do ativo. Valores acima de 0.5 indicam boa aderência ao modelo; abaixo disso, o beta e alpha podem ser pouco confiáveis."
+                            style="cursor: help;">R&sup2; <i class="bi bi-question-circle small text-muted"></i></th>
                         <th class="text-end">Dados</th>
                     </tr>
                 </thead>

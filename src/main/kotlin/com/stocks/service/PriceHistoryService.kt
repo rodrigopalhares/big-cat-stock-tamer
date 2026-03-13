@@ -211,7 +211,8 @@ class PriceHistoryService(
                     val ticker = asset.ticker.value
                     val firstTx = asset.transactions.toList().minOfOrNull { it.date } ?: return@mapNotNull null
                     val lastStored = getLastStoredDate(ticker)
-                    val start = if (lastStored != null) lastStored.plusDays(1) else firstTx
+                    val fiveYearsAgo = today.minusYears(5)
+                    val start = if (lastStored != null) lastStored.plusDays(1) else minOf(firstTx, fiveYearsAgo)
                     if (start > today) return@mapNotNull null
                     startDates[ticker] = start
                     AssetTickerInfo(ticker, asset.yfTicker, asset.type, asset.delisted)
