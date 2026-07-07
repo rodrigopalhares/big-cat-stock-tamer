@@ -48,5 +48,11 @@ A personal stock portfolio tracking application built with Kotlin and Spring Boo
 
 ## Database
 
-- Uses H2 file-based database stored in `./data/stocks.mv.db`.
+- Uses H2 file-based database stored in `${APP_DATA_DIR}/stocks.mv.db` (data directory, default `./data`).
 - Flyway migrations are located in `src/main/resources/db/migration`.
+
+## Authentication
+
+- Single-user login: the password is set via the `APP_AUTH_PASSWORD` env var (see `.env`). If blank, authentication is disabled.
+- Sessions are persisted to `${APP_DATA_DIR}/auth.key` (token hashes), so they survive restarts.
+- `APP_DATA_DIR` sets the base data directory for both the H2 database and `auth.key` (default `./data`).

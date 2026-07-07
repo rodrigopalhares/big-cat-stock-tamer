@@ -14,3 +14,8 @@ spring:
     scheduling:
       pool:
         size: 1
+
+# Disable authentication during tests (blank password).
+app:
+  auth:
+    password:

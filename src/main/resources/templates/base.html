@@ -64,10 +64,15 @@
                     onclick="toggleTheme()" title="Alternar tema">
                 <i class="bi bi-moon-fill"></i>
             </button>
-            <span class="navbar-text text-secondary small">
+            <span class="navbar-text text-secondary small me-3">
                 <i class="bi bi-circle-fill text-success" style="font-size:0.5rem;"></i>
                 Spring Boot + Kotlin
             </span>
+            <form method="post" action="/logout" class="d-inline">
+                <button type="submit" class="btn btn-link nav-link px-2" title="Sair">
+                    <i class="bi bi-box-arrow-right"></i>
+                </button>
+            </form>
         </div>
     </div>
 </nav>
