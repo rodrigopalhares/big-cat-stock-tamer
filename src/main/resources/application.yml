@@ -3,7 +3,7 @@ spring:
     name: stocks
 
   datasource:
-    url: jdbc:h2:file:./data/stocks;AUTO_SERVER=TRUE
+    url: jdbc:h2:file:${app.data-dir}/stocks;AUTO_SERVER=TRUE
     driver-class-name: org.h2.Driver
     username: sa
     password:
@@ -33,3 +33,15 @@ logging:
 
 server:
   port: 8000
+
+app:
+  # Diretório base de dados (banco H2 + arquivo de sessão). Default: ./data
+  data-dir: ${APP_DATA_DIR:./data}
+
+  # Autenticação simples de usuário único.
+  # A senha é lida da variável de ambiente APP_AUTH_PASSWORD (ver .env).
+  # Se ficar em branco, a autenticação é desabilitada.
+  auth:
+    password: ${APP_AUTH_PASSWORD:}
+    key-file: ${APP_AUTH_KEY_FILE:${app.data-dir}/auth.key}
+    session-days: ${APP_AUTH_SESSION_DAYS:365}
