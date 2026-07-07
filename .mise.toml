@@ -1,0 +1,22 @@
+[tools]
+java = "temurin-21"
+
+[tasks.run]
+description = "Sobe a aplicação (Spring Boot)"
+run = "./gradlew bootRun"
+
+[tasks.build]
+description = "Compila e empacota o projeto"
+run = "./gradlew build"
+
+[tasks.test]
+description = "Roda os testes"
+run = "./gradlew test"
+
+[tasks.lint]
+description = "Verifica o estilo do código (ktlint)"
+run = "./gradlew ktlintCheck"
+
+[tasks.format]
+description = "Corrige o estilo do código (ktlint)"
+run = "./gradlew ktlintFormat"

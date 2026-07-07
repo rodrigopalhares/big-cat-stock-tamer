@@ -37,8 +37,8 @@ Aplicação web para acompanhamento de investimentos no mercado de renda variáv
 ## Ambiente de Desenvolvimento
 
 ```bash
-# Opção 1: Nix (recomendado — instala tudo automaticamente)
-nix develop
+# Opção 1: mise (recomendado — instala tudo automaticamente)
+mise install
 
 # Opção 2: SDKMAN!
 sdk install java 21-open
@@ -66,7 +66,7 @@ O banco de dados H2 é criado automaticamente em `data/stocks.mv.db` na primeira
 stocks/
 ├── build.gradle.kts                          # Build Gradle (dependências, plugins)
 ├── settings.gradle.kts
-├── flake.nix                                 # Dev environment (Nix)
+├── .mise.toml                                # Dev environment (mise)
 ├── src/
 │   ├── main/
 │   │   ├── kotlin/com/stocks/

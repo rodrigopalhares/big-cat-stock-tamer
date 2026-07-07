@@ -8,15 +8,16 @@ out/
 *.class
 *.jar
 *.war
+!gradle/wrapper/gradle-wrapper.jar
 
 # IDE
 .vscode/
 .idea/
 *.iml
 
-# direnv
+# direnv / mise / env
 .direnv/
-.envrc
+.env
 
 # OS
 .DS_Store
