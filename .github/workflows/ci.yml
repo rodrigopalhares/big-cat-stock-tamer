@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [master, 'feat/**']
+  pull_request:
+
+jobs:
+  typescript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - name: Tipos
+        run: npm run typecheck
+      - name: Estilo (Biome)
+        run: npx biome check
+      - name: Regras type-aware (typescript-eslint)
+        run: npx eslint .
+      - name: Regras de camada (dependency-cruiser)
+        run: npx depcruise src
+      - name: Schema do Prisma
+        run: npx prisma validate
+      - name: Migration aplica em banco vazio
+        run: npm run db:deploy
+        env:
+          DATABASE_URL: file:./ci.db
+      - name: Testes
+        run: npm test

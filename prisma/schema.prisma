@@ -1,0 +1,151 @@
+// Tradução dos 8 modelos Exposed de src/main/kotlin/com/stocks/model/.
+// Nomes de coluna preservados em snake_case via @map.
+//
+// Datas de calendário (LocalDate no Kotlin) são String no formato YYYY-MM-DD.
+// O Prisma não tem tipo data-sem-hora, e DateTime + America/Sao_Paulo desloca o dia.
+// Ver docs/migracao-typescript.md §3.1.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Asset {
+  ticker         String   @id
+  yfTicker       String?  @map("yf_ticker")
+  name           String?
+  type           String?
+  currency       String   @default("BRL")
+  delisted       Boolean  @default(false)
+  hasPosition    Boolean  @default(false) @map("has_position")
+  quantity       Float    @default(0)
+  avgPrice       Float    @default(0) @map("avg_price")
+  avgPriceBrl    Float    @default(0) @map("avg_price_brl")
+  totalCost      Float    @default(0) @map("total_cost")
+  totalCostBrl   Float    @default(0) @map("total_cost_brl")
+  realizedPnl    Float    @default(0) @map("realized_pnl")
+  realizedPnlBrl Float    @default(0) @map("realized_pnl_brl")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  transactions     Transaction[]
+  dividends        Dividend[]
+  priceHistory     PriceHistory[]
+  monthlySnapshots MonthlySnapshot[]
+
+  @@map("assets")
+}
+
+model Transaction {
+  id        Int      @id @default(autoincrement())
+  assetId   String   @map("asset_id")
+  type      String
+  quantity  Float
+  price     Float
+  fees      Float    @default(0)
+  priceBrl  Float    @default(0) @map("price_brl")
+  feesBrl   Float    @default(0) @map("fees_brl")
+  currency  String   @default("BRL")
+  date      String
+  broker    String?
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [ticker], onDelete: Cascade)
+
+  @@index([assetId])
+  @@map("transactions")
+}
+
+model Dividend {
+  id             Int      @id @default(autoincrement())
+  assetId        String   @map("asset_id")
+  type           String
+  date           String
+  totalAmount    Float    @map("total_amount")
+  taxWithheld    Float    @default(0) @map("tax_withheld")
+  totalAmountBrl Float    @default(0) @map("total_amount_brl")
+  taxWithheldBrl Float    @default(0) @map("tax_withheld_brl")
+  broker         String?
+  currency       String   @default("BRL")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [ticker], onDelete: Cascade)
+
+  @@index([assetId])
+  @@map("dividends")
+}
+
+model PriceHistory {
+  id        Int      @id @default(autoincrement())
+  assetId   String   @map("asset_id")
+  date      String
+  close     Float
+  createdAt DateTime @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [ticker], onDelete: Cascade)
+
+  @@unique([assetId, date], map: "uq_price_history_asset_date")
+  @@map("price_history")
+}
+
+model MonthlySnapshot {
+  id                      Int      @id @default(autoincrement())
+  assetId                 String   @map("asset_id")
+  month                   String
+  quantity                Float
+  avgPrice                Float    @map("avg_price")
+  marketPrice             Float    @map("market_price")
+  totalCost               Float    @map("total_cost")
+  marketValue             Float    @map("market_value")
+  accumulatedNetDividends Float    @default(0) @map("accumulated_net_dividends")
+  createdAt               DateTime @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [ticker], onDelete: Cascade)
+
+  @@unique([assetId, month], map: "uq_monthly_snapshot_asset_month")
+  @@map("monthly_snapshots")
+}
+
+model ExchangeRate {
+  id           Int      @id @default(autoincrement())
+  date         String
+  fromCurrency String   @map("from_currency")
+  toCurrency   String   @map("to_currency")
+  buyRate      Float    @map("buy_rate")
+  sellRate     Float    @map("sell_rate")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([date, fromCurrency, toCurrency], map: "uq_exchange_rate_date_pair")
+  @@map("exchange_rates")
+}
+
+model BenchmarkPrice {
+  id        Int      @id @default(autoincrement())
+  ticker    String
+  month     String
+  close     Float
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([ticker, month], map: "uq_benchmark_ticker_month")
+  @@map("benchmark_prices")
+}
+
+model RiskMetric {
+  id           Int      @id @default(autoincrement())
+  ticker       String
+  calculatedAt String   @map("calculated_at")
+  beta         Float?
+  alpha        Float?
+  rSquared     Float?   @map("r_squared")
+  dataPoints   Int      @map("data_points")
+  cdiAnnual    Float?   @map("cdi_annual")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([ticker, calculatedAt], map: "uq_risk_metrics_ticker_date")
+  @@map("risk_metrics")
+}

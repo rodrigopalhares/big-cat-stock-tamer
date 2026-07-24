@@ -1,22 +1,36 @@
 [tools]
+node = "22"
+# Removido na fase 7, quando o Kotlin sair do repositório.
 java = "temurin-21"
 
 [tasks.run]
-description = "Sobe a aplicação (Spring Boot)"
-run = "./gradlew bootRun"
+description = "Sobe a aplicação (Fastify)"
+run = "npm run dev"
 
 [tasks.build]
-description = "Compila e empacota o projeto"
-run = "./gradlew build"
+description = "Compila o projeto"
+run = "npm run build"
 
 [tasks.test]
 description = "Roda os testes"
-run = "./gradlew test"
+run = "npm test"
 
 [tasks.lint]
-description = "Verifica o estilo do código (ktlint)"
-run = "./gradlew ktlintCheck"
+description = "Verifica tipos, estilo e regras de camada"
+run = "npm run typecheck && npm run lint"
 
 [tasks.format]
-description = "Corrige o estilo do código (ktlint)"
-run = "./gradlew ktlintFormat"
+description = "Corrige o estilo do código (Biome)"
+run = "npm run format"
+
+[tasks.check]
+description = "Tudo: tipos, lint e testes"
+run = "npm run check"
+
+[tasks."kotlin:run"]
+description = "Sobe a aplicação Kotlin antiga (durante a migração)"
+run = "./gradlew bootRun"
+
+[tasks."kotlin:test"]
+description = "Roda os testes Kotlin (durante a migração)"
+run = "./gradlew test"

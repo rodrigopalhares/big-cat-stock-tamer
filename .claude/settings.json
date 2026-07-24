@@ -16,6 +16,22 @@
             "command": "git diff --name-only HEAD | grep -qE \"\\.kts?$\" && ./gradlew test --quiet 2>&1 || true"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git diff --name-only HEAD | grep -qE \"^(src|tests)/.*\\.tsx?$\" && npx biome check --write 2>&1 || true"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "git diff --name-only HEAD | grep -qE \"^(src|tests)/.*\\.tsx?$\" && npm test --silent 2>&1 || true"
+          }
+        ]
       }
     ]
   }

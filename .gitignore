@@ -1,5 +1,16 @@
 # Database
 /data
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Node / TypeScript
+node_modules/
+dist/
+src/generated/
+public/js/
+*.tsbuildinfo
 
 # Kotlin / Gradle
 build/
