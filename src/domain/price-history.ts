@@ -1,4 +1,4 @@
-import type { IsoDate } from '../shared/iso-date.js'
+import { addDays, compareDates, daysBetween, type IsoDate } from '../shared/iso-date.js'
 import { type AssetType, NO_QUOTE_TYPES } from './constants.js'
 import { classifyTicker } from './ticker-classification.js'
 
@@ -78,5 +78,43 @@ export function filterBatchToRecords(
       if (datePredicate(assetTicker, date)) records.push({ assetId: assetTicker, date, close })
     }
   }
+  return records
+}
+
+/**
+ * Série de preços diária para um ativo deslistado, que não tem mais cotação em lugar nenhum.
+ * Porte da parte pura de `generateDelistedPrices` em PriceHistoryService.kt.
+ *
+ * Entre duas transações, interpola linearmente entre os preços praticados; a partir da
+ * última, repete o preço até [today]. É uma aproximação declarada — sem mercado, não há
+ * preço "certo", e sem série a carteira simplesmente não conseguiria montar o gráfico.
+ */
+export function interpolateDelistedPrices(
+  assetTicker: string,
+  transactionPrices: readonly DatedPrice[],
+  today: IsoDate,
+): PriceRecord[] {
+  if (transactionPrices.length === 0) return []
+
+  const sorted = [...transactionPrices].sort((a, b) => compareDates(a[0], b[0]))
+  const records: PriceRecord[] = []
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const [dateA, priceA] = sorted[i] as DatedPrice
+    const [dateB, priceB] = sorted[i + 1] as DatedPrice
+    const totalDays = daysBetween(dateA, dateB)
+
+    for (let date = dateA; date < dateB; date = addDays(date, 1)) {
+      const dayOffset = daysBetween(dateA, date)
+      const close = totalDays > 0 ? priceA + ((priceB - priceA) * dayOffset) / totalDays : priceA
+      records.push({ assetId: assetTicker, date, close })
+    }
+  }
+
+  const [lastDate, lastPrice] = sorted[sorted.length - 1] as DatedPrice
+  for (let date = lastDate; date <= today; date = addDays(date, 1)) {
+    records.push({ assetId: assetTicker, date, close: lastPrice })
+  }
+
   return records
 }
