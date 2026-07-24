@@ -25,7 +25,7 @@ Tudo migra. O resultado final não tem Gradle, JVM nem Kotlin no repositório.
 
 | Camada | Hoje | Depois |
 |---|---|---|
-| Linguagem | Kotlin 2.3 / JDK 21 | TypeScript 5.x / Node 22 LTS |
+| Linguagem | Kotlin 2.3 / JDK 21 | TypeScript **5.9** / Node 22 LTS (ver `fase-0-spike.md` §2) |
 | Runtime web | Spring Boot 4 (MVC) | **Fastify 5** |
 | Banco | H2 file-based | **SQLite** (`better-sqlite3` via Prisma) |
 | Acesso a dados | Exposed (DAO + DSL) | **Prisma** |
@@ -391,11 +391,16 @@ Os fragments Thymeleaf viram componentes; os partials HTMX são componentes devo
 Helper de resposta:
 
 ```ts
-// src/plugins/views.ts
-app.decorateReply('html', function (node: VNode) {
-  return this.type('text/html; charset=utf-8').send('<!DOCTYPE html>' + renderToString(node))
+// src/plugins/views.ts — dois helpers, não um (descoberto na fase 0)
+app.decorateReply('html', function (node: VNode) {          // páginas
+  return this.type('text/html; charset=utf-8').send(`<!DOCTYPE html>${render(node)}`)
+})
+app.decorateReply('partial', function (node: VNode) {        // respostas HTMX
+  return this.type('text/html; charset=utf-8').send(render(node))
 })
 ```
+
+Um helper só prefixaria `<!DOCTYPE html>` também nos fragmentos HTMX, que são pedaços de HTML injetados numa página já renderizada.
 
 ### Convenções gerais
 
@@ -406,6 +411,76 @@ app.decorateReply('html', function (node: VNode) {
 - Erros de aplicação via `HttpError` (`new HttpError(404, 'Asset not found')`), tratados num único `setErrorHandler` que decide entre página HTML e JSON pelo `Accept`/`HX-Request`.
 - Código em inglês; UI em português (mantém a regra atual do `CLAUDE.md`).
 
+### Ferramental de estilo e verificação (fase 1)
+
+Convenção que não é verificada por máquina não sobrevive a 18 dias de porte. Todas as regras acima são configuradas na fase 1, antes de existir código para violá-las.
+
+| Ferramenta | Papel | Roda quando |
+|---|---|---|
+| `tsc --noEmit` | Verificação de tipos — a defesa principal | CI, editor, pré-commit |
+| **Biome** | Formatação + lint de estilo e correção | CI, editor (`--write` ao salvar), hook `Stop` |
+| **`typescript-eslint`** (escopo estreito) | **Obrigatório** (decidido na fase 0). Só as regras que exigem o type checker: `no-floating-promises`, `no-misused-promises`, `await-thenable` | CI, pré-commit |
+| **`dependency-cruiser`** | Regras de camada do §5 (`domain/` não importa Prisma etc.) | CI |
+| `prisma format` | Formata `schema.prisma` — nenhum formatador de JS entende `.prisma` | CI, pré-commit |
+| `knip` (opcional) | Código morto e exports não usados — útil no fim, para achar o que foi portado mas nunca ligado | manual, fase 7 |
+
+**Por que Biome e não ESLint + Prettier.** Uma ferramenta, um arquivo de config, uma passada — em vez de dois binários, dois formatos de config e a integração `eslint-config-prettier` para eles não brigarem. Ordens de grandeza mais rápido, o que importa quando roda a cada `Stop` do agente. O que se perde é o ecossistema de plugins do ESLint, que este projeto não usa.
+
+**Por que ainda assim um `typescript-eslint` mínimo — medido na fase 0.** O Biome faz inferência de tipos própria, sem o compilador do TypeScript. Num arquivo autocontido ele empata com o typescript-eslint (8 de 9 casos de promise solta, nas mesmas posições). Mas **não enxerga a `PrismaPromise`**: `PrismaPromise<T> extends Promise<T>`, e a inferência do Biome não segue essa herança através dos arquivos de declaração. Resultado medido:
+
+```ts
+prisma.asset.create({ data: { ticker: 'VALE3' } })   // sem await: não grava, não avisa
+//  Biome 2.5.5 ......... não sinaliza
+//  typescript-eslint ... sinaliza
+```
+
+Como **toda** chamada ao banco desta aplicação retorna `PrismaPromise`, a regra que protegeria o ponto mais perigoso da migração é justamente a que falha. O typescript-eslint entra, com três regras e nada mais. O Biome mantém `noFloatingPromises` + `noMisusedPromises` ligadas mesmo assim: pegam o resto, e pegam rápido, direto no editor.
+
+Consequência: **o TypeScript fica em 5.9**. O `npm install typescript` hoje traz a 7.x, mas o typescript-eslint declara peer `<6.1.0`. Ganho de velocidade de compilação em 5,5k linhas não paga perder a única regra que pega `await` esquecido em escrita no banco. Detalhes e evidências em `fase-0-spike.md` §2.
+
+**Regras que codificam as convenções deste documento** (nomes exatos e formato do arquivo variam entre Biome 1.x e 2.x — gerar com `biome init` na versão pinada, não copiar):
+
+```jsonc
+{
+  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "asNeeded",      // Kotlin não usa ponto e vírgula; mantém o hábito
+      "trailingCommas": "all"
+    }
+  },
+  "linter": {
+    "rules": {
+      "recommended": true,
+      "style": {
+        "noDefaultExport": "error",              // §5: sempre export nomeado
+        "useFilenamingConvention": {             // §5: kebab-case
+          "level": "error",
+          "options": { "filenameCases": ["kebab-case"] }
+        }
+      },
+      "suspicious": {
+        "noExplicitAny": "error"                 // §5: any proibido
+      }
+    }
+  }
+}
+```
+
+**Decisões de formatação e por que divergem do Kotlin atual:**
+
+| | Kotlin hoje | TypeScript | Motivo |
+|---|---|---|---|
+| Indentação | 4 espaços | **2 espaços** | Convenção do ecossistema, e JSX aninha fundo — 4 espaços empurra tudo para fora da tela |
+| Largura de linha | 140 | **100** | JSX quebra melhor curto; 140 vem do ktlint, não de preferência |
+| Ponto e vírgula | n/a | **omitido** | Igual ao Kotlin |
+| Aspas | `"` | `'` | Convenção do ecossistema; JSX usa `"` em atributos de qualquer forma |
+
+**`.editorconfig`:** mantido, com as sete linhas de `ktlint_*` e o bloco `[*.{kt,kts}]` removidos na fase 7. Ele continua útil para o que o Biome não cobre (charset, fim de linha, newline final) e para editores sem plugin do Biome.
+
+**Hooks do `.claude/settings.json`:** o repositório já dispara `ktlintFormat` e `gradlew test` no `Stop` quando um `.kt` muda. Os equivalentes em TypeScript (`biome check --write` e `vitest run` para `.ts`/`.tsx`) entram **na fase 1**, convivendo com os de Kotlin — não na fase 7. Durante o porte os dois idiomas coexistem, e é justamente aí que a formatação automática vale mais.
+
 ---
 
 ## 6. Schema Prisma
@@ -414,14 +489,45 @@ Tradução direta dos 8 modelos Exposed. Nomes de coluna preservados em `snake_c
 
 > **Oportunidade descartada de propósito.** Sem dados para preservar, este seria o momento barato de limpar o schema — `assets.type` e `assets.name` são `nullable` sem motivo, os `type`/`currency` poderiam virar `enum` do Prisma com CHECK constraint no banco, e `transactions.type` é redundante com o sinal de `quantity`. Deixei de fora: misturar redesenho de schema com troca de linguagem tira o principal apoio da migração, que é poder afirmar "o comportamento é o mesmo". Vale abrir como trabalho separado **depois** que a suíte de testes estiver verde em TypeScript — aí cada mudança de schema é validada pelos testes que já existem.
 
+> Formato validado na fase 0 contra o **Prisma 7.9**, que mudou três coisas em relação ao Prisma 6: a `url` saiu do schema, o generator virou `prisma-client` (emite TypeScript, não JS) e o client exige driver adapter. Ver `fase-0-spike.md` §3.
+
+Na raiz do projeto, `prisma.config.ts`:
+
+```ts
+import { defineConfig, env } from 'prisma/config'
+
+process.loadEnvFile()   // Prisma 7 não carrega .env sozinho; Node 22 tem loader nativo
+
+export default defineConfig({
+  schema: 'prisma/schema.prisma',
+  migrations: { path: 'prisma/migrations' },
+  datasource: { url: env('DATABASE_URL') },
+})
+```
+
+E a instanciação do client, em `src/config/db.ts`:
+
+```ts
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3'   // "Sqlite", q minúsculo
+import { PrismaClient } from '../generated/prisma/client.js'
+
+export const prisma = new PrismaClient({
+  adapter: new PrismaBetterSqlite3({ url: env.DATABASE_URL }),
+})
+await prisma.$executeRawUnsafe('PRAGMA journal_mode = WAL')   // não é o default: vem "delete"
+await prisma.$executeRawUnsafe('PRAGMA foreign_keys = ON')
+```
+
+O `prisma/schema.prisma`:
+
 ```prisma
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"     // TypeScript gerado; fica no .gitignore
 }
 
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")     // file:../data/stocks.db
 }
 
 model Asset {
@@ -717,6 +823,8 @@ const dbPath = `/tmp/stocks-test-${process.env.VITEST_WORKER_ID}.db`
 
 Cópia de arquivo em vez de `prisma migrate deploy` por worker economiza segundos por execução. O reset entre testes é `DELETE FROM` sequencial — mais rápido que recriar o arquivo e equivalente ao `beforeEach` atual.
 
+**Alternativa a medir na fase 1:** a fase 0 confirmou que o adapter aceita `url: ':memory:'`. Seria mais rápido e mais isolado que arquivo temporário, ao custo de aplicar o schema em toda conexão nova (nada persiste entre elas). Vale cronometrar as duas com a suíte real antes de fixar.
+
 **Sobre mock do Prisma:** não usar. Bibliotecas tipo `prismock` divergem do comportamento real (constraints, cascade, defaults) justamente onde os bugs aparecem. SQLite local é rápido o bastante para os testes serem reais.
 
 ### Critério de aceitação por fase
@@ -731,8 +839,8 @@ A ordem é ditada por duas coisas: dependências reais e concentração de risco
 
 | # | Fase | Entrega | Tamanho |
 |---|---|---|---|
-| **0** | **Spike** | Validar as 5 decisões do §3 num app de brinquedo: data como string, `VACUUM INTO` via `$executeRawUnsafe`, WAL + FK, JSX renderizado pelo Fastify, `app.inject()`. Confirmar também o timeout de `$transaction` no SQLite e escolher entre os geradores `prisma-client-js` e `prisma-client`. | ½ dia |
-| **1** | **Fundação** | `package.json`, `tsconfig`, Biome, Vitest, `.mise.toml`; `schema.prisma` + migration `init`; `config/env.ts`; `app.ts` que sobe e responde `/health`; CI. | 1 dia |
+| **0** | **Spike** | Validar as 5 decisões do §3 num app de brinquedo: data como string, `VACUUM INTO` via `$executeRawUnsafe`, WAL + FK, JSX renderizado pelo Fastify, `app.inject()`. Confirmar o timeout de `$transaction` no SQLite, escolher entre os geradores `prisma-client-js` e `prisma-client`, e **testar a cobertura do `noFloatingPromises` do Biome** (§5) para decidir se o `typescript-eslint` entra. | ½ dia |
+| **1** | **Fundação** | `package.json`, `tsconfig` estrito, **ferramental de estilo completo do §5** (Biome, `dependency-cruiser`, hooks `Stop` de TS), Vitest, `.mise.toml` com `node = "22"`; `schema.prisma` + migration `init`; `config/env.ts`; `app.ts` que sobe e responde `/health`; CI. | 1 dia |
 | **2** | **Domínio puro** | `calculation`, `xirr`, `regression`, `evolution`, `ticker-classification`, `backup-retention`, `csv/*`, `constants`, `iso-date`. **Com todos os testes correspondentes portados.** Sem banco, sem rede. | 3 dias |
 | **3** | **Integrações** | Clientes Yahoo, BCB e Tesouro + schemas Zod; MSW montado sobre os 11 fixtures atuais; testes portados. | 1,5 dia |
 | **4** | **Services com banco** | Os 8 services de módulo, `container.ts`, setup de banco de teste; N+1 corrigido; testes portados. | 4 dias |
