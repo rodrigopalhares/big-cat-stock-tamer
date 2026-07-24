@@ -1,5 +1,12 @@
-// Setup global do Vitest. A infraestrutura de banco de teste entra na fase 4,
-// quando existirem services para testar. Por ora só fixa o ambiente.
+import { afterAll, afterEach, beforeAll } from 'vitest'
+import { server } from './msw.js'
+
 process.env['NODE_ENV'] = 'test'
 process.env['DATABASE_URL'] ??= 'file::memory:'
 process.env['LOG_LEVEL'] ??= 'silent'
+
+// `error` garante que uma chamada HTTP não prevista quebre o teste em vez de
+// vazar para a rede de verdade.
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+afterEach(() => server.resetHandlers())
+afterAll(() => server.close())

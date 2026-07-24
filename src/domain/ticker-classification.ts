@@ -51,3 +51,26 @@ export function classifyTicker(ticker: string): TickerClassification {
 
   return { suggestedType: null, yfCandidates: [`${ticker}.SA`, ticker], defaultCurrency: 'BRL' }
 }
+
+const REIT_NAME_KEYWORDS = ['fii', 'fundo de investimento imobili', 'fdo inv imob']
+const ONLY_LETTERS = /^\p{L}+$/u
+
+/**
+ * Distingue FII de ação quando o Yahoo classifica os dois como EQUITY.
+ * Porte de `isBrazilianReit` em QuoteService.kt.
+ *
+ * Dois sinais: o código termina em 11 com prefixo só de letras, ou o nome traz
+ * uma das expressões que as gestoras usam.
+ */
+export function isBrazilianReit(symbol: string, name: string): boolean {
+  const baseTicker = symbol.endsWith('.SA') ? symbol.slice(0, -3) : symbol
+  if (
+    baseTicker.length >= 5 &&
+    baseTicker.endsWith('11') &&
+    ONLY_LETTERS.test(baseTicker.slice(0, -2))
+  ) {
+    return true
+  }
+  const lowerName = name.toLowerCase()
+  return REIT_NAME_KEYWORDS.some((keyword) => lowerName.includes(keyword))
+}

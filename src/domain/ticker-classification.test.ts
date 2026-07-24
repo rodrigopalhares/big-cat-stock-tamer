@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyTicker } from './ticker-classification.js'
+import { classifyTicker, isBrazilianReit } from './ticker-classification.js'
 
 // Porte de src/test/kotlin/com/stocks/service/TickerPatternTest.kt
 
@@ -88,5 +88,52 @@ describe('fallback', () => {
       yfCandidates: [`${ticker}.SA`, ticker],
       defaultCurrency: 'BRL',
     })
+  })
+})
+
+// Porte de `isBrazilianReit`, privado no QuoteService.kt — o Yahoo devolve EQUITY
+// tanto para ação quanto para FII, então o desempate é aqui.
+describe('isBrazilianReit', () => {
+  it.each([
+    ['HGLG11.SA', 'CSHG LOGISTICA'],
+    ['KNCRI11.SA', 'KINEA CREDITO'],
+    ['MXRF11', 'MAXI RENDA'],
+  ])('%s: código de 5+ letras terminando em 11 é FII', (symbol, name) => {
+    expect(isBrazilianReit(symbol, name)).toBe(true)
+  })
+
+  it.each([
+    ['PETR4.SA', 'FII Imobiliario Teste'],
+    ['XPTO3.SA', 'Fundo de Investimento Imobiliario XP'],
+    ['ABCD3.SA', 'FDO INV IMOB ABC'],
+  ])('%s: nome com expressão de FII conta mesmo sem o código 11', (symbol, name) => {
+    expect(isBrazilianReit(symbol, name)).toBe(true)
+  })
+
+  it.each([
+    ['PETR4.SA', 'Petróleo Brasileiro'],
+    ['VALE3.SA', 'Vale S.A.'],
+    ['AAPL', 'Apple Inc.'],
+  ])('%s: ação comum não é FII', (symbol, name) => {
+    expect(isBrazilianReit(symbol, name)).toBe(false)
+  })
+
+  it('ETF terminado em 11 também casa pelo código — o desempate é a ordem em fetchAssetInfo', () => {
+    // BOVA11 é ETF, mas o padrão "letras + 11" não distingue de FII. Quem resolve é
+    // fetchAssetInfo, que testa instrumentType === 'ETF' *antes* de chamar esta função.
+    // Comportamento idêntico ao do Kotlin; documentado aqui porque não é óbvio.
+    expect(isBrazilianReit('BOVA11.SA', 'iShares Ibovespa')).toBe(true)
+  })
+
+  it('código com menos de 5 caracteres não casa pelo padrão', () => {
+    expect(isBrazilianReit('AB11.SA', 'Qualquer Coisa')).toBe(false)
+  })
+
+  it('código com dígito antes do 11 não casa', () => {
+    expect(isBrazilianReit('ABC123411.SA', 'Qualquer Coisa')).toBe(false)
+  })
+
+  it('a busca no nome ignora maiúsculas', () => {
+    expect(isBrazilianReit('XPTO3.SA', 'FUNDO DE INVESTIMENTO IMOBILIÁRIO')).toBe(true)
   })
 })
