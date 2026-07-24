@@ -5,9 +5,11 @@ description: >
   Use this skill whenever the user asks to query the database, check data, run SQL,
   inspect tables, connect to H2, look at database contents, debug data issues,
   or verify records in the database. Also use this skill when the user asks to clean up
-  or reset test data (cleanup, limpar dados, resetar banco, apagar registros de teste).
+  or reset test data (cleanup, limpar dados, resetar banco, apagar registros de teste),
+  or to inspect and restore a database backup.
   Trigger on mentions of: H2, database, SQL, query, banco de dados, consulta, tabela,
-  SELECT, dados do banco, h2-console, verificar dados, cleanup, limpar dados, resetar.
+  SELECT, dados do banco, h2-console, verificar dados, cleanup, limpar dados, resetar,
+  backup, restaurar backup, restore, snapshot do banco.
 ---
 
 # H2 Database Access
@@ -213,3 +215,44 @@ Tables preserved (not cleaned):
 - **ASSETS** — the asset catalog is reference data, not test data
 - **EXCHANGE_RATES** — historical rates are reusable across tests
 - **PRICE_HISTORY** — price data is fetched from external APIs and expensive to rebuild
+
+---
+
+## Backup and Restore
+
+The app backs itself up automatically (`BackupService`, see `CLAUDE.md`): on startup and
+every day at 00:05 it writes an H2 online backup (`BACKUP TO`) as a zip holding
+`stocks.mv.db`.
+
+| Set | Path | Retention |
+|-----|------|-----------|
+| Daily | `${APP_BACKUP_DIR}/daily/stocks-yyyy-MM-dd.zip` | 7 most recent |
+| Monthly | `${APP_BACKUP_DIR}/monthly/stocks-yyyy-MM.zip` | 3 most recent |
+
+`APP_BACKUP_DIR` defaults to `${APP_DATA_DIR}/backups`.
+
+### Listing what is available
+
+```bash
+ls -lh "${APP_DATA_DIR:-./data}"/backups/daily "${APP_DATA_DIR:-./data}"/backups/monthly
+```
+
+### Restoring
+
+The zip contains the database file, so restoring is unzipping it over the data directory.
+**Stop the application first** — restoring under a running app corrupts the database.
+
+```bash
+# 1. Stop the app.
+# 2. Keep the current database aside, in case the restore is not what you wanted.
+mv "${APP_DATA_DIR:-./data}/stocks.mv.db" "${APP_DATA_DIR:-./data}/stocks.mv.db.before-restore"
+# 3. Unzip the chosen backup into the data directory.
+unzip -o "${APP_DATA_DIR:-./data}/backups/daily/stocks-2026-06-09.zip" -d "${APP_DATA_DIR:-./data}"
+# 4. Start the app again.
+```
+
+To inspect a backup *without* restoring, unzip it somewhere else and point the H2 Shell
+`-url` at the extracted copy (drop the `.mv.db` suffix in the JDBC URL).
+
+Never run a manual `cp` of `stocks.mv.db` while the app is running as a "backup" — it can
+catch the file mid-transaction. Use `BACKUP TO` (what the service does) or stop the app.

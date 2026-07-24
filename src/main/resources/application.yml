@@ -45,3 +45,11 @@ app:
     password: ${APP_AUTH_PASSWORD:}
     key-file: ${APP_AUTH_KEY_FILE:${app.data-dir}/auth.key}
     session-days: ${APP_AUTH_SESSION_DAYS:365}
+
+  # Backup automático do banco (snapshot ao subir e às 00:05 de cada dia, com rotação).
+  # Vai para <dir>/daily e <dir>/monthly. Banco em memória (testes) = no-op.
+  backup:
+    enabled: ${APP_BACKUP_ENABLED:true}
+    dir: ${APP_BACKUP_DIR:${app.data-dir}/backups}
+    daily-copies: ${APP_BACKUP_DAILY_COPIES:7}
+    monthly-copies: ${APP_BACKUP_MONTHLY_COPIES:3}

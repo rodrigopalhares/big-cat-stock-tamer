@@ -51,6 +51,22 @@ A personal stock portfolio tracking application built with Kotlin and Spring Boo
 - Uses H2 file-based database stored in `${APP_DATA_DIR}/stocks.mv.db` (data directory, default `./data`).
 - Flyway migrations are located in `src/main/resources/db/migration`.
 
+## Backup
+
+- `BackupService` (I/O) + `BackupRetention` (pure retention policy) take a snapshot of the database
+  on startup and every day at 00:05 (`SchedulerConfig`, `America/Sao_Paulo`).
+- Uses H2's *online* backup (`BACKUP TO`), consistent even while the app is writing — never a naive
+  file copy. Written to a `.tmp` file first, so a failure never leaves a partial zip behind.
+- Two sets: `<dir>/daily/stocks-yyyy-MM-dd.zip` (keeps 7) and `<dir>/monthly/stocks-yyyy-MM.zip`
+  (keeps 3). Idempotent per period — restarting several times a day does not duplicate anything.
+- Config (`app.backup.*` in `application.yml`): `APP_BACKUP_ENABLED` (default `true`),
+  `APP_BACKUP_DIR` (default `${APP_DATA_DIR}/backups`), `APP_BACKUP_DAILY_COPIES` (7),
+  `APP_BACKUP_MONTHLY_COPIES` (3).
+- Only the database is backed up, and only for a file-based database — an in-memory database
+  (the tests) is a no-op.
+- To restore: stop the app and unzip the chosen backup over `${APP_DATA_DIR}` (see the
+  `h2-database` skill).
+
 ## Authentication
 
 - Single-user login: the password is set via the `APP_AUTH_PASSWORD` env var (see `.env`). If blank, authentication is disabled.
