@@ -217,7 +217,9 @@ function AssetTable({ assets }: { assets: AssetView[] }) {
                 )}
               </td>
               <td class="text-muted">{asset.name ?? '—'}</td>
-              <td>{asset.type !== null ? <AssetBadge type={asset.type} /> : '—'}</td>
+              <td>
+                <AssetBadge type={asset.type} />
+              </td>
               <td>
                 <span class="badge bg-light text-dark border">{asset.currency}</span>
               </td>

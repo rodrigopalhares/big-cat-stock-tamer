@@ -18,8 +18,7 @@ const DIVIDEND_BADGE_CLASSES: Record<string, string> = {
   BTC: 'bg-secondary',
 }
 
-export function AssetBadge({ type }: { type: string | null }) {
-  if (type === null) return null
+export function AssetBadge({ type }: { type: string }) {
   return <span class={`badge ${ASSET_BADGE_CLASSES[type] ?? 'bg-secondary'}`}>{type}</span>
 }
 

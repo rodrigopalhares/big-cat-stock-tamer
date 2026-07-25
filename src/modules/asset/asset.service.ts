@@ -88,7 +88,7 @@ export class AssetService {
       where: { ticker: normalized },
       data: {
         name: blankToNull(fields.name),
-        type: fields.type === undefined || fields.type === null ? null : fields.type || 'STOCK',
+        type: fields.type || current.type,
         yfTicker: blankToNull(fields.yfTicker),
         currency: fields.currency ? fields.currency : current.currency,
         delisted: fields.delisted,

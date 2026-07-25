@@ -194,7 +194,7 @@ export class PriceHistoryService {
     Array<{
       ticker: string
       yfTicker: string | null
-      type: string | null
+      type: string
       delisted: boolean
       transactionCount: number
       firstTransactionDate: IsoDate | null

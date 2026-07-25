@@ -18,7 +18,7 @@ model Asset {
   ticker         String   @id
   yfTicker       String?  @map("yf_ticker")
   name           String?
-  type           String?
+  type           String   @default("STOCK")
   currency       String   @default("BRL")
   delisted       Boolean  @default(false)
   hasPosition    Boolean  @default(false) @map("has_position")

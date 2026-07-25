@@ -140,7 +140,7 @@ function MetricsTable({ metrics }: { metrics: RiskMetricsResult[] }) {
                 </a>
               </td>
               <td>
-                <AssetBadge type={m.type} />
+                {m.type === null ? <span class="text-muted">—</span> : <AssetBadge type={m.type} />}
               </td>
               <td class="text-end">
                 {m.beta === null ? (

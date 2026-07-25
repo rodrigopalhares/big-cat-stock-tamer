@@ -259,7 +259,7 @@ function PositionRow({ position: p }: { position: AssetPosition }) {
     )
 
   return (
-    <tr data-type={p.type ?? ''} data-quantity={String(p.quantity)}>
+    <tr data-type={p.type} data-quantity={String(p.quantity)}>
       <td>
         <a href={`/assets/${p.ticker}`} class="fw-bold text-decoration-none">
           {p.ticker}

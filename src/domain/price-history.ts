@@ -11,7 +11,7 @@ import { classifyTicker } from './ticker-classification.js'
 export type AssetTickerInfo = {
   readonly ticker: string
   readonly yfTicker: string | null
-  readonly type: AssetType | string | null
+  readonly type: AssetType | string
   readonly delisted?: boolean
 }
 
@@ -47,7 +47,7 @@ export function categorizeAssets(assets: readonly AssetTickerInfo[]): TickerMaps
 
   for (const asset of assets) {
     if (asset.delisted) continue
-    if (asset.type !== null && NO_QUOTE_TYPES.has(asset.type as AssetType)) continue
+    if (NO_QUOTE_TYPES.has(asset.type as AssetType)) continue
 
     if (asset.type === 'TESOURO_DIRETO') {
       if (asset.yfTicker !== null) tdTickerMap.set(asset.yfTicker, asset.ticker)

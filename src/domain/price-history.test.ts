@@ -78,8 +78,8 @@ describe('categorizeAssets', () => {
     expect(result.tdTickerMap.size).toBe(0)
   })
 
-  it('tipo nulo cai no mapa do Yahoo', () => {
-    const result = categorizeAssets([{ ticker: 'PETR4', yfTicker: null, type: null }])
+  it('tipo desconhecido cai no mapa do Yahoo', () => {
+    const result = categorizeAssets([{ ticker: 'PETR4', yfTicker: null, type: 'QUALQUER' }])
     expect(Object.fromEntries(result.yfTickerMap)).toEqual({ 'PETR4.SA': 'PETR4' })
   })
 })

@@ -33,7 +33,7 @@ export type AssetView = {
   ticker: string
   yfTicker: string | null
   name: string | null
-  type: string | null
+  type: string
   currency: string
   delisted: boolean
   hasPosition: boolean

@@ -233,7 +233,7 @@ export class TransactionService {
       return {
         ticker: normalized,
         name: existing.name,
-        type: existing.type ?? 'STOCK',
+        type: existing.type,
         status: 'EXISTS',
       }
     }

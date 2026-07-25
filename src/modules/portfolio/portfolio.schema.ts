@@ -5,7 +5,7 @@ import type { CashFlow } from '../../domain/xirr.js'
 export type AssetPosition = {
   ticker: string
   name: string | null
-  type: string | null
+  type: string
   quantity: number
   avgPrice: number
   avgPriceBrl: number
