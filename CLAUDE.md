@@ -1,74 +1,119 @@
 # Stocks Application
 
-A personal stock portfolio tracking application built with Kotlin and Spring Boot.
+Aplicação pessoal de acompanhamento de carteira de investimentos, em TypeScript.
 
-## Development Commands
+## Comandos
 
-- **Build**: `./gradlew build`
-- **Run**: `./gradlew bootRun`
-- **Test**: `./gradlew test`
-- **Linter**: `./gradlew ktlintCheck`
-- **Linter Fix**: `./gradlew ktlintFormat`
+- **Rodar**: `npm run dev`
+- **Build**: `npm run build`
+- **Testes**: `npm test`
+- **Tipos**: `npm run typecheck`
+- **Lint**: `npm run lint` (Biome + typescript-eslint + dependency-cruiser + prisma validate)
+- **Formatar**: `npm run format`
+- **Tudo**: `npm run check`
+- **Migrations**: `npm run db:migrate` (dev) · `npm run db:deploy` (aplicar) · `npm run db:seed`
 
-## Core Guidelines
+## Diretrizes
 
-- **Kotlin First**: Use Kotlin-idiomatic patterns (extension functions, data classes, null safety).
-- **Simplicity**: Prefer simple solutions over complex abstractions.
-- **English Code**: All code (variables, functions, classes, comments) must be in English.
-- **Portuguese UI**: User interface (templates, labels, error messages) can remain in Portuguese.
-- **Surgical Changes**: Make focused changes and ensure verification with tests.
-- **Tests Required**: When creating or modifying a feature, always create or update the corresponding tests.
-- **Skills Maintenance**: When a feature has an associated skill (in `.claude/skills/`), update the skill if the changes affect its scope.
+- **Simplicidade**: prefira solução simples a abstração complexa.
+- **Código em inglês**, **interface em português** (labels, mensagens, textos de tela).
+- **Mudanças cirúrgicas**: mexa no necessário e verifique com testes.
+- **Testes obrigatórios**: ao criar ou alterar uma feature, crie ou atualize os testes junto,
+  no mesmo commit.
+- **Skills**: quando uma feature tem skill em `.claude/skills/`, atualize a skill se a
+  mudança afetar o escopo dela.
 
-## Tech Stack
+## Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Language | Kotlin (JDK 21+) |
-| Backend | Spring Boot 3.4 |
-| ORM / DB | Exposed (DAO + DSL) + H2 |
-| Migrations | Flyway |
-| Templates | Thymeleaf + HTMX |
-| CSS | Bootstrap 5 |
-| HTTP Client | RestClient (Spring) |
-| JSON | Jackson |
-| CSV | kotlin-csv-jvm |
-| Scheduler | Spring @Scheduled |
-| Tests | Kotest + MockK + SpringMockK + MockRestServiceServer |
-| Build | Gradle (Kotlin DSL) |
-| Linter | ktlint |
+| Camada | Tecnologia |
+|---|---|
+| Linguagem | TypeScript 5.9 / Node 22 |
+| Servidor | Fastify 5 |
+| Banco | SQLite (better-sqlite3) |
+| ORM / migrations | Prisma 7 |
+| Views | JSX no servidor (`preact-render-to-string`) + HTMX |
+| CSS | Bootstrap 5 (CDN) |
+| Validação | Zod |
+| HTTP client | `fetch` nativo |
+| Scheduler | croner |
+| Testes | Vitest + MSW |
+| Lint/format | Biome + typescript-eslint + dependency-cruiser |
 
-## Architecture
+## Arquitetura
 
-- **Controller**: Handles web requests and HTMX partials.
-- **Service**: Contains business logic and transaction boundaries.
-- **DTO**: Data Transfer Objects for API and internal data movement.
-- **Model**: Exposed DAO entities and table definitions.
-- **Config**: Application configuration (Security, HTTP, etc.).
+Módulos por feature em `src/modules/<feature>/`, cada um com rota, service, schema e teste
+juntos. O que não é de feature fica fora:
 
-## Database
+```
+src/
+  domain/        funções puras — cálculo, XIRR, regressão, parsing de CSV. Sem I/O.
+  integrations/  clientes HTTP (Yahoo, BCB, Tesouro). Não persistem.
+  modules/       uma pasta por feature: *.routes.ts, *.service.ts, *.schema.ts, *.test.ts
+  views/         componentes JSX. Recebem tudo por props.
+  plugins/       hooks do Fastify (auth, erros, views)
+  infra/         backup e scheduler
+  shared/        utilidades sem dono (datas, formatação, HttpError)
+  client/        TypeScript de navegador, compilado por esbuild para public/js/
+  config/        ambiente (Zod) e conexão do banco
+  container.ts   composition root — instancia e liga os services
+```
 
-- Uses H2 file-based database stored in `${APP_DATA_DIR}/stocks.mv.db` (data directory, default `./data`).
-- Flyway migrations are located in `src/main/resources/db/migration`.
+### Regras de camada
+
+Verificadas pelo `dependency-cruiser` no CI, não só combinadas:
+
+- `domain/` não importa Prisma, Fastify, service ou integração. Se precisa de `await`,
+  não pertence ao domínio.
+- `views/` não chama service nem Prisma. Import **type-only** de schema é permitido — é o
+  contrato tipado entre rota e view.
+- `integrations/` busca dado externo e devolve; quem persiste é o service.
+- Rota não tem lógica de negócio: valida com Zod, chama um service, escolhe a resposta.
+
+## Convenções
+
+- Arquivos em `kebab-case`, com sufixo `.service.ts`, `.routes.ts`, `.schema.ts`, `.test.ts`.
+- Sem `export default` — sempre nomeado.
+- `any` proibido; use `unknown` + validação Zod na fronteira externa.
+- Erros de aplicação via `HttpError`; um único `setErrorHandler` decide HTML ou JSON.
+
+## Decisões que valem conhecer antes de mexer
+
+**Data de calendário é `string` ISO, não `Date`.** O tipo `IsoDate` em `src/shared/iso-date.ts`
+substitui o `LocalDate` do Java. Toda aritmética passa por `Date.UTC`, então nada depende do
+fuso do processo. Usar `Date` para data de transação reintroduz o bug de "o dia 1º aparece
+como dia 31 do mês anterior".
+
+**Nada de rede dentro de transação.** O SQLite tem escritor único; segurar o lock durante uma
+chamada HTTP trava a aplicação inteira. Busque primeiro, escreva depois.
+
+**`Float` continua `Float`.** Não troque por `Decimal` sem uma bateria de validação própria —
+os resultados de TIR e preço médio mudariam.
+
+**Backup é `VACUUM INTO`**, cópia consistente com a aplicação escrevendo. Nunca cópia de arquivo.
+
+## Banco de dados
+
+SQLite em `${APP_DATA_DIR}/stocks.db` (padrão `./data`). Migrations em `prisma/migrations/`,
+aplicadas com `npm run db:deploy`. `PRAGMA journal_mode = WAL` e `foreign_keys = ON` são
+aplicados no boot — o segundo é obrigatório, senão o SQLite ignora silenciosamente os
+`ON DELETE CASCADE`.
 
 ## Backup
 
-- `BackupService` (I/O) + `BackupRetention` (pure retention policy) take a snapshot of the database
-  on startup and every day at 00:05 (`SchedulerConfig`, `America/Sao_Paulo`).
-- Uses H2's *online* backup (`BACKUP TO`), consistent even while the app is writing — never a naive
-  file copy. Written to a `.tmp` file first, so a failure never leaves a partial zip behind.
-- Two sets: `<dir>/daily/stocks-yyyy-MM-dd.zip` (keeps 7) and `<dir>/monthly/stocks-yyyy-MM.zip`
-  (keeps 3). Idempotent per period — restarting several times a day does not duplicate anything.
-- Config (`app.backup.*` in `application.yml`): `APP_BACKUP_ENABLED` (default `true`),
-  `APP_BACKUP_DIR` (default `${APP_DATA_DIR}/backups`), `APP_BACKUP_DAILY_COPIES` (7),
-  `APP_BACKUP_MONTHLY_COPIES` (3).
-- Only the database is backed up, and only for a file-based database — an in-memory database
-  (the tests) is a no-op.
-- To restore: stop the app and unzip the chosen backup over `${APP_DATA_DIR}` (see the
-  `h2-database` skill).
+`BackupService` (I/O) + `backup-retention` (política pura) tiram snapshot ao subir e às 00:05
+(`America/Sao_Paulo`). Dois conjuntos: `daily/stocks-yyyy-MM-dd.zip` (7 cópias) e
+`monthly/stocks-yyyy-MM.zip` (3). Idempotente por período — reiniciar várias vezes no mesmo
+dia não duplica nada. Banco em memória é no-op. Configuração em `APP_BACKUP_*`.
+Para restaurar: pare a aplicação e descomprima o `.zip` escolhido sobre
+`${APP_DATA_DIR}/stocks.db`.
 
-## Authentication
+## Autenticação
 
-- Single-user login: the password is set via the `APP_AUTH_PASSWORD` env var (see `.env`). If blank, authentication is disabled.
-- Sessions are persisted to `${APP_DATA_DIR}/auth.key` (token hashes), so they survive restarts.
-- `APP_DATA_DIR` sets the base data directory for both the H2 database and `auth.key` (default `./data`).
+Usuário único, senha em `APP_AUTH_PASSWORD`. Em branco, autenticação desabilitada.
+As sessões são persistidas em `${APP_DATA_DIR}/auth.key` como *hashes* de token — o arquivo
+nunca guarda o token em claro, então vazá-lo não dá acesso a ninguém.
+
+## Histórico
+
+Este projeto era Kotlin/Spring Boot e foi migrado para TypeScript. O plano, as decisões e o
+porquê de cada escolha estão em `docs/migracao-typescript.md` e `docs/fase-0-spike.md`.

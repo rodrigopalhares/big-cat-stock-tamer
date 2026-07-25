@@ -1,14 +1,12 @@
 [tools]
 node = "22"
-# Removido na fase 7, quando o Kotlin sair do repositório.
-java = "temurin-21"
 
 [tasks.run]
-description = "Sobe a aplicação (Fastify)"
+description = "Sobe a aplicação em modo de desenvolvimento"
 run = "npm run dev"
 
 [tasks.build]
-description = "Compila o projeto"
+description = "Compila o servidor e o JS de cliente"
 run = "npm run build"
 
 [tasks.test]
@@ -27,10 +25,10 @@ run = "npm run format"
 description = "Tudo: tipos, lint e testes"
 run = "npm run check"
 
-[tasks."kotlin:run"]
-description = "Sobe a aplicação Kotlin antiga (durante a migração)"
-run = "./gradlew bootRun"
+[tasks.migrate]
+description = "Aplica as migrations no banco"
+run = "npm run db:deploy"
 
-[tasks."kotlin:test"]
-description = "Roda os testes Kotlin (durante a migração)"
-run = "./gradlew test"
+[tasks.seed]
+description = "Popula o banco com dados de exemplo"
+run = "npm run db:seed"

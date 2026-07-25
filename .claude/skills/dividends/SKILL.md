@@ -17,7 +17,7 @@ so you can make targeted changes without exploring the codebase.
 
 ## Domain Concepts
 
-- **Dividend types**: DIVIDENDO, JCP, RENDIMENTO, BONIFICACAO, BTC (defined in `Constants.kt`)
+- **Dividend types**: DIVIDENDO, JCP, RENDIMENTO, BONIFICACAO, BTC (defined in `constants.ts`)
 - **Net amount**: `totalAmount - taxWithheld` (the effective amount the investor receives)
 - **BRL conversion**: Dividends and transactions store converted BRL values (`totalAmountBrl`, `taxWithheldBrl` for dividends; `priceBrl`, `feesBrl` for transactions). For BRL assets, these equal the original values. For USD assets, conversion happens at creation/update time using the exchange rate on the dividend/transaction date.
 - **Dividend PnL**: sum of `totalAmountBrl - taxWithheldBrl` per asset (always in BRL), shown as a separate column in the dashboard
@@ -30,37 +30,37 @@ so you can make targeted changes without exploring the codebase.
 
 | File | Role |
 |------|------|
-| `src/main/resources/db/migration/V5__create_dividends.sql` | DB schema — `dividends` table with FK to `assets(ticker)` |
-| `src/main/kotlin/com/stocks/model/Dividend.kt` | Exposed model — `Dividends` IntIdTable + `DividendEntity` |
-| `src/main/kotlin/com/stocks/model/Asset.kt` | Asset model — has `val dividends by DividendEntity referrersOn Dividends.assetId` |
-| `src/main/kotlin/com/stocks/dto/DividendDtos.kt` | `DividendRequest` (with validation) + `DividendResponse` (with `netAmount`) |
-| `src/main/kotlin/com/stocks/dto/Constants.kt` | `DIVIDEND_TYPES` list |
-| `src/main/kotlin/com/stocks/service/DividendService.kt` | Business logic — CRUD + aggregation methods |
-| `src/main/kotlin/com/stocks/controller/DividendController.kt` | HTML + API routes + template data class |
+| `prisma/migrations/` | DB schema — `dividends` table with FK to `assets(ticker)` |
+| `prisma/schema.prisma (model Dividend)` | Prisma model — `Dividends` IntIdTable + `DividendEntity` |
+| `prisma/schema.prisma (model Asset)` | Asset model — has `val dividends by DividendEntity referrersOn Dividends.assetId` |
+| `src/modules/dividend/dividend.schema.ts` | `DividendRequest` (with validation) + `DividendResponse` (with `netAmount`) |
+| `src/domain/constants.ts` | `DIVIDEND_TYPES` list |
+| `src/modules/dividend/dividend.service.ts` | Business logic — CRUD + aggregation methods |
+| `src/modules/dividend/dividend.routes.ts` | HTML + API routes + template type |
 
 ### Template Files
 
 | File | Role |
 |------|------|
-| `src/main/resources/templates/dividends.html` | Main page — form (col-lg-4) + history table (col-lg-8) with filters |
-| `src/main/resources/templates/fragments/badge.html` | `dividendBadge(type)` fragment with colored badges per type |
-| `src/main/resources/templates/base.html` | Navbar — "Proventos" link between Transacoes and Evolucao |
+| `src/views/pages/dividends.tsx` | Main page — form (col-lg-4) + history table (col-lg-8) with filters |
+| `src/views/components/badge.tsx` | `dividendBadge(type)` fragment with colored badges per type |
+| `src/views/layout.tsx` | Navbar — "Proventos" link between Transacoes and Evolucao |
 
 ### Portfolio Integration
 
 | File | Role |
 |------|------|
-| `src/main/kotlin/com/stocks/dto/PortfolioDtos.kt` | `dividendPnl` field on both `AssetPosition` and `PortfolioSummary` |
-| `src/main/kotlin/com/stocks/service/PortfolioService.kt` | Calls `DividendService` to get PnL and cash flows per asset, merges into XIRR |
-| `src/main/kotlin/com/stocks/controller/PortfolioController.kt` | Passes `dividendPnl` to dashboard model |
-| `src/main/resources/templates/dashboard.html` | "Proventos Recebidos" summary card + "Proventos" column in positions table |
+| `src/modules/portfolio/portfolio.schema.ts` | `dividendPnl` field on both `AssetPosition` and `PortfolioSummary` |
+| `src/modules/portfolio/portfolio.service.ts` | Calls `DividendService` to get PnL and cash flows per asset, merges into XIRR |
+| `src/modules/portfolio/portfolio.routes.ts` | Passes `dividendPnl` to dashboard model |
+| `src/views/pages/dashboard.tsx` | "Proventos Recebidos" summary card + "Proventos" column in positions table |
 
 ### Test Files
 
 | File | Role |
 |------|------|
-| `src/test/kotlin/com/stocks/service/DividendServiceTest.kt` | 11 tests — CRUD, filters, PnL aggregation, cash flows |
-| `src/test/kotlin/com/stocks/controller/DividendControllerTest.kt` | 12 tests — HTML routes, API routes, portfolio integration |
+| `src/modules/dividend/dividend.service.test.ts` | 11 tests — CRUD, filters, PnL aggregation, cash flows |
+| `tests/integration/routes.test.ts` | 12 tests — HTML routes, API routes, portfolio integration |
 
 ## Database Schema
 
@@ -84,7 +84,7 @@ CREATE TABLE dividends (
 
 ## Service Methods
 
-```kotlin
+```typescript
 class DividendService(transactionService, exchangeRateService) {
     fun createDividend(ticker, type, date, totalAmount, taxWithheld, notes, broker?, currency): DividendEntity
     // Auto-converts to BRL using ExchangeRateService when currency != BRL
@@ -110,10 +110,10 @@ class DividendService(transactionService, exchangeRateService) {
 
 ## Template Data
 
-The controller uses `DividendTemplateData` for Thymeleaf:
+The controller uses `DividendTemplateData` for JSX:
 
-```kotlin
-data class DividendTemplateData(
+```typescript
+type DividendTemplateData(
     val id: Int,
     val assetTicker: String,
     val type: String,
@@ -133,7 +133,7 @@ data class DividendTemplateData(
 Model attributes passed to `dividends.html`:
 - `dividends` — list of DividendTemplateData
 - `assets` — list of maps with `ticker` and `name` (for datalist)
-- `dividendTypes` — DIVIDEND_TYPES from Constants.kt
+- `dividendTypes` — DIVIDEND_TYPES from constants.ts
 - `selectedTicker` — current filter
 - `selectedType` — current filter
 - `today` — today's date for the form default
@@ -150,14 +150,14 @@ In `PortfolioService.buildPositions()`:
 ## Common Modification Patterns
 
 ### Adding a new dividend type
-1. Add the type string to `DIVIDEND_TYPES` in `Constants.kt`
-2. Add a color mapping in `fragments/badge.html` inside the `dividendBadge` fragment
+1. Add the type string to `DIVIDEND_TYPES` in `constants.ts`
+2. Add a color mapping in `src/views/components/badge.tsx` inside the `DividendBadge` component
 3. No other changes needed — the form select and filters are driven by `DIVIDEND_TYPES`
 
 ### Adding a new field to the dividend
-1. Add the column to a new Flyway migration (e.g., `V6__alter_dividends_add_field.sql`)
-2. Add the field to `Dividends` table and `DividendEntity` in `Dividend.kt`
-3. Add to `DividendRequest`, `DividendResponse`, and `DividendTemplateData`
+1. Add the column to the Prisma schema and generate a migration (`npm run db:migrate`)
+2. Add the field to `model Dividend` in `prisma/schema.prisma`
+3. Add to `DividendForm`, `DividendView` and `toDividendView` in `dividend.schema.ts`
 4. Add `@RequestParam` in `DividendController.createDividendForm()`
 5. Pass the field in `DividendService.createDividend()`
 6. Add form input in `dividends.html` and `<td>` in the table
@@ -170,7 +170,7 @@ In `PortfolioService.buildPositions()`:
 - Summary aggregation: `PortfolioService.aggregatePositions()`
 
 ### Modifying the dividend badge colors
-Edit the `dividendBadge(type)` fragment in `fragments/badge.html`. Current mapping:
+Edit the `dividendBadge(type)` fragment in `src/views/components/badge.tsx`. Current mapping:
 - DIVIDENDO → `bg-success`
 - JCP → `bg-primary`
 - RENDIMENTO → `bg-info`
@@ -184,7 +184,7 @@ Tests follow the project convention: Kotest FunSpec + SpringExtension.
 Every test file that deletes `AssetEntity` in `beforeEach` must also delete `DividendEntity`
 first (FK constraint). This applies to all test files across the project.
 
-```kotlin
+```typescript
 beforeEach {
     transaction {
         DividendEntity.all().forEach { it.delete() }  // before assets!

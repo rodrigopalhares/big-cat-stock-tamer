@@ -1,4 +1,0 @@
-ALTER TABLE dividends ADD COLUMN total_amount_brl DOUBLE DEFAULT 0;
-ALTER TABLE dividends ADD COLUMN tax_withheld_brl DOUBLE DEFAULT 0;
-ALTER TABLE transactions ADD COLUMN price_brl DOUBLE DEFAULT 0;
-ALTER TABLE transactions ADD COLUMN fees_brl DOUBLE DEFAULT 0;

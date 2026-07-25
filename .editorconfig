@@ -1,27 +1,21 @@
 root = true
 
+# O Biome cuida da formatação de TS/TSX/JSON/CSS. O que fica aqui é o que ele não
+# cobre — e serve para editores sem plugin do Biome.
+
 [*]
 charset = utf-8
 end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
 
-[*.{py,toml,txt}]
-indent_style = space
-indent_size = 4
-
-[*.{html,css,js,json,yaml,yml}]
+[*.{ts,tsx,js,mjs,cjs,json,jsonc,css,html,yml,yaml}]
 indent_style = space
 indent_size = 2
 
-[*.{kt,kts}]
+[*.prisma]
 indent_style = space
-indent_size = 4
-max_line_length = 140
-ktlint_code_style = ktlint_official
-ktlint_standard_trailing-comma-on-call-site = disabled
-ktlint_standard_trailing-comma-on-declaration-site = disabled
-ktlint_standard_no-wildcard-imports = disabled
+indent_size = 2
 
 [*.md]
 trim_trailing_whitespace = false

@@ -8,18 +8,11 @@
 # Node / TypeScript
 node_modules/
 dist/
+coverage/
+# Gerados: o client do Prisma e o bundle do cliente saem do build
 src/generated/
 public/js/
 *.tsbuildinfo
-
-# Kotlin / Gradle
-build/
-.gradle/
-out/
-*.class
-*.jar
-*.war
-!gradle/wrapper/gradle-wrapper.jar
 
 # IDE
 .vscode/
@@ -33,7 +26,6 @@ out/
 # OS
 .DS_Store
 Thumbs.db
-.coverage
 
 # claude
 .claude/*.local.*

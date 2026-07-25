@@ -35,14 +35,14 @@ User pastes CSV -> Step 1: Asset Review -> Step 2: Transaction Preview -> Batch 
 
 | File | Role |
 |------|------|
-| `src/main/kotlin/com/stocks/controller/TransactionController.kt` | Routes: `parse-csv`, `parse-csv-step2`, `batch` |
-| `src/main/kotlin/com/stocks/service/TransactionService.kt` | `extractDistinctAssets()`, `parseCsvWithAssetLookup()`, `batchImport()` |
-| `src/main/kotlin/com/stocks/dto/CsvBatchDtos.kt` | DTOs: `CsvRow`, `CsvAssetRow`, `BatchRowRequest`, `AssetBatchRow`, `parseCsvRows()`, `parseBrazilianNumber()` |
-| `src/main/kotlin/com/stocks/service/QuoteService.kt` | `fetchAssetInfo()` — Yahoo Finance lookup for unknown tickers |
-| `src/main/kotlin/com/stocks/service/TickerClassification.kt` | `classifyTicker()` — detects asset type from ticker pattern |
-| `src/main/resources/templates/fragments/csv-asset-review.html` | Step 1 UI — asset review table (Thymeleaf fragment) |
-| `src/main/resources/templates/fragments/csv-preview.html` | Step 2 UI — transaction preview table (Thymeleaf fragment) |
-| `src/main/resources/static/js/transactions.js` | Client-side logic: `csvNextStep()`, `batchSubmit()`, ignore toggles, ticker change handlers |
+| `src/modules/transaction/transaction.routes.ts` | Routes: `parse-csv`, `parse-csv-step2`, `batch` |
+| `src/modules/transaction/transaction.service.ts` | `extractDistinctAssets()`, `parseCsvWithAssetLookup()`, `batchImport()` |
+| `src/domain/csv/transaction-csv.ts` | DTOs: `CsvRow`, `CsvAssetRow`, `BatchRowRequest`, `AssetBatchRow`, `parseCsvRows()`, `parseBrazilianNumber()` |
+| `src/integrations/yahoo/yahoo.client.ts` | `fetchAssetInfo()` — Yahoo Finance lookup for unknown tickers |
+| `src/domain/ticker-classification.ts` | `classifyTicker()` — detects asset type from ticker pattern |
+| `src/views/partials/csv-asset-review.tsx` | Step 1 UI — asset review table (JSX fragment) |
+| `src/views/partials/csv-preview.tsx` | Step 2 UI — transaction preview table (JSX fragment) |
+| `src/client/transactions.ts` | Client-side logic: `csvNextStep()`, `batchSubmit()`, ignore toggles, ticker change handlers |
 
 ## CSV Input Format
 
@@ -61,20 +61,20 @@ Tab-separated, one transaction per line. Columns by index:
 | 8 | Currency | `BRL` | Defaults to BRL if missing |
 | 9 | Notes | `Split` | Optional free text |
 
-Parsing lives in `parseCsvRows()` and `parseSingleRow()` inside `CsvBatchDtos.kt`.
+Parsing lives in `parseCsvRows()` and `parseSingleRow()` inside `transaction-csv.ts`.
 
 ## Key DTOs
 
-```kotlin
+```typescript
 // Step 1 — asset review
-data class CsvAssetRow(ticker, name, type, yfTicker, currency, assetStatus: AssetStatus)
+type CsvAssetRow(ticker, name, type, yfTicker, currency, assetStatus: AssetStatus)
 
 // Step 2 — transaction preview
-data class CsvRow(rowIndex, ticker, date, type, quantity, price, fees, broker, notes, currency, assetStatus, error?)
+type CsvRow(rowIndex, ticker, date, type, quantity, price, fees, broker, notes, currency, assetStatus, error?)
 
 // Batch submit payload
-data class BatchRowRequest(ticker, date, type, quantity, price, fees, broker, notes, currency)
-data class AssetBatchRow(ticker, name, type, yfTicker, currency)
+type BatchRowRequest(ticker, date, type, quantity, price, fees, broker, notes, currency)
+type AssetBatchRow(ticker, name, type, yfTicker, currency)
 ```
 
 `AssetStatus` enum: `EXISTS`, `WILL_CREATE`, `UNKNOWN`.
@@ -104,20 +104,20 @@ data class AssetBatchRow(ticker, name, type, yfTicker, currency)
 ## Common Modification Patterns
 
 ### Adding a new CSV column
-1. Add the column index parsing in `parseSingleRow()` (`CsvBatchDtos.kt`)
+1. Add the column index parsing in `parseSingleRow()` (`transaction-csv.ts`)
 2. Add the field to `CsvRow` and `BatchRowRequest`
-3. Add `<th>` + `<td>` with input in `csv-preview.html`
+3. Add `<th>` + `<td>` with input in `csv-preview.tsx`
 4. Include the field in `batchSubmit()` row collection (JS)
 5. Handle the new field in `TransactionService.batchImport()`
 
 ### Adding a new field to asset review
 1. Add the field to `CsvAssetRow` and `AssetBatchRow`
-2. Add `<th>` + `<td>` in `csv-asset-review.html` with `class="asset-field" data-field="fieldName"`
+2. Add `<th>` + `<td>` in `csv-asset-review.tsx` with `class="asset-field" data-field="fieldName"`
 3. Include it in `csvNextStep()` asset collection (JS)
 4. Handle it in `TransactionService.batchImport()` when creating assets
 
 ### Changing validation rules
-- Validation logic is in `parseSingleRow()` inside `CsvBatchDtos.kt`
+- Validation logic is in `parseSingleRow()` inside `transaction-csv.ts`
 - Return `errorRow("message")` for invalid data — the row will appear in step 2 as editable + pre-ignored
 
 ### Modifying the ignore behavior

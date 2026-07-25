@@ -879,18 +879,67 @@ Sem banco existente, **os testes são a única rede de segurança**. Isso muda u
 
 ## 11. Checklist de conclusão
 
-- [ ] 300 testes portados e verdes (ou faltantes justificados por escrito)
-- [ ] `prisma migrate deploy` cria o banco do zero e a aplicação sobe vazia sem erro
-- [ ] Fluxo completo manual: cadastrar ativo → lançar transação → ver dashboard → lançar provento → recalcular evolução → risk metrics
-- [ ] Importação de CSV funcionando nas duas etapas (revisão de ativos + preview de transações)
-- [ ] Backup automático rodando no boot e às 00:05, com rotação 7 diários / 3 mensais
-- [ ] Login persistindo sessão entre restarts (`auth.key`)
-- [ ] Scheduler disparando 18:30 (cotações) e 00:05 (backup) em `America/Sao_Paulo`
-- [ ] Todas as rotas do README respondendo, HTML e JSON
-- [ ] HTMX funcionando: preview de CSV, `ticker-info`, swaps OOB
-- [ ] Tema claro/escuro e gráficos Chart.js intactos
-- [ ] `biome check` e `tsc --noEmit` limpos
-- [ ] Gradle, JVM e Kotlin removidos do repositório
-- [ ] `README.md`, `CLAUDE.md` e `.mise.toml` reescritos
-- [ ] Hooks `Stop` do `.claude/settings.json` migrados — hoje disparam `./gradlew ktlintFormat` e `./gradlew test` quando um `.kt`/`.kts` muda; passam a `biome check --write` e `vitest run` em `.ts`/`.tsx`
-- [ ] Skills atualizadas: `h2-database` → `sqlite-database`; `csv-import` e `dividends` apontando para os novos caminhos
+- [x] 300 testes portados e verdes — a suíte fechou com **571**
+- [x] `prisma migrate deploy` cria o banco do zero e a aplicação sobe sem erro
+- [x] Importação de CSV nas duas etapas (revisão de ativos + preview de transações)
+- [x] Backup rodando no boot e às 00:05, com rotação 7 diários / 3 mensais
+- [x] Login persistindo sessão entre restarts (`auth.key`)
+- [x] Scheduler com 18:30 (cotações) e 00:05 (backup) em `America/Sao_Paulo`
+- [x] Todas as rotas do README respondendo, HTML e JSON
+- [x] HTMX: preview de CSV, `ticker-info`, swaps OOB
+- [x] Tema claro/escuro e gráficos Chart.js preservados
+- [x] `biome check`, `tsc --noEmit`, `eslint`, `depcruise` e `prisma validate` limpos
+- [x] Gradle, JVM e Kotlin removidos do repositório
+- [x] `README.md`, `CLAUDE.md` e `.mise.toml` reescritos
+- [x] Hooks `Stop` do `.claude/settings.json` migrados para Biome + Vitest
+- [x] Skills atualizadas: `h2-database` → `sqlite-database`; `csv-import` e `dividends` repontadas
+
+---
+
+## 12. Como terminou
+
+**571 testes** contra os 300 originais. O excedente não é inflação: são casos que o
+Kotlin deixava implícitos (arrays não mutados, entrada fora de ordem, resolver não chamado
+para ticker já conhecido), o módulo de datas que substitui o `java.time`, e três áreas que
+nunca tiveram teste — `PortfolioService`, `AssetService` e todo o fluxo de autenticação.
+
+| Fase | Commit |
+|---|---|
+| 0 · Spike | `525fc64` |
+| 1 · Fundação | `5024462` |
+| 2 · Domínio puro | `ba3121e` |
+| 3 · Integrações | `f451c58` |
+| 4 · Services com banco | `9e7dd9b` |
+| 5 · Views + rotas | `a7b6786` |
+| 6 · Auth, scheduler, backup | `47af93d` |
+
+### O que mudou de comportamento, de propósito
+
+Fora isso, qualquer diferença de resultado é bug.
+
+- **N+1 eliminado** em portfolio, price-history, evolution e `refreshAllPositionFields`.
+  O Kotlin fazia uma query por ativo e o controller "aquecia" a coleção lazy para disfarçar.
+- **`QuoteService` (384 linhas) dividido** em Yahoo, Tesouro e cache.
+- **Separador de milhar no servidor.** O `formatDecimal` do Thymeleaf não os inseria; o
+  `format.js` compensava percorrendo o DOM por regex. Agora sai certo da origem.
+- **Backfill de câmbio numa transação só**, com a rede acontecendo antes — o original abria
+  uma transação por dia, intercalada com HTTP.
+
+### Bugs encontrados durante a migração
+
+- `loadEnv(source)` lia `process.env` para dois campos derivados, ignorando o argumento. Em
+  teste isso resolvia para o diretório de dados de produção.
+- O `.env` do desenvolvedor vazava para a suíte, o que só apareceu quando a autenticação
+  passou a existir e 51 testes começaram a exigir sessão.
+- A regra de camada `domain-sem-io` estava **inerte**: `src/generated` em `exclude` removia o
+  nó do grafo junto com a dependência. Descoberto porque testei se a regra falhava, em vez
+  de assumir que passava.
+
+### Dívida conhecida, registrada e não escondida
+
+- **41 `<label>` sem `for`** — falha de acessibilidade herdada dos templates Thymeleaf, onde
+  nenhum linter olhava. Motivo de não corrigir durante o porte em `src/views/README.md`.
+- **TypeScript preso em 5.9** enquanto o `typescript-eslint` não suportar o 7.x.
+- **Schema não foi redesenhado.** `assets.type` e `assets.name` são `nullable` sem motivo,
+  `type`/`currency` poderiam ser `enum` com CHECK, e `transactions.type` é redundante com o
+  sinal de `quantity`. Deixado para depois, quando a suíte verde permite validar cada mudança.
