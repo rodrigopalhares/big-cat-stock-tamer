@@ -101,11 +101,11 @@ aplicados no boot — o segundo é obrigatório, senão o SQLite ignora silencio
 ## Backup
 
 `BackupService` (I/O) + `backup-retention` (política pura) tiram snapshot ao subir e às 00:05
-(`America/Sao_Paulo`). Dois conjuntos: `daily/stocks-yyyy-MM-dd.zip` (7 cópias) e
-`monthly/stocks-yyyy-MM.zip` (3). Idempotente por período — reiniciar várias vezes no mesmo
+(`America/Sao_Paulo`). Dois conjuntos: `daily/stocks-yyyy-MM-dd.db.gz` (7 cópias) e
+`monthly/stocks-yyyy-MM.db.gz` (3). Idempotente por período — reiniciar várias vezes no mesmo
 dia não duplica nada. Banco em memória é no-op. Configuração em `APP_BACKUP_*`.
-Para restaurar: pare a aplicação e descomprima o `.zip` escolhido sobre
-`${APP_DATA_DIR}/stocks.db`.
+O arquivo é gzip de um `.db`, não um zip — restaurar é parar a aplicação e rodar
+`gunzip -c <backup> > ${APP_DATA_DIR}/stocks.db`.
 
 ## Autenticação
 

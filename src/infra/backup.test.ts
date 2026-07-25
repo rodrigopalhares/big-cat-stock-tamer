@@ -47,14 +47,14 @@ describe('BackupService', () => {
   it('cria o backup diário e o mensal', async () => {
     await service().ensureBackups(isoDate('2026-06-09'))
 
-    expect(listing(daily())).toEqual(['stocks-2026-06-09.zip'])
-    expect(listing(monthly())).toEqual(['stocks-2026-06.zip'])
+    expect(listing(daily())).toEqual(['stocks-2026-06-09.db.gz'])
+    expect(listing(monthly())).toEqual(['stocks-2026-06.db.gz'])
   })
 
   it('o backup contém o banco de verdade', async () => {
     await service().ensureBackups(isoDate('2026-06-09'))
 
-    const compressed = readFileSync(join(daily(), 'stocks-2026-06-09.zip'))
+    const compressed = readFileSync(join(daily(), 'stocks-2026-06-09.db.gz'))
     const contents = gunzipSync(compressed)
 
     // Cabeçalho de arquivo SQLite, e o dado gravado está lá dentro.
@@ -65,14 +65,14 @@ describe('BackupService', () => {
   it('é idempotente no mesmo dia', async () => {
     const backup = service()
     await backup.ensureBackups(isoDate('2026-06-09'))
-    const first = readFileSync(join(daily(), 'stocks-2026-06-09.zip'))
+    const first = readFileSync(join(daily(), 'stocks-2026-06-09.db.gz'))
 
     await db.$executeRawUnsafe("INSERT INTO assets VALUES ('VALE3', 'Vale')")
     await backup.ensureBackups(isoDate('2026-06-09'))
 
     expect(listing(daily())).toHaveLength(1)
     // Não reescreveu: o conteúdo é o mesmo de antes da nova linha.
-    expect(readFileSync(join(daily(), 'stocks-2026-06-09.zip'))).toEqual(first)
+    expect(readFileSync(join(daily(), 'stocks-2026-06-09.db.gz'))).toEqual(first)
   })
 
   it('rotaciona os diários mantendo a quantidade configurada', async () => {
@@ -82,9 +82,9 @@ describe('BackupService', () => {
     }
 
     expect(listing(daily())).toEqual([
-      'stocks-2026-06-07.zip',
-      'stocks-2026-06-08.zip',
-      'stocks-2026-06-09.zip',
+      'stocks-2026-06-07.db.gz',
+      'stocks-2026-06-08.db.gz',
+      'stocks-2026-06-09.db.gz',
     ])
   })
 
@@ -94,7 +94,7 @@ describe('BackupService', () => {
       await backup.ensureBackups(isoDate(`2026-${month}-01`))
     }
 
-    expect(listing(monthly())).toEqual(['stocks-2026-06.zip', 'stocks-2026-07.zip'])
+    expect(listing(monthly())).toEqual(['stocks-2026-06.db.gz', 'stocks-2026-07.db.gz'])
   })
 
   it('funciona com a aplicação segurando conexão aberta', async () => {
@@ -136,10 +136,10 @@ describe('BackupService', () => {
   it('arquivo já existente com nome do dia não é sobrescrito', async () => {
     const backup = service()
     await backup.ensureBackups(isoDate('2026-06-09'))
-    writeFileSync(join(daily(), 'stocks-2026-06-09.zip'), 'marcador')
+    writeFileSync(join(daily(), 'stocks-2026-06-09.db.gz'), 'marcador')
 
     await backup.ensureBackups(isoDate('2026-06-09'))
 
-    expect(readFileSync(join(daily(), 'stocks-2026-06-09.zip'), 'utf8')).toBe('marcador')
+    expect(readFileSync(join(daily(), 'stocks-2026-06-09.db.gz'), 'utf8')).toBe('marcador')
   })
 })

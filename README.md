@@ -155,7 +155,7 @@ escrevendo.
 ```bash
 # restaurar
 # 1. pare a aplicação
-gunzip -c data/backups/daily/stocks-2026-06-09.zip > data/stocks.db
+gunzip -c data/backups/daily/stocks-2026-06-09.db.gz > data/stocks.db
 # 2. suba de novo
 ```
 

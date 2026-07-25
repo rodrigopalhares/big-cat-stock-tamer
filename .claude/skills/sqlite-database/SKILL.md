@@ -134,17 +134,17 @@ rm data/stocks.db && npm run db:deploy && npm run db:seed
 
 ## Backup e restauração
 
-Os backups ficam em `data/backups/daily/` e `data/backups/monthly/`, como `.zip` (gzip de um
+Os backups ficam em `data/backups/daily/` e `data/backups/monthly/`, como `.db.gz` (gzip de um
 arquivo SQLite). São gerados ao subir a aplicação e às 00:05.
 
 ```bash
 # inspecionar um backup sem tocar no banco atual
-gunzip -c data/backups/daily/stocks-2026-06-09.zip > /tmp/inspecao.db
+gunzip -c data/backups/daily/stocks-2026-06-09.db.gz > /tmp/inspecao.db
 sqlite3 /tmp/inspecao.db "SELECT COUNT(*) FROM transactions"
 
 # restaurar
 # 1. pare a aplicação
-gunzip -c data/backups/daily/stocks-2026-06-09.zip > data/stocks.db
+gunzip -c data/backups/daily/stocks-2026-06-09.db.gz > data/stocks.db
 # 2. suba de novo
 ```
 

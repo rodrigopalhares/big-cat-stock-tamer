@@ -11,14 +11,15 @@ import { type IsoDate, yearMonth } from '../shared/iso-date.js'
  */
 
 export const PREFIX = 'stocks-'
-export const SUFFIX = '.zip'
+/** O conteúdo é gzip de um `.db`, não um zip — a extensão diz isso para o `gunzip` funcionar. */
+export const SUFFIX = '.db.gz'
 
-/** Nome do backup do dia: `stocks-yyyy-MM-dd.zip`. */
+/** Nome do backup do dia: `stocks-yyyy-MM-dd.db.gz`. */
 export function dailyName(date: IsoDate): string {
   return `${PREFIX}${date}${SUFFIX}`
 }
 
-/** Nome do backup do mês: `stocks-yyyy-MM.zip`. */
+/** Nome do backup do mês: `stocks-yyyy-MM.db.gz`. */
 export function monthlyName(date: IsoDate): string {
   return `${PREFIX}${yearMonth(date)}${SUFFIX}`
 }
