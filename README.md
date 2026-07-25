@@ -110,15 +110,20 @@ Tudo por variável de ambiente, validada no boot (`src/config/env.ts`). Ver `.en
 
 | Variável | Padrão | O que faz |
 |---|---|---|
+| `NODE_ENV` | `development` | `development`, `test` ou `production` |
 | `PORT` | `8000` | Porta do servidor |
 | `APP_DATA_DIR` | `./data` | Base do banco, do backup e da sessão |
 | `DATABASE_URL` | `file:./data/stocks.db` | Caminho do SQLite |
 | `APP_AUTH_PASSWORD` | vazio | Senha de acesso; vazio desabilita a autenticação |
 | `APP_AUTH_SESSION_DAYS` | `365` | Validade da sessão |
+| `APP_AUTH_KEY_FILE` | `${APP_DATA_DIR}/auth.key` | Onde ficam os hashes de sessão |
 | `APP_BACKUP_ENABLED` | `true` | Liga o backup automático |
+| `APP_BACKUP_DIR` | `${APP_DATA_DIR}/backups` | Destino dos snapshots |
 | `APP_BACKUP_DAILY_COPIES` | `7` | Backups diários mantidos |
 | `APP_BACKUP_MONTHLY_COPIES` | `3` | Backups mensais mantidos |
 | `LOG_LEVEL` | `info` | Nível de log |
+
+Nenhuma delas precisa de um arquivo `.env` em produção — valem as variáveis do ambiente.
 
 ## Rotas
 
