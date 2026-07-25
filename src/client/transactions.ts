@@ -273,8 +273,8 @@ async function goToPreviewStep(): Promise<void> {
   if (button !== null) button.disabled = true
   spinner?.classList.remove('d-none')
 
-  const body = new FormData()
-  body.append('csv', rawCsv.value)
+  // urlencoded, não FormData: o app só registra o @fastify/formbody — multipart daria 415.
+  const body = new URLSearchParams({ csv: rawCsv.value })
 
   try {
     const response = await fetch('/transactions/parse-csv-step2', { method: 'POST', body })

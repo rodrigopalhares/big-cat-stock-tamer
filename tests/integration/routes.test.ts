@@ -179,12 +179,18 @@ describe('rotas da aplicação', () => {
     it('parse-csv-step2 devolve o preview das transações', async () => {
       await createAsset(h.db, 'PETR4')
 
+      // urlencoded de propósito: é o que o cliente manda. Com JSON o teste passava
+      // enquanto o browser levava 415.
       const res = await h.app.inject({
         method: 'POST',
         url: '/transactions/parse-csv-step2',
-        payload: { csv: 'PETR4\t01/06/2024\tC\t100\t25,50\t0\tXP\t0\tBRL\t' },
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        payload: new URLSearchParams({
+          csv: 'PETR4\t01/06/2024\tC\t100\t25,50\t0\tXP\t0\tBRL\t',
+        }).toString(),
       })
 
+      expect(res.statusCode).toBe(200)
       expect(res.body).toContain('csvPreviewTable')
       expect(res.body).toContain('Confirmar Importação')
     })
