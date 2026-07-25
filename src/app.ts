@@ -6,11 +6,13 @@ import type { Db } from './config/db.js'
 import type { Env } from './config/env.js'
 import { buildContainer, type Container } from './container.js'
 import { assetRoutes } from './modules/asset/asset.routes.js'
+import { authRoutes } from './modules/auth/auth.routes.js'
 import { dividendRoutes } from './modules/dividend/dividend.routes.js'
 import { evolutionRoutes } from './modules/evolution/evolution.routes.js'
 import { portfolioRoutes } from './modules/portfolio/portfolio.routes.js'
 import { riskRoutes } from './modules/risk/risk.routes.js'
 import { transactionRoutes } from './modules/transaction/transaction.routes.js'
+import { authPlugin } from './plugins/auth.js'
 import { errorsPlugin } from './plugins/errors.js'
 import { viewsPlugin } from './plugins/views.js'
 
@@ -38,6 +40,7 @@ export async function buildApp({ env, db, container }: AppDeps): Promise<Fastify
   // Os formulários da aplicação são todos form-urlencoded; o Fastify só trata JSON por padrão.
   await app.register(formbody)
   await app.register(viewsPlugin)
+  await app.register(authPlugin, { auth: c.auth })
   await app.register(errorsPlugin)
 
   await app.register(fastifyStatic, {
@@ -54,6 +57,7 @@ export async function buildApp({ env, db, container }: AppDeps): Promise<Fastify
     return { status: 'ok' }
   })
 
+  await app.register(authRoutes(c, env.APP_AUTH_SESSION_DAYS))
   await app.register(assetRoutes(c))
   await app.register(portfolioRoutes(c))
   await app.register(evolutionRoutes(c))

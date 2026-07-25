@@ -1,10 +1,12 @@
 import type { Db } from './config/db.js'
 import type { Env } from './config/env.js'
+import { BackupService } from './infra/backup.js'
 import { BcbClient } from './integrations/bcb/bcb.client.js'
 import { BROWSER_USER_AGENT, HttpClient, type Logger, silentLogger } from './integrations/http.js'
 import { TesouroClient } from './integrations/tesouro/tesouro.client.js'
 import { YahooClient } from './integrations/yahoo/yahoo.client.js'
 import { AssetService } from './modules/asset/asset.service.js'
+import { AuthService } from './modules/auth/auth.service.js'
 import { CsvImportService } from './modules/csv-import/csv-import.service.js'
 import { DividendService } from './modules/dividend/dividend.service.js'
 import { EvolutionService } from './modules/evolution/evolution.service.js'
@@ -21,7 +23,7 @@ import { TransactionService } from './modules/transaction/transaction.service.js
  * A ordem aqui é a ordem de dependência real. Se der ciclo, o TypeScript acusa na hora,
  * em vez de virar erro de runtime como acontecia com a injeção por anotação.
  */
-export function buildContainer(db: Db, _env: Env, logger: Logger = silentLogger) {
+export function buildContainer(db: Db, env: Env, logger: Logger = silentLogger) {
   const yahooHttp = new HttpClient({ userAgent: BROWSER_USER_AGENT, logger })
   const plainHttp = new HttpClient({ logger })
 
@@ -40,6 +42,21 @@ export function buildContainer(db: Db, _env: Env, logger: Logger = silentLogger)
   const riskMetrics = new RiskMetricsService(db, benchmarks, logger)
   const csvImport = new CsvImportService(db, yahoo, transactions, dividends)
 
+  const auth = new AuthService({
+    password: env.APP_AUTH_PASSWORD,
+    keyFile: env.authKeyFile,
+    sessionDays: env.APP_AUTH_SESSION_DAYS,
+    logger,
+  })
+  const backup = new BackupService(db, {
+    enabled: env.APP_BACKUP_ENABLED,
+    dir: env.backupDir,
+    dailyCopies: env.APP_BACKUP_DAILY_COPIES,
+    monthlyCopies: env.APP_BACKUP_MONTHLY_COPIES,
+    databaseUrl: env.DATABASE_URL,
+    logger,
+  })
+
   return {
     db,
     yahoo,
@@ -55,6 +72,8 @@ export function buildContainer(db: Db, _env: Env, logger: Logger = silentLogger)
     benchmarks,
     riskMetrics,
     csvImport,
+    auth,
+    backup,
   } as const
 }
 

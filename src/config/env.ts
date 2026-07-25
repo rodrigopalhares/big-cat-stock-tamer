@@ -39,10 +39,12 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     throw new Error(`Configuração inválida:\n${issues}`)
   }
   const env = parsed.data
+  // Os derivados leem de `source`, não de process.env — senão `loadEnv(outraCoisa)` mentiria
+  // e o teste acabaria apontando para o diretório de dados de produção.
   return {
     ...env,
     authEnabled: env.APP_AUTH_PASSWORD.length > 0,
-    backupDir: process.env['APP_BACKUP_DIR'] ?? `${env.APP_DATA_DIR}/backups`,
-    authKeyFile: process.env['APP_AUTH_KEY_FILE'] ?? `${env.APP_DATA_DIR}/auth.key`,
+    backupDir: source['APP_BACKUP_DIR'] ?? `${env.APP_DATA_DIR}/backups`,
+    authKeyFile: source['APP_AUTH_KEY_FILE'] ?? `${env.APP_DATA_DIR}/auth.key`,
   }
 }
