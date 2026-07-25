@@ -32,15 +32,15 @@ export type TransactionInput = {
   price: number
   fees: number
   date: IsoDate
-  broker?: string | null
-  notes?: string | null
-  inputCurrency?: string | null
+  broker?: string | null | undefined
+  notes?: string | null | undefined
+  inputCurrency?: string | null | undefined
 }
 
 export type TransactionFilters = {
-  ticker?: string | null
-  type?: string | null
-  position?: string | null
+  ticker?: string | null | undefined
+  type?: string | null | undefined
+  position?: string | null | undefined
 }
 
 export class TransactionService {

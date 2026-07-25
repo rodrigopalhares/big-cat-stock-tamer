@@ -13,8 +13,8 @@ export type DividendInput = {
   date: IsoDate
   totalAmount: number
   taxWithheld: number
-  notes?: string | null
-  broker?: string | null
+  notes?: string | null | undefined
+  broker?: string | null | undefined
   currency?: string
 }
 

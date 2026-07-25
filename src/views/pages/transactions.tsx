@@ -1,0 +1,512 @@
+import { ASSET_TYPES } from '../../domain/constants.js'
+import type { TransactionView } from '../../modules/transaction/transaction.schema.js'
+import { date as fmtDate, money, quantity } from '../../shared/format.js'
+import type { IsoDate } from '../../shared/iso-date.js'
+import { Layout } from '../layout.js'
+
+/** Porte de src/main/resources/templates/transactions.html. */
+
+export type TransactionsPageProps = {
+  transactions: TransactionView[]
+  assets: Array<{ ticker: string; name: string }>
+  selectedTicker: string | null
+  selectedType: string
+  selectedPosition: string
+  today: IsoDate
+}
+
+export function TransactionsPage(props: TransactionsPageProps) {
+  const { transactions } = props
+
+  return (
+    <Layout title="Transações" path="/transactions/">
+      <div class="container-fluid py-4 px-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h2 class="mb-0">
+            <i class="bi bi-arrow-left-right" /> Transações
+          </h2>
+          <button
+            type="button"
+            class="btn btn-outline-primary"
+            data-bs-toggle="modal"
+            data-bs-target="#csvImportModal"
+          >
+            <i class="bi bi-file-earmark-spreadsheet" /> Importar CSV
+          </button>
+        </div>
+
+        <CsvImportModal />
+
+        <div class="row g-4">
+          <div class="col-lg-4">
+            <NewTransactionForm {...props} />
+          </div>
+          <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+              <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">
+                  Histórico <span class="badge bg-secondary ms-1">{transactions.length}</span>
+                </span>
+                <HistoryFilters {...props} />
+              </div>
+              <div class="card-body p-0">
+                {transactions.length > 0 ? (
+                  <HistoryTable transactions={transactions} />
+                ) : (
+                  <div class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox fs-1" />
+                    <p class="mt-2">Nenhuma transação registrada.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <EditTransactionModal />
+      <script src="/js/transactions.js" defer />
+    </Layout>
+  )
+}
+
+function CsvImportModal() {
+  return (
+    <div class="modal fade" id="csvImportModal" tabindex={-1} aria-hidden="true">
+      <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <i class="bi bi-file-earmark-spreadsheet" /> Importar Transações via CSV
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar" />
+          </div>
+          <div class="modal-body d-flex flex-column overflow-hidden">
+            <div class="flex-shrink-0 mb-3">
+              <label class="form-label">Cole os dados do CSV (separado por tab):</label>
+              <textarea
+                id="csvTextarea"
+                name="csv"
+                class="form-control font-monospace"
+                rows={6}
+                placeholder="PETR4&#9;01/01/2024&#9;C&#9;100&#9;25,50&#9;10,00&#9;XP&#9;0&#9;BRL&#9;"
+              />
+              <div class="form-text">
+                Formato: ticker &lt;tab&gt; data &lt;tab&gt; C/V &lt;tab&gt; qtd &lt;tab&gt; preço
+                &lt;tab&gt; taxas &lt;tab&gt; corretora &lt;tab&gt; irrf &lt;tab&gt; moeda
+                &lt;tab&gt; notas
+              </div>
+            </div>
+            <div class="flex-shrink-0 mb-3">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                hx-post="/transactions/parse-csv"
+                hx-include="#csvTextarea"
+                hx-target="#csv-preview-area"
+                hx-indicator="#csv-spinner"
+              >
+                <i class="bi bi-arrow-repeat" /> Processar
+              </button>
+              <span id="csv-spinner" class="htmx-indicator">
+                <span class="spinner-border spinner-border-sm" role="status" /> Processando...
+              </span>
+            </div>
+            <div id="csv-preview-area" class="flex-grow-1 overflow-auto min-h-0" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageProps) {
+  return (
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white fw-semibold">
+        <i class="bi bi-plus-circle" /> Nova Transação
+      </div>
+      <div class="card-body">
+        <form method="post" action="/transactions/new">
+          <div class="mb-3">
+            <label class="form-label">
+              Ticker <span class="text-danger">*</span>
+            </label>
+            {selectedTicker === null ? (
+              <input
+                type="text"
+                name="ticker"
+                id="tickerInput"
+                class="form-control"
+                list="ticker-list"
+                placeholder="Ex: PETR4, MXRF11, BOVA11"
+                autocomplete="off"
+                required
+                data-uppercase
+                hx-get="/transactions/ticker-info"
+                hx-trigger="change, keyup changed delay:600ms"
+                hx-target="#ticker-preview"
+                hx-include="this"
+              />
+            ) : (
+              <input
+                type="text"
+                name="ticker"
+                id="tickerInput"
+                class="form-control"
+                value={selectedTicker}
+                readonly
+                required
+              />
+            )}
+            <datalist id="ticker-list">
+              {assets.map((a) => (
+                <option value={a.ticker}>{a.name}</option>
+              ))}
+            </datalist>
+            <div id="ticker-preview" class="mt-2" />
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">
+              Tipo <span class="text-danger">*</span>
+            </label>
+            <TypeToggle idPrefix="type" checked="BUY" />
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Moeda</label>
+            <select name="currency" id="txCurrency" class="form-select">
+              <option value="BRL" selected>
+                BRL
+              </option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label">
+                Quantidade <span class="text-danger">*</span>
+              </label>
+              <input
+                type="number"
+                id="txQty"
+                name="quantity"
+                class="form-control"
+                step="0.0001"
+                min="0.0001"
+                required
+              />
+            </div>
+            <div class="col-6">
+              <label class="form-label">Preço Unit.</label>
+              <input
+                type="number"
+                id="txPrice"
+                name="price"
+                class="form-control"
+                step="0.0001"
+                min="0"
+                placeholder="ou informe o total"
+              />
+            </div>
+          </div>
+
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label">Valor Total</label>
+              <input
+                type="number"
+                id="txTotal"
+                name="total_price"
+                class="form-control"
+                step="0.01"
+                min="0"
+                placeholder="opcional"
+              />
+            </div>
+            <div class="col-6">
+              <label class="form-label">Taxas</label>
+              <input
+                type="number"
+                id="txFees"
+                name="fees"
+                class="form-control"
+                step="0.01"
+                min="0"
+                value="0"
+              />
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">
+              Data <span class="text-danger">*</span>
+            </label>
+            <input type="date" name="date" class="form-control" value={today} required />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Corretora</label>
+            <input type="text" name="broker" class="form-control" placeholder="Ex: Clear, XP" />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Notas</label>
+            <textarea name="notes" class="form-control" rows={2} placeholder="Opcional" />
+          </div>
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-check-lg" /> Registrar
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function TypeToggle({ idPrefix, checked }: { idPrefix: string; checked: 'BUY' | 'SELL' | null }) {
+  const buyId = `${idPrefix}Buy`
+  const sellId = `${idPrefix}Sell`
+  return (
+    <div class="btn-group w-100">
+      <input
+        type="radio"
+        class="btn-check"
+        name="type"
+        id={buyId}
+        value="BUY"
+        checked={checked === 'BUY'}
+      />
+      <label class="btn btn-outline-success" for={buyId}>
+        <i class="bi bi-arrow-down-circle" /> Compra
+      </label>
+      <input
+        type="radio"
+        class="btn-check"
+        name="type"
+        id={sellId}
+        value="SELL"
+        checked={checked === 'SELL'}
+      />
+      <label class="btn btn-outline-danger" for={sellId}>
+        <i class="bi bi-arrow-up-circle" /> Venda
+      </label>
+    </div>
+  )
+}
+
+function HistoryFilters({ selectedTicker, selectedType, selectedPosition }: TransactionsPageProps) {
+  const hasFilters = selectedTicker !== null || selectedType !== '' || selectedPosition !== ''
+  return (
+    <div class="d-flex align-items-center gap-2">
+      <form method="get" action="/transactions/" class="d-flex align-items-center gap-2 mb-0">
+        {selectedTicker !== null && <input type="hidden" name="ticker" value={selectedTicker} />}
+        <select name="type" class="form-select form-select-sm" style="width:auto" data-autosubmit>
+          <option value="">Tipo: Todos</option>
+          {ASSET_TYPES.map((t) => (
+            <option value={t} selected={t === selectedType}>
+              {t}
+            </option>
+          ))}
+        </select>
+        <select
+          name="position"
+          class="form-select form-select-sm"
+          style="width:auto"
+          data-autosubmit
+        >
+          <option value="">Posição: Todos</option>
+          <option value="with" selected={selectedPosition === 'with'}>
+            Com posição
+          </option>
+          <option value="without" selected={selectedPosition === 'without'}>
+            Sem posição
+          </option>
+        </select>
+      </form>
+      {hasFilters && (
+        <a href="/transactions/" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-x-lg" />
+        </a>
+      )}
+    </div>
+  )
+}
+
+function HistoryTable({ transactions }: { transactions: TransactionView[] }) {
+  return (
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle small">
+        <thead class="table-light">
+          <tr>
+            <th>Data</th>
+            <th>Ativo</th>
+            <th>Tipo</th>
+            <th class="text-end">Qtd</th>
+            <th class="text-end">Preço</th>
+            <th class="text-end">Taxas</th>
+            <th class="text-end">Total</th>
+            <th>Corretora</th>
+            <th class="text-center">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {transactions.map((t) => (
+            <TransactionRow transaction={t} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function TransactionRow({ transaction: t }: { transaction: TransactionView }) {
+  const foreign = t.currency !== 'BRL'
+  const dual = (value: number, valueBrl: number, extraClass = '') => (
+    <>
+      {money(value, t.currency)}
+      {foreign && <div class={`text-muted small ${extraClass}`}>{money(valueBrl)}</div>}
+    </>
+  )
+
+  return (
+    <tr>
+      <td>{fmtDate(t.date)}</td>
+      <td class="fw-bold">
+        <a href={`/assets/${t.assetTicker}`} class="text-decoration-none">
+          {t.assetTicker}
+        </a>
+      </td>
+      <td>
+        <span class={`badge ${t.type === 'BUY' ? 'bg-success' : 'bg-danger'}`}>
+          {t.type === 'BUY' ? 'Compra' : 'Venda'}
+        </span>
+      </td>
+      <td class="text-end">{quantity(t.quantity)}</td>
+      <td class="text-end">{dual(t.price, t.priceBrl)}</td>
+      <td class="text-end text-muted">{dual(t.fees, t.feesBrl)}</td>
+      <td class="text-end fw-semibold">{dual(t.total, t.totalBrl)}</td>
+      <td class="text-muted">{t.broker ?? '—'}</td>
+      <td class="text-center text-nowrap">
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-primary border-0"
+          title="Editar"
+          data-edit-tx
+          data-tx-id={String(t.id)}
+          data-tx-type={t.type}
+          data-tx-quantity={String(t.quantity)}
+          data-tx-price={String(t.price)}
+          data-tx-fees={String(t.fees)}
+          data-tx-date={t.date}
+          data-tx-currency={t.currency}
+          data-tx-broker={t.broker ?? ''}
+          data-tx-notes={t.notes ?? ''}
+        >
+          <i class="bi bi-pencil" />
+        </button>
+        <form
+          method="post"
+          action={`/transactions/${t.id}/delete`}
+          class="d-inline"
+          data-confirm="Excluir esta transação?"
+        >
+          <button type="submit" class="btn btn-sm btn-outline-danger border-0">
+            <i class="bi bi-trash" />
+          </button>
+        </form>
+      </td>
+    </tr>
+  )
+}
+
+export function EditTransactionModal() {
+  return (
+    <div class="modal fade" id="editTxModal" tabindex={-1}>
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <i class="bi bi-pencil" /> Editar Transação
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" />
+          </div>
+          <form id="editTxForm" method="post">
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">Tipo</label>
+                <TypeToggle idPrefix="editTxType" checked={null} />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Moeda</label>
+                <select id="editTxCurrency" name="currency" class="form-select">
+                  <option value="BRL">BRL</option>
+                  <option value="USD">USD</option>
+                </select>
+              </div>
+              <div class="row g-2 mb-3">
+                <div class="col-6">
+                  <label class="form-label">Quantidade</label>
+                  <input
+                    type="number"
+                    id="editTxQty"
+                    name="quantity"
+                    class="form-control"
+                    step="0.0001"
+                    min="0.0001"
+                    required
+                  />
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Preço Unit.</label>
+                  <input
+                    type="number"
+                    id="editTxPrice"
+                    name="price"
+                    class="form-control"
+                    step="0.0001"
+                    min="0"
+                    required
+                  />
+                </div>
+              </div>
+              <div class="row g-2 mb-3">
+                <div class="col-6">
+                  <label class="form-label">Taxas</label>
+                  <input
+                    type="number"
+                    id="editTxFees"
+                    name="fees"
+                    class="form-control"
+                    step="0.01"
+                    min="0"
+                    value="0"
+                  />
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Data</label>
+                  <input type="date" id="editTxDate" name="date" class="form-control" required />
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Corretora</label>
+                <input type="text" id="editTxBroker" name="broker" class="form-control" />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Notas</label>
+                <textarea id="editTxNotes" name="notes" class="form-control" rows={2} />
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                Cancelar
+              </button>
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg" /> Salvar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -22,10 +22,16 @@ module.exports = {
     },
     {
       name: 'views-sem-dados',
-      comment: 'src/views/ recebe tudo por props: sem service, sem Prisma, sem config.',
+      comment:
+        'src/views/ recebe tudo por props: sem chamar service, sem Prisma, sem config. ' +
+        'Import type-only é permitido — some na compilação e é justamente o contrato ' +
+        'tipado entre rota e view que a migração busca.',
       severity: 'error',
       from: { path: '^src/views' },
-      to: { path: '^(src/(modules|config|infra|integrations|generated)|node_modules/@prisma)' },
+      to: {
+        path: '^(src/(modules|config|infra|integrations|generated)|node_modules/@prisma)',
+        dependencyTypesNot: ['type-only'],
+      },
     },
     {
       name: 'integrations-sem-banco',

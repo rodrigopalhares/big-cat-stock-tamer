@@ -22,6 +22,7 @@ describe('container', () => {
       'bcb',
       'benchmarks',
       'csvImport',
+      'db',
       'dividends',
       'evolution',
       'exchangeRates',

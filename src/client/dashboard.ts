@@ -1,0 +1,207 @@
+/**
+ * Gráfico de evolução e ordenação/filtro da tabela de posições.
+ * Porte de static/js/dashboard.js e static/js/dashboard-table.js.
+ *
+ * O Chart.js vem da CDN como global; só o que este arquivo usa é declarado.
+ */
+
+type ChartDataset = Record<string, unknown>
+declare const Chart: new (el: Element, config: Record<string, unknown>) => unknown
+
+const TYPE_COLORS: Record<string, { bg: string; border: string }> = {
+  BDR: { bg: 'rgba(255, 159, 64, 0.6)', border: 'rgb(255, 159, 64)' },
+  ETF: { bg: 'rgba(75, 192, 192, 0.6)', border: 'rgb(75, 192, 192)' },
+  REIT: { bg: 'rgba(153, 102, 255, 0.6)', border: 'rgb(153, 102, 255)' },
+  STOCK: { bg: 'rgba(54, 162, 235, 0.6)', border: 'rgb(54, 162, 235)' },
+  TESOURO_DIRETO: { bg: 'rgba(255, 205, 86, 0.6)', border: 'rgb(255, 205, 86)' },
+}
+
+const FALLBACK_COLOR = { bg: 'rgba(201, 203, 207, 0.6)', border: 'rgb(201, 203, 207)' }
+
+/** Linha tracejada sobreposta às áreas — referência, não composição do patrimônio. */
+function referenceLine(label: string, data: Array<number | null>, color: string): ChartDataset {
+  return {
+    label,
+    data,
+    fill: false,
+    backgroundColor: 'transparent',
+    borderColor: color,
+    borderWidth: 2,
+    borderDash: [6, 3],
+    pointRadius: 0,
+    pointHitRadius: 10,
+    order: 1,
+    yAxisID: 'yInvested',
+  }
+}
+
+const brl = (value: number, digits = 0) =>
+  `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`
+
+document.addEventListener('DOMContentLoaded', () => {
+  buildChart()
+  wireTable()
+})
+
+function buildChart(): void {
+  const dataEl = document.getElementById('evolution-data')
+  const canvas = document.getElementById('evolutionChart')
+  if (dataEl === null || canvas === null) return
+
+  const parse = <T>(raw: string | undefined, fallback: T): T =>
+    raw === undefined || raw === '' ? fallback : (JSON.parse(raw) as T)
+
+  const labels = parse<string[]>(dataEl.dataset['labels'], [])
+  const rawDatasets = parse<Array<{ label: string; data: number[] }>>(
+    dataEl.dataset['datasets'],
+    [],
+  )
+  const invested = parse<number[]>(dataEl.dataset['invested'], [])
+  const ibov = parse<Array<number | null>>(dataEl.dataset['ibov'], [])
+  const cdi = parse<Array<number | null>>(dataEl.dataset['cdi'], [])
+
+  const datasets: ChartDataset[] = rawDatasets.map((ds) => {
+    const colors = TYPE_COLORS[ds.label] ?? FALLBACK_COLOR
+    return {
+      label: ds.label,
+      data: ds.data,
+      fill: true,
+      backgroundColor: colors.bg,
+      borderColor: colors.border,
+      borderWidth: 1,
+      pointRadius: 0,
+      pointHitRadius: 10,
+      order: 2,
+    }
+  })
+
+  datasets.push(referenceLine('Total Investido', invested, 'rgb(220, 53, 69)'))
+  if (ibov.some((v) => v !== null))
+    datasets.push(referenceLine('IBOVESPA', ibov, 'rgb(40, 167, 69)'))
+  if (cdi.some((v) => v !== null)) datasets.push(referenceLine('CDI', cdi, 'rgb(255, 193, 7)'))
+
+  new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { grid: { display: false } },
+        y: {
+          stacked: true,
+          position: 'right',
+          ticks: { callback: (v: number) => brl(v) },
+        },
+        // Eixo invisível para as linhas de referência não entrarem no empilhamento,
+        // mas ainda compartilharem a escala das áreas.
+        yInvested: {
+          display: false,
+          stacked: false,
+          afterBuildTicks: (axis: {
+            chart: { scales: { y: { min: number; max: number } } }
+            min: number
+            max: number
+          }) => {
+            axis.min = axis.chart.scales.y.min
+            axis.max = axis.chart.scales.y.max
+          },
+        },
+      },
+      plugins: {
+        tooltip: {
+          bodyAlign: 'right',
+          callbacks: {
+            label: (ctx: { dataset: { label: string }; parsed: { y: number } }) =>
+              `${ctx.dataset.label}: ${brl(ctx.parsed.y)}`,
+            afterBody: (items: Array<{ parsed: { y: number } }>) => [
+              `\nTotal: ${brl(items.reduce((sum, item) => sum + item.parsed.y, 0))}`,
+            ],
+          },
+        },
+        legend: { position: 'bottom' },
+      },
+    },
+  })
+}
+
+function wireTable(): void {
+  const table = document.getElementById('positionsTable')
+  const filterType = document.getElementById('filterType')
+  const filterPosition = document.getElementById('filterPosition')
+  if (
+    !(table instanceof HTMLTableElement) ||
+    !(filterType instanceof HTMLSelectElement) ||
+    !(filterPosition instanceof HTMLInputElement)
+  ) {
+    return
+  }
+
+  const tbody = table.tBodies[0]
+  const thead = table.tHead
+  if (tbody === undefined || thead === null) return
+
+  const applyFilter = (): void => {
+    for (const row of Array.from(tbody.rows)) {
+      const matchesType = filterType.value === '' || row.dataset['type'] === filterType.value
+      const hasPosition = Number(row.dataset['quantity'] ?? '0') > 0
+      row.style.display = matchesType && (!filterPosition.checked || hasPosition) ? '' : 'none'
+    }
+  }
+
+  filterType.addEventListener('change', applyFilter)
+  filterPosition.addEventListener('change', applyFilter)
+  applyFilter()
+
+  const headers = Array.from(thead.querySelectorAll<HTMLTableCellElement>('th[data-sort]'))
+  let currentSort = { column: -1, ascending: true }
+
+  for (const th of headers) {
+    th.style.cursor = 'pointer'
+    th.style.userSelect = 'none'
+    th.addEventListener('click', () => {
+      const column = th.cellIndex
+      const ascending = currentSort.column === column ? !currentSort.ascending : true
+      currentSort = { column, ascending }
+
+      for (const header of headers) {
+        const arrow = header.querySelector('.sort-arrow')
+        if (arrow !== null) arrow.textContent = ''
+      }
+      const arrow = th.querySelector('.sort-arrow')
+      if (arrow !== null) arrow.textContent = ascending ? ' ↑' : ' ↓'
+
+      const numeric = th.dataset['sort'] === 'num'
+      const rows = Array.from(tbody.rows).sort((a, b) => {
+        const aValue = cellValue(a, column, numeric)
+        const bValue = cellValue(b, column, numeric)
+        if (numeric) {
+          return ascending
+            ? (aValue as number) - (bValue as number)
+            : (bValue as number) - (aValue as number)
+        }
+        return ascending
+          ? String(aValue).localeCompare(String(bValue))
+          : String(bValue).localeCompare(String(aValue))
+      })
+      for (const row of rows) tbody.appendChild(row)
+    })
+  }
+}
+
+/** Lê o valor da célula para ordenação, desfazendo a formatação pt-BR. */
+function cellValue(row: HTMLTableRowElement, column: number, numeric: boolean): number | string {
+  const cell = row.cells[column]
+  if (cell === undefined) return numeric ? 0 : ''
+
+  const text = cell.textContent?.trim() ?? ''
+  if (!numeric) return text
+
+  const cleaned = text
+    .replace(/[R$US$%\s≈—]/g, '')
+    .replace(/\./g, '')
+    .replace(',', '.')
+  const value = Number.parseFloat(cleaned)
+  // Célula sem número vai para o fim na ordem crescente.
+  return Number.isNaN(value) ? Number.NEGATIVE_INFINITY : value
+}

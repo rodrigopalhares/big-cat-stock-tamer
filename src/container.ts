@@ -41,6 +41,7 @@ export function buildContainer(db: Db, _env: Env, logger: Logger = silentLogger)
   const csvImport = new CsvImportService(db, yahoo, transactions, dividends)
 
   return {
+    db,
     yahoo,
     bcb,
     tesouro,
