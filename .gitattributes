@@ -1,57 +1,20 @@
+# Normalização de fim de linha. Esta linha sozinha já cobre todo arquivo de texto do
+# repositório, inclusive .ts e .tsx — o git detecta texto e grava LF. O que as regras
+# abaixo acrescentam é só o driver de diff, que melhora o cabeçalho do hunk.
 * text=auto eol=lf
 
-# Source files
-*.kt            text eol=lf diff=kotlin
-*.kts           text eol=lf diff=kotlin
-*.java          text eol=lf diff=java
-*.groovy        text eol=lf diff=java
-*.scala         text eol=lf diff=java
-*.gradle        text eol=lf diff=java
-*.gradle.kts    text eol=lf diff=kotlin
+# Drivers de diff. O git 2.55 não tem driver para TypeScript nem JavaScript, então não
+# adianta declarar *.ts aqui; só existem os tipos abaixo entre os arquivos do projeto.
+*.md            diff=markdown
+*.css           diff=css
 
-# Web / frontend
-*.html          text eol=lf diff=html
-*.htm           text eol=lf diff=html
-*.css           text eol=lf diff=css
-*.scss          text eol=lf diff=css
-*.sass          text eol=lf
-*.js            text eol=lf
-*.mjs           text eol=lf
-*.cjs           text eol=lf
-*.json          text eol=lf
-*.jsp           text eol=lf
-*.jspf          text eol=lf
-*.jspx          text eol=lf
+# Lockfile é gerado: fora do diff e da estatística de linguagem.
+package-lock.json  linguist-generated=true -diff
 
-# Config / docs
-*.md            text eol=lf
-*.txt           text eol=lf
-*.yml           text eol=lf
-*.yaml          text eol=lf
-*.toml          text eol=lf
-*.xml           text eol=lf
-*.properties    text eol=lf
-*.sql           text eol=lf
-*.py            text eol=lf
-*.df            text eol=lf
-*.tld           text eol=lf
-*.tag           text eol=lf
-*.tagx          text eol=lf
-*.editorconfig  text eol=lf
+# Binários — explícito para nunca escapar da detecção automática.
+*.png           binary
+*.ico           binary
 
-# Build-tool wrappers
-mvnw            text eol=lf
-gradlew         text eol=lf
-
-# Windows-specific
+# Scripts de Windows precisam de CRLF mesmo num projeto que só roda em Linux.
 *.bat           text eol=crlf
 *.cmd           text eol=crlf
-
-# Binary files (no text conversion, no diff)
-*.class         binary
-*.dll           binary
-*.ear           binary
-*.jar           binary
-*.so            binary
-*.war           binary
-*.jks           binary
