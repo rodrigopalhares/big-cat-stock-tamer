@@ -1,10 +1,13 @@
+import { existsSync } from 'node:fs'
+
 import { buildApp } from './app.js'
 import { createDb } from './config/db.js'
 import { loadEnv } from './config/env.js'
 import { buildContainer } from './container.js'
 import { startScheduler } from './infra/scheduler.js'
 
-process.loadEnvFile('.env')
+// Em produção as variáveis vêm do ambiente; o .env é conveniência de desenvolvimento.
+if (existsSync('.env')) process.loadEnvFile('.env')
 
 const env = loadEnv()
 const db = await createDb(env)

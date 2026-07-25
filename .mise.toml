@@ -32,3 +32,27 @@ run = "npm run db:deploy"
 [tasks.seed]
 description = "Popula o banco com dados de exemplo"
 run = "npm run db:seed"
+
+[tasks.start]
+description = "Roda o build de produção"
+run = "npm start"
+
+[tasks."test:watch"]
+description = "Testes em modo watch"
+run = "npm run test:watch"
+
+[tasks.typecheck]
+description = "Só a verificação de tipos"
+run = "npm run typecheck"
+
+[tasks."db:new-migration"]
+description = "Cria e aplica uma migration nova (desenvolvimento)"
+run = "npm run db:migrate"
+
+[tasks."db:generate"]
+description = "Regenera o client do Prisma"
+run = "npm run db:generate"
+
+[tasks."db:studio"]
+description = "Abre a GUI de inspeção do banco"
+run = "npm run db:studio"
