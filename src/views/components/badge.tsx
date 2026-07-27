@@ -1,4 +1,5 @@
 import { assetTypeColor, assetTypeTextColor } from '../../shared/asset-colors.js'
+import { transactionTypeMetaOrNull } from '../../shared/transaction-types.js'
 
 /** Porte de src/main/resources/templates/fragments/badge.html. */
 
@@ -19,6 +20,18 @@ export function AssetBadge({ type }: { type: string | null }) {
       style={`background-color: ${assetTypeColor(type)}; color: ${assetTypeTextColor(type)}`}
     >
       {type}
+    </span>
+  )
+}
+
+/** Cor, ícone e rótulo saem de `shared/transaction-types.ts` — o mesmo mapa que o cálculo lê. */
+export function TransactionBadge({ type }: { type: string }) {
+  const meta = transactionTypeMetaOrNull(type)
+  if (meta === null) return <span class="badge bg-secondary">{type}</span>
+  return (
+    <span class={`badge ${meta.badgeClass}`}>
+      <i class={`bi ${meta.icon} me-1`} />
+      {meta.labelPt}
     </span>
   )
 }

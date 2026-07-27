@@ -2,6 +2,8 @@ import { ASSET_TYPES } from '../../domain/constants.js'
 import type { TransactionView } from '../../modules/transaction/transaction.schema.js'
 import { date as fmtDate, money, quantity } from '../../shared/format.js'
 import type { IsoDate } from '../../shared/iso-date.js'
+import { TRANSACTION_TYPE_LIST } from '../../shared/transaction-types.js'
+import { TransactionBadge } from '../components/badge.js'
 import { Layout } from '../layout.js'
 
 /** Porte de src/main/resources/templates/transactions.html. */
@@ -92,9 +94,14 @@ function CsvImportModal() {
                 placeholder="PETR4&#9;01/01/2024&#9;C&#9;100&#9;25,50&#9;10,00&#9;XP&#9;0&#9;BRL&#9;"
               />
               <div class="form-text">
-                Formato: ticker &lt;tab&gt; data &lt;tab&gt; C/V &lt;tab&gt; qtd &lt;tab&gt; preço
-                &lt;tab&gt; taxas &lt;tab&gt; corretora &lt;tab&gt; irrf &lt;tab&gt; moeda
-                &lt;tab&gt; notas
+                Formato: ticker &lt;tab&gt; data &lt;tab&gt; C/V/B/D/A/R.CAP &lt;tab&gt; qtd
+                &lt;tab&gt; preço &lt;tab&gt; taxas &lt;tab&gt; corretora &lt;tab&gt; irrf
+                &lt;tab&gt; moeda &lt;tab&gt; notas
+                <br />B = bonificação, D = desdobramento, A = agrupamento. Nesses três a quantidade
+                é o delta de ações; o preço só vale na bonificação, como custo atribuído.
+                <br />
+                R.CAP = redução de capital: a quantidade é a base de ações e o preço é o valor
+                devolvido por ação, que abate o preço médio.
               </div>
             </div>
             <div class="flex-shrink-0 mb-3">
@@ -171,7 +178,8 @@ function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageP
             <label class="form-label">
               Tipo <span class="text-danger">*</span>
             </label>
-            <TypeToggle idPrefix="type" checked="BUY" />
+            <TransactionTypeSelect idPrefix="tx" selected="BUY" />
+            <div class="form-text" id="txTypeHint" />
           </div>
 
           <div class="mb-3">
@@ -199,8 +207,10 @@ function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageP
                 required
               />
             </div>
-            <div class="col-6">
-              <label class="form-label">Preço Unit.</label>
+            <div class="col-6" id="txPriceCol">
+              <label class="form-label" id="txPriceLabel">
+                Preço Unit.
+              </label>
               <input
                 type="number"
                 id="txPrice"
@@ -213,7 +223,7 @@ function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageP
             </div>
           </div>
 
-          <div class="row g-2 mb-3">
+          <div class="row g-2 mb-3" id="txMarketExtrasRow">
             <div class="col-6">
               <label class="form-label">Valor Total</label>
               <input
@@ -263,34 +273,25 @@ function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageP
   )
 }
 
-function TypeToggle({ idPrefix, checked }: { idPrefix: string; checked: 'BUY' | 'SELL' | null }) {
-  const buyId = `${idPrefix}Buy`
-  const sellId = `${idPrefix}Sell`
+/**
+ * Cinco tipos não cabem num grupo de botões — vira `select`, percorrendo o mesmo mapa que
+ * o cálculo usa, como a página de proventos já faz com `DIVIDEND_TYPES`.
+ */
+function TransactionTypeSelect({
+  idPrefix,
+  selected,
+}: {
+  idPrefix: string
+  selected: string | null
+}) {
   return (
-    <div class="btn-group w-100">
-      <input
-        type="radio"
-        class="btn-check"
-        name="type"
-        id={buyId}
-        value="BUY"
-        checked={checked === 'BUY'}
-      />
-      <label class="btn btn-outline-success" for={buyId}>
-        <i class="bi bi-arrow-down-circle" /> Compra
-      </label>
-      <input
-        type="radio"
-        class="btn-check"
-        name="type"
-        id={sellId}
-        value="SELL"
-        checked={checked === 'SELL'}
-      />
-      <label class="btn btn-outline-danger" for={sellId}>
-        <i class="bi bi-arrow-up-circle" /> Venda
-      </label>
-    </div>
+    <select name="type" id={`${idPrefix}Type`} class="form-select" data-tx-type-select required>
+      {TRANSACTION_TYPE_LIST.map((meta) => (
+        <option value={meta.type} selected={meta.type === selected}>
+          {meta.labelPt}
+        </option>
+      ))}
+    </select>
   )
 }
 
@@ -377,9 +378,7 @@ function TransactionRow({ transaction: t }: { transaction: TransactionView }) {
         </a>
       </td>
       <td>
-        <span class={`badge ${t.type === 'BUY' ? 'bg-success' : 'bg-danger'}`}>
-          {t.type === 'BUY' ? 'Compra' : 'Venda'}
-        </span>
+        <TransactionBadge type={t.type} />
       </td>
       <td class="text-end">{quantity(t.quantity)}</td>
       <td class="text-end">{dual(t.price, t.priceBrl)}</td>
@@ -434,7 +433,7 @@ export function EditTransactionModal() {
             <div class="modal-body">
               <div class="mb-3">
                 <label class="form-label">Tipo</label>
-                <TypeToggle idPrefix="editTxType" checked={null} />
+                <TransactionTypeSelect idPrefix="editTx" selected={null} />
               </div>
               <div class="mb-3">
                 <label class="form-label">Moeda</label>
@@ -443,6 +442,7 @@ export function EditTransactionModal() {
                   <option value="USD">USD</option>
                 </select>
               </div>
+              {/* Quantidade e data valem para todo tipo; preço e taxas, só quando há negócio. */}
               <div class="row g-2 mb-3">
                 <div class="col-6">
                   <label class="form-label">Quantidade</label>
@@ -457,7 +457,15 @@ export function EditTransactionModal() {
                   />
                 </div>
                 <div class="col-6">
-                  <label class="form-label">Preço Unit.</label>
+                  <label class="form-label">Data</label>
+                  <input type="date" id="editTxDate" name="date" class="form-control" required />
+                </div>
+              </div>
+              <div class="row g-2 mb-3" id="editTxMarketRow">
+                <div class="col-6" id="editTxPriceCol">
+                  <label class="form-label" id="editTxPriceLabel">
+                    Preço Unit.
+                  </label>
                   <input
                     type="number"
                     id="editTxPrice"
@@ -466,11 +474,10 @@ export function EditTransactionModal() {
                     step="0.0001"
                     min="0"
                     required
+                    data-required-when-visible="true"
                   />
                 </div>
-              </div>
-              <div class="row g-2 mb-3">
-                <div class="col-6">
+                <div class="col-6" id="editTxFeesCol">
                   <label class="form-label">Taxas</label>
                   <input
                     type="number"
@@ -481,10 +488,6 @@ export function EditTransactionModal() {
                     min="0"
                     value="0"
                   />
-                </div>
-                <div class="col-6">
-                  <label class="form-label">Data</label>
-                  <input type="date" id="editTxDate" name="date" class="form-control" required />
                 </div>
               </div>
               <div class="mb-3">

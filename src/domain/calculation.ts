@@ -1,4 +1,5 @@
 import { compareDates, type IsoDate, today } from '../shared/iso-date.js'
+import { transactionTypeMeta } from '../shared/transaction-types.js'
 import type { TransactionType } from './constants.js'
 import { type CashFlow, computeIrr, xirr } from './xirr.js'
 
@@ -10,7 +11,10 @@ import { type CashFlow, computeIrr, xirr } from './xirr.js'
  */
 
 export type TransactionData = {
-  /** Mantido por fidelidade ao modelo; o que decide compra/venda é o *sinal* de `quantity`. */
+  /**
+   * Manda no cálculo: decide direção, efeito no custo e se gera fluxo de caixa —
+   * ver `src/shared/transaction-types.ts`. O sinal de `quantity` apenas o acompanha.
+   */
   readonly type: TransactionType
   readonly quantity: number
   readonly price: number
@@ -51,20 +55,51 @@ export function calculatePosition(transactions: readonly TransactionData[]): Pos
   const cashFlowsBrl: CashFlow[] = []
 
   for (const t of sortedByDate(transactions)) {
+    const meta = transactionTypeMeta(t.type)
     const absQty = Math.abs(t.quantity)
 
-    if (t.quantity > 0) {
-      // Compra
-      const purchaseCost = absQty * t.price + t.fees
-      accumulatedCost += purchaseCost
-      quantity += absQty
-      cashFlows.push({ date: t.date, value: -purchaseCost })
+    if (meta.costEffect === 'RETURN_OF_CAPITAL') {
+      // Devolução de capital: entra dinheiro, o custo cai e a quantidade fica igual.
+      if (quantity <= 0) continue
 
-      const purchaseCostBrl = absQty * t.priceBrl + t.feesBrl
-      accumulatedCostBrl += purchaseCostBrl
-      cashFlowsBrl.push({ date: t.date, value: -purchaseCostBrl })
-    } else if (t.quantity < 0 && quantity > 0) {
-      // Venda
+      const returned = absQty * t.price - t.fees
+      const returnedBrl = absQty * t.priceBrl - t.feesBrl
+
+      // Devolveram mais do que custou: o custo para em zero e a sobra vira ganho.
+      realizedPnl += Math.max(0, returned - accumulatedCost)
+      realizedPnlBrl += Math.max(0, returnedBrl - accumulatedCostBrl)
+      accumulatedCost = Math.max(0, accumulatedCost - returned)
+      accumulatedCostBrl = Math.max(0, accumulatedCostBrl - returnedBrl)
+
+      cashFlows.push({ date: t.date, value: returned })
+      cashFlowsBrl.push({ date: t.date, value: returnedBrl })
+      continue
+    }
+
+    if (meta.sign > 0) {
+      // Compra, bonificação e desdobramento — aumentam a posição.
+      quantity += absQty
+
+      if (meta.costEffect !== 'NONE') {
+        // MARKET soma a corretagem ao custo; FIXED_PRICE entra ao custo atribuído, sem taxas.
+        const cost = absQty * t.price + t.fees
+        const costBrl = absQty * t.priceBrl + t.feesBrl
+        accumulatedCost += cost
+        accumulatedCostBrl += costBrl
+
+        if (meta.cashFlow) {
+          cashFlows.push({ date: t.date, value: -cost })
+          cashFlowsBrl.push({ date: t.date, value: -costBrl })
+        }
+      }
+      continue
+    }
+
+    // Reduzir sem posição não faz nada — vale para venda e para agrupamento.
+    if (quantity <= 0) continue
+
+    if (meta.costEffect === 'MARKET') {
+      // Venda: baixa o custo pelo preço médio e realiza o resultado.
       const avgPrice = accumulatedCost / quantity
       const avgPriceBrl = accumulatedCostBrl / quantity
 
@@ -78,10 +113,14 @@ export function calculatePosition(transactions: readonly TransactionData[]): Pos
       realizedPnlBrl += saleProceedsBrl - costOfSoldBrl
       accumulatedCostBrl -= costOfSoldBrl
 
-      quantity -= absQty
-      cashFlows.push({ date: t.date, value: saleProceeds })
-      cashFlowsBrl.push({ date: t.date, value: saleProceedsBrl })
+      if (meta.cashFlow) {
+        cashFlows.push({ date: t.date, value: saleProceeds })
+        cashFlowsBrl.push({ date: t.date, value: saleProceedsBrl })
+      }
     }
+    // Agrupamento (`NONE`): o custo total fica de pé sobre menos ações — o preço médio sobe.
+
+    quantity -= absQty
   }
 
   if (quantity < QUANTITY_EPSILON) quantity = 0

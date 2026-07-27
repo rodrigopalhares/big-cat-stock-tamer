@@ -33,27 +33,149 @@ describe('TransactionService', () => {
 
   describe('resolvePrice', () => {
     it('preço e taxas informados diretamente', () => {
-      expect(service.resolvePrice(25.5, null, 10, 100)).toEqual({ price: 25.5, fees: 10 })
+      expect(service.resolvePrice('BUY', 25.5, null, 10, 100)).toEqual({ price: 25.5, fees: 10 })
     })
 
     it('valor total com preço unitário calcula as taxas', () => {
       // 100 × 25 = 2500; total 2510 ⇒ taxas 10
-      expect(service.resolvePrice(25, 2510, 0, 100)).toEqual({ price: 25, fees: 10 })
+      expect(service.resolvePrice('BUY', 25, 2510, 0, 100)).toEqual({ price: 25, fees: 10 })
     })
 
     it('valor total sem preço unitário calcula o preço', () => {
       // (2510 − 10) / 100 = 25
-      expect(service.resolvePrice(null, 2510, 10, 100)).toEqual({ price: 25, fees: 10 })
+      expect(service.resolvePrice('BUY', null, 2510, 10, 100)).toEqual({ price: 25, fees: 10 })
     })
 
     it('sem preço e sem total dá 400', () => {
-      expect(() => service.resolvePrice(null, null, 0, 100)).toThrow(
+      expect(() => service.resolvePrice('BUY', null, null, 0, 100)).toThrow(
         /Informe o preço unitário ou o valor total/,
       )
     })
 
     it('preço zero e sem total dá 400', () => {
-      expect(() => service.resolvePrice(0, null, 0, 100)).toThrow()
+      expect(() => service.resolvePrice('BUY', 0, null, 0, 100)).toThrow()
+    })
+
+    it('desdobramento não exige preço e zera preço e taxas', () => {
+      expect(service.resolvePrice('DESDOBRAMENTO', null, null, 0, 100)).toEqual({
+        price: 0,
+        fees: 0,
+      })
+    })
+
+    it('agrupamento descarta preço e taxas digitados', () => {
+      expect(service.resolvePrice('AGRUPAMENTO', 99, null, 7, 100)).toEqual({ price: 0, fees: 0 })
+    })
+
+    it('bonificação sem custo atribuído vale zero', () => {
+      expect(service.resolvePrice('BONIFICACAO', null, null, 0, 10)).toEqual({ price: 0, fees: 0 })
+    })
+
+    it('bonificação preserva o custo atribuído e zera as taxas', () => {
+      expect(service.resolvePrice('BONIFICACAO', 5, null, 7, 10)).toEqual({ price: 5, fees: 0 })
+    })
+
+    it('redução de capital exige valor por ação, como compra e venda', () => {
+      expect(() => service.resolvePrice('REDUCAO_CAPITAL', null, null, 0, 100)).toThrow(
+        /Informe o preço unitário ou o valor total/,
+      )
+    })
+
+    it('redução de capital deduz o valor por ação a partir do total recebido', () => {
+      // (200 − 0) / 100 = 2 por ação
+      expect(service.resolvePrice('REDUCAO_CAPITAL', null, 200, 0, 100)).toEqual({
+        price: 2,
+        fees: 0,
+      })
+    })
+
+    it('tipo desconhecido não passa em silêncio', () => {
+      expect(() => service.resolvePrice('QUALQUER', 10, null, 0, 1)).toThrow(
+        /Tipo de transação desconhecido/,
+      )
+    })
+  })
+
+  describe('eventos societários', () => {
+    beforeEach(async () => {
+      await createAsset(db, 'PETR4')
+    })
+
+    it('bonificação é gravada positiva, com o custo atribuído', async () => {
+      const tx = await service.createTransaction('PETR4', {
+        type: 'BONIFICACAO',
+        quantity: 10,
+        price: 5,
+        fees: 0,
+        date: isoDate('2024-03-01'),
+      })
+
+      expect(tx).toMatchObject({ type: 'BONIFICACAO', quantity: 10, price: 5, fees: 0 })
+    })
+
+    it('desdobramento grava preço e taxas zerados mesmo se vierem preenchidos', async () => {
+      const tx = await service.createTransaction('PETR4', {
+        type: 'DESDOBRAMENTO',
+        quantity: 100,
+        price: 42,
+        fees: 9,
+        date: isoDate('2024-03-01'),
+      })
+
+      expect(tx).toMatchObject({ type: 'DESDOBRAMENTO', quantity: 100, price: 0, fees: 0 })
+      expect(tx.priceBrl).toBe(0)
+      expect(tx.feesBrl).toBe(0)
+    })
+
+    it('agrupamento é gravado com quantidade negativa', async () => {
+      const tx = await service.createTransaction('PETR4', {
+        type: 'AGRUPAMENTO',
+        quantity: 900,
+        price: 0,
+        fees: 0,
+        date: isoDate('2024-03-01'),
+      })
+
+      expect(tx).toMatchObject({ type: 'AGRUPAMENTO', quantity: -900 })
+    })
+
+    it('tipo em minúscula é normalizado', async () => {
+      const tx = await service.createTransaction('PETR4', {
+        type: 'desdobramento',
+        quantity: 50,
+        price: 0,
+        fees: 0,
+        date: isoDate('2024-03-01'),
+      })
+
+      expect(tx.type).toBe('DESDOBRAMENTO')
+    })
+
+    it('redução de capital é gravada positiva e mantém o valor por ação', async () => {
+      const tx = await service.createTransaction('PETR4', {
+        type: 'REDUCAO_CAPITAL',
+        quantity: 100,
+        price: 2,
+        fees: 0,
+        date: isoDate('2024-03-01'),
+      })
+
+      expect(tx).toMatchObject({ type: 'REDUCAO_CAPITAL', quantity: 100, price: 2 })
+    })
+
+    it('editar para agrupamento inverte o sinal e limpa o preço', async () => {
+      const created = await createTransaction(db, 'PETR4', { quantity: 100, price: 20 })
+
+      await service.updateTransaction(created.id, {
+        type: 'AGRUPAMENTO',
+        quantity: 90,
+        price: 20,
+        fees: 3,
+        date: isoDate('2024-04-01'),
+      })
+
+      const updated = await db.transaction.findUniqueOrThrow({ where: { id: created.id } })
+      expect(updated).toMatchObject({ type: 'AGRUPAMENTO', quantity: -90, price: 0, fees: 0 })
     })
   })
 

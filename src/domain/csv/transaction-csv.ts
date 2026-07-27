@@ -1,5 +1,11 @@
 import { fromBrazilianDate } from '../../shared/iso-date.js'
-import { type Currency, isCurrency, type TransactionType } from '../constants.js'
+import { transactionTypeMeta } from '../../shared/transaction-types.js'
+import {
+  type Currency,
+  isCurrency,
+  TRANSACTION_TYPE_ALIASES,
+  type TransactionType,
+} from '../constants.js'
 import { formatBrazilianNumber, parseBrazilianNumber } from './br-number.js'
 
 /**
@@ -7,8 +13,15 @@ import { formatBrazilianNumber, parseBrazilianNumber } from './br-number.js'
  * Porte da parte pura de src/main/kotlin/com/stocks/service/CsvParsingService.kt.
  *
  * Colunas esperadas, separadas por TAB:
- *   0 ticker · 1 data (dd/MM/yyyy) · 2 tipo (C/V) · 3 quantidade · 4 preço unitário
- *   5 taxas · 6 corretora · 7 IRRF · 8 moeda · 9 observações
+ *   0 ticker · 1 data (dd/MM/yyyy) · 2 tipo (C/V/B/D/A/R.CAP) · 3 quantidade
+ *   4 preço unitário · 5 taxas · 6 corretora · 7 IRRF · 8 moeda · 9 observações
+ *
+ * Nos eventos societários a quantidade é o delta de ações: B(onificação) e D(esdobramento)
+ * somam, A(grupamento) subtrai. A coluna de preço só é lida na bonificação, como custo
+ * unitário atribuído — nos outros dois o service zera preço e taxas.
+ *
+ * R.CAP é a exceção: a quantidade é a base de ações que recebeu a devolução (a posição não
+ * muda) e o preço é o valor devolvido por ação, que abate o custo.
  */
 
 export type AssetStatus = 'EXISTS' | 'WILL_CREATE' | 'UNKNOWN'
@@ -118,7 +131,7 @@ function parseSingleRow(
 
   const rawType = column(cols, 2).trim().toUpperCase()
   const type = normalizeType(rawType)
-  if (type === null) errors.push(`Tipo inválido: ${rawType} (esperado C ou V)`)
+  if (type === null) errors.push(`Tipo inválido: ${rawType} (esperado C, V, B, D, A ou R.CAP)`)
 
   const rawQuantity = column(cols, 3)
   const quantity = parseBrazilianNumber(rawQuantity)
@@ -153,7 +166,7 @@ function parseSingleRow(
     ticker,
     date: parsedDate ?? rawDate,
     type: type ?? rawType,
-    quantity: type === 'SELL' ? -absQuantity : absQuantity,
+    quantity: (type === null ? 1 : transactionTypeMeta(type).sign) * absQuantity,
     price: price ?? 0,
     fees: taxes + irrf,
     broker,
@@ -165,16 +178,7 @@ function parseSingleRow(
 }
 
 function normalizeType(raw: string): TransactionType | null {
-  switch (raw) {
-    case 'C':
-    case 'BUY':
-      return 'BUY'
-    case 'V':
-    case 'SELL':
-      return 'SELL'
-    default:
-      return null
-  }
+  return TRANSACTION_TYPE_ALIASES[raw] ?? null
 }
 
 /** Equivale ao `String.lines().filter { it.isNotBlank() }` do Kotlin. */

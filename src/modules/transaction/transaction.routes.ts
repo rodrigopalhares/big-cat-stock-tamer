@@ -77,6 +77,7 @@ export function transactionRoutes(c: Container): FastifyPluginAsync {
     app.post('/transactions/new', async (req, reply) => {
       const form = TransactionForm.parse(req.body)
       const resolved = c.transactions.resolvePrice(
+        form.type,
         form.price,
         form.total_price,
         form.fees,

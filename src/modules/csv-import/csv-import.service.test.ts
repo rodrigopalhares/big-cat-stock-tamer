@@ -171,6 +171,69 @@ describe('CsvImportService', () => {
       expect(tx.quantity).toBe(-50)
     })
 
+    it('agrupamento entra com quantidade negativa mesmo vindo positivo', async () => {
+      await createAsset(db, 'PETR4')
+
+      await service.batchImport([
+        {
+          ticker: 'PETR4',
+          date: '2024-06-01',
+          type: 'AGRUPAMENTO',
+          quantity: 900,
+          price: 0,
+          fees: 0,
+          broker: '',
+          notes: '',
+          currency: 'BRL',
+        },
+      ])
+
+      const tx = await db.transaction.findFirstOrThrow()
+      expect(tx).toMatchObject({ type: 'AGRUPAMENTO', quantity: -900 })
+    })
+
+    it('desdobramento importado descarta preço e taxas da planilha', async () => {
+      await createAsset(db, 'PETR4')
+
+      await service.batchImport([
+        {
+          ticker: 'PETR4',
+          date: '2024-06-01',
+          type: 'DESDOBRAMENTO',
+          quantity: 100,
+          price: 25,
+          fees: 8,
+          broker: '',
+          notes: '',
+          currency: 'BRL',
+        },
+      ])
+
+      const tx = await db.transaction.findFirstOrThrow()
+      expect(tx).toMatchObject({ type: 'DESDOBRAMENTO', quantity: 100, price: 0, fees: 0 })
+    })
+
+    it('bonificação importada mantém o custo atribuído', async () => {
+      await createAsset(db, 'PETR4')
+
+      await service.batchImport([
+        {
+          ticker: 'PETR4',
+          date: '2024-06-01',
+          type: 'BONIFICACAO',
+          quantity: 10,
+          price: 5,
+          fees: 3,
+          broker: '',
+          notes: '',
+          currency: 'BRL',
+        },
+      ])
+
+      const tx = await db.transaction.findFirstOrThrow()
+      expect(tx).toMatchObject({ type: 'BONIFICACAO', quantity: 10, price: 5, fees: 0 })
+    })
+
     it('lista vazia insere zero', async () => {
       expect(await service.batchImport([])).toBe(0)
     })

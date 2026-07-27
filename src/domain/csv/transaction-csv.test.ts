@@ -243,6 +243,64 @@ describe('parseCsvRows', () => {
     expect(parseCsvRows(sell, existingTickers, resolver)[0]?.type).toBe('SELL')
   })
 
+  it('eventos societários têm letra própria', () => {
+    const row = (type: string) => `PETR4\t01/06/2024\t${type}\t10\t0\t0\tXP\t0\tBRL\t`
+
+    expect(parseCsvRows(row('B'), existingTickers, resolver)[0]?.type).toBe('BONIFICACAO')
+    expect(parseCsvRows(row('BN'), existingTickers, resolver)[0]?.type).toBe('BONIFICACAO')
+    expect(parseCsvRows(row('D'), existingTickers, resolver)[0]?.type).toBe('DESDOBRAMENTO')
+    expect(parseCsvRows(row('A'), existingTickers, resolver)[0]?.type).toBe('AGRUPAMENTO')
+  })
+
+  it('nomes por extenso e os apelidos das corretoras também são aceitos', () => {
+    const row = (type: string) => `PETR4\t01/06/2024\t${type}\t10\t0\t0\tXP\t0\tBRL\t`
+
+    expect(parseCsvRows(row('BONIFICAÇÃO'), existingTickers, resolver)[0]?.type).toBe('BONIFICACAO')
+    expect(parseCsvRows(row('SPLIT'), existingTickers, resolver)[0]?.type).toBe('DESDOBRAMENTO')
+    expect(parseCsvRows(row('GRUPAMENTO'), existingTickers, resolver)[0]?.type).toBe('AGRUPAMENTO')
+    expect(parseCsvRows(row('INPLIT'), existingTickers, resolver)[0]?.type).toBe('AGRUPAMENTO')
+    expect(parseCsvRows(row('COMPRA'), existingTickers, resolver)[0]?.type).toBe('BUY')
+    expect(parseCsvRows(row('VENDA'), existingTickers, resolver)[0]?.type).toBe('SELL')
+  })
+
+  it('redução de capital atende por R.CAP', () => {
+    const row = (type: string) => `PETR4\t01/06/2024\t${type}\t100\t2,00\t0\tXP\t0\tBRL\t`
+
+    expect(parseCsvRows(row('R.CAP'), existingTickers, resolver)[0]).toMatchObject({
+      type: 'REDUCAO_CAPITAL',
+      quantity: 100,
+      price: 2,
+      error: null,
+    })
+    expect(parseCsvRows(row('RCAP'), existingTickers, resolver)[0]?.type).toBe('REDUCAO_CAPITAL')
+    expect(parseCsvRows(row('REDUÇÃO DE CAPITAL'), existingTickers, resolver)[0]?.type).toBe(
+      'REDUCAO_CAPITAL',
+    )
+  })
+
+  it('só o agrupamento sai com quantidade negativa', () => {
+    const row = (type: string) => `PETR4\t01/06/2024\t${type}\t10\t0\t0\tXP\t0\tBRL\t`
+
+    expect(parseCsvRows(row('B'), existingTickers, resolver)[0]?.quantity).toBe(10)
+    expect(parseCsvRows(row('D'), existingTickers, resolver)[0]?.quantity).toBe(10)
+    expect(parseCsvRows(row('A'), existingTickers, resolver)[0]?.quantity).toBe(-10)
+  })
+
+  it('desdobramento sem preço não é erro', () => {
+    const csv = 'PETR4\t01/06/2024\tD\t100\t\t\tXP\t0\tBRL\t'
+    const rows = parseCsvRows(csv, existingTickers, resolver)
+
+    expect(rows[0]?.error).toBeNull()
+    expect(rows[0]).toMatchObject({ type: 'DESDOBRAMENTO', quantity: 100, price: 0 })
+  })
+
+  it('bonificação carrega o custo unitário atribuído na coluna de preço', () => {
+    const csv = 'PETR4\t01/06/2024\tB\t10\t5,00\t0\tXP\t0\tBRL\t'
+    const rows = parseCsvRows(csv, existingTickers, resolver)
+
+    expect(rows[0]).toMatchObject({ type: 'BONIFICACAO', quantity: 10, price: 5, error: null })
+  })
+
   it('colunas opcionais ausentes usam os padrões', () => {
     const csv = 'PETR4\t01/06/2024\tC\t100\t25,50\t0\tXP'
     const rows = parseCsvRows(csv, existingTickers, resolver)

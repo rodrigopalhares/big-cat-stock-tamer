@@ -1,6 +1,8 @@
 import { z } from 'zod'
+import { TRANSACTION_TYPES } from '../../domain/constants.js'
 import type { Transaction } from '../../generated/prisma/client.js'
 import type { IsoDate } from '../../shared/iso-date.js'
+import { feesSign, transactionTypeMeta } from '../../shared/transaction-types.js'
 
 /** Porte de src/main/kotlin/com/stocks/dto/TransactionDtos.kt. */
 
@@ -28,7 +30,7 @@ export const TransactionEditForm = TransactionForm.omit({ ticker: true, total_pr
 
 export const TransactionApiRequest = z.object({
   assetId: z.string().min(1),
-  type: z.enum(['BUY', 'SELL']),
+  type: z.enum(TRANSACTION_TYPES),
   quantity: z.number().positive(),
   price: z.number().nonnegative(),
   fees: z.number().default(0),
@@ -57,7 +59,7 @@ export type TransactionView = {
 
 export function toTransactionView(tx: Transaction): TransactionView {
   const absQuantity = Math.abs(tx.quantity)
-  const sign = tx.type === 'BUY' ? 1 : -1
+  const sign = feesSign(transactionTypeMeta(tx.type))
   return {
     id: tx.id,
     assetTicker: tx.assetId,

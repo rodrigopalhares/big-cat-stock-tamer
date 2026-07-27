@@ -1,9 +1,10 @@
 import type { Db } from '../../config/db.js'
-import type { Currency, TransactionType } from '../../domain/constants.js'
+import type { Currency } from '../../domain/constants.js'
 import type { Asset, Transaction } from '../../generated/prisma/client.js'
 import type { YahooClient } from '../../integrations/yahoo/yahoo.client.js'
 import { HttpError } from '../../shared/http-error.js'
 import type { IsoDate } from '../../shared/iso-date.js'
+import { transactionTypeMeta } from '../../shared/transaction-types.js'
 import type { ExchangeRateService } from '../exchange-rate/exchange-rate.service.js'
 
 /** Porte de src/main/kotlin/com/stocks/service/TransactionService.kt. */
@@ -73,13 +74,21 @@ export class TransactionService {
    * Deduz preço unitário e taxas a partir do que o formulário trouxe.
    * Com o valor total preenchido, calcula o que faltar: preço a partir do total,
    * ou taxas como a diferença entre o total e quantidade × preço.
+   *
+   * Evento sem caixa não negocia preço, então sai antes da exigência de preço ou total.
+   * A redução de capital passa pela regra normal — sem valor por ação ela não diz nada.
    */
   resolvePrice(
+    type: string,
     price: number | null | undefined,
     totalPrice: number | null | undefined,
     fees: number,
     quantity: number,
   ): ResolvedPrice {
+    if (!transactionTypeMeta(normalizeType(type)).cashFlow) {
+      return normalizePriceFees(type, price ?? 0, fees)
+    }
+
     let resolvedPrice = price ?? null
     let resolvedFees = fees
 
@@ -142,16 +151,20 @@ export class TransactionService {
       input.date,
     )
 
-    const type = input.type.toUpperCase()
+    const type = normalizeType(input.type)
+    const meta = transactionTypeMeta(type)
+    const normalized = normalizePriceFees(type, converted.price, converted.fees)
+    const normalizedBrl = normalizePriceFees(type, converted.priceBrl, converted.feesBrl)
+
     await this.db.transaction.update({
       where: { id },
       data: {
         type,
-        quantity: type === 'SELL' ? -input.quantity : input.quantity,
-        price: converted.price,
-        fees: converted.fees,
-        priceBrl: converted.priceBrl,
-        feesBrl: converted.feesBrl,
+        quantity: meta.sign * Math.abs(input.quantity),
+        price: normalized.price,
+        fees: normalized.fees,
+        priceBrl: normalizedBrl.price,
+        feesBrl: normalizedBrl.fees,
         currency: assetCurrency,
         date: input.date,
         broker: blankToNull(input.broker),
@@ -256,17 +269,20 @@ export class TransactionService {
       asset.currency,
       input.date,
     )
-    const type = input.type.trim().toUpperCase() as TransactionType
+    const type = normalizeType(input.type)
+    const meta = transactionTypeMeta(type)
+    const normalized = normalizePriceFees(type, converted.price, converted.fees)
+    const normalizedBrl = normalizePriceFees(type, converted.priceBrl, converted.feesBrl)
 
     return this.db.transaction.create({
       data: {
         assetId,
         type,
-        quantity: type === 'SELL' ? -input.quantity : input.quantity,
-        price: converted.price,
-        fees: converted.fees,
-        priceBrl: converted.priceBrl,
-        feesBrl: converted.feesBrl,
+        quantity: meta.sign * Math.abs(input.quantity),
+        price: normalized.price,
+        fees: normalized.fees,
+        priceBrl: normalizedBrl.price,
+        feesBrl: normalizedBrl.fees,
         currency: asset.currency as Currency,
         date: input.date,
         broker: blankToNull(input.broker),
@@ -298,4 +314,29 @@ export class TransactionService {
 
 function blankToNull(value: string | null | undefined): string | null {
   return value === undefined || value === null || value.trim() === '' ? null : value
+}
+
+function normalizeType(type: string): string {
+  return type.trim().toUpperCase()
+}
+
+/**
+ * Preço e taxas que o tipo admite, aplicado imediatamente antes de gravar.
+ *
+ * Fica aqui, e não na rota, porque o formulário HTML é só um dos três caminhos de escrita —
+ * a API JSON e o lote do CSV não passam por `resolvePrice`. Sem isso, um desdobramento
+ * vindo da API guardaria o preço que o cliente mandasse e a tabela mostraria um valor que
+ * o cálculo ignora.
+ */
+function normalizePriceFees(type: string, price: number, fees: number): ResolvedPrice {
+  switch (transactionTypeMeta(normalizeType(type)).costEffect) {
+    case 'MARKET':
+    case 'RETURN_OF_CAPITAL':
+      return { price, fees }
+    case 'FIXED_PRICE':
+      // Bonificação: o custo atribuído vale, corretagem não existe.
+      return { price, fees: 0 }
+    case 'NONE':
+      return { price: 0, fees: 0 }
+  }
 }

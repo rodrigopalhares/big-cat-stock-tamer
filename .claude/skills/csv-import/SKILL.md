@@ -52,7 +52,7 @@ Tab-separated, one transaction per line. Columns by index:
 |-------|-------|---------|-------|
 | 0 | Ticker | `PETR4` | Uppercased automatically |
 | 1 | Date | `15/03/2025` | Brazilian format dd/MM/yyyy, converted to ISO |
-| 2 | Type | `C` or `V` | Mapped to BUY / SELL |
+| 2 | Type | `C`, `V`, `B`, `D`, `A`, `R.CAP` | Resolved through `TRANSACTION_TYPE_ALIASES` |
 | 3 | Quantity | `1.000,50` | Brazilian number format |
 | 4 | Unit Price | `28,45` | Brazilian number format |
 | 5 | Taxes | `4,50` | Brazilian number format |
@@ -62,6 +62,32 @@ Tab-separated, one transaction per line. Columns by index:
 | 9 | Notes | `Split` | Optional free text |
 
 Parsing lives in `parseCsvRows()` and `parseSingleRow()` inside `transaction-csv.ts`.
+
+### Transaction types in column 2
+
+`normalizeType()` is a lookup into `TRANSACTION_TYPE_ALIASES` (`src/domain/constants.ts`) — add a
+spelling there, not in the parser. What each type does with quantity, cost and cash flow lives in
+the `TRANSACTION_TYPE_META` table in `src/shared/transaction-types.ts` — that map is the single
+source of truth, read by the calculation, the views and the browser bundle alike.
+
+| Column value | Type | Quantity column means | Price column means |
+|---|---|---|---|
+| `C`, `COMPRA`, `BUY` | BUY | shares bought | unit price paid |
+| `V`, `VENDA`, `SELL` | SELL | shares sold | unit price received |
+| `B`, `BN`, `BONIFICACAO` | BONIFICACAO | shares received | attributed unit cost (0 if blank) |
+| `D`, `DESDOBRAMENTO`, `SPLIT` | DESDOBRAMENTO | shares **gained** (delta, not the new total) | ignored, forced to 0 |
+| `A`, `AGRUPAMENTO`, `GRUPAMENTO`, `INPLIT` | AGRUPAMENTO | shares **lost** (delta) | ignored, forced to 0 |
+| `R.CAP`, `RCAP`, `REDUCAO DE CAPITAL` | REDUCAO_CAPITAL | share base that received the payout (position is unchanged) | amount returned per share |
+
+Two traps worth knowing:
+
+- **The parser signs the quantity for preview only.** `AGRUPAMENTO` comes out negative there, but
+  `batchImport()` passes `Math.abs()` and `insert()` re-derives the sign from the final type — so
+  changing the type in the step-2 dropdown always yields the right sign.
+- **Price and taxes are normalized server-side**, in `normalizePriceFees()` inside
+  `transaction.service.ts`, not in the parser. A stray price on a `D`/`A` row is discarded, and
+  taxes are zeroed for every type except BUY, SELL and R.CAP. This is the one enforcement point
+  shared by the HTML form, the CSV batch and the JSON API.
 
 ## Key DTOs
 

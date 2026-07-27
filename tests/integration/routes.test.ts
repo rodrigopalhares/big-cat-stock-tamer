@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { TRANSACTION_TYPES } from '../../src/domain/constants.js'
 import { monthLabel } from '../../src/shared/format.js'
 import { today } from '../../src/shared/iso-date.js'
 import { createHarness, type Harness } from '../app-harness.js'
@@ -341,6 +342,179 @@ describe('rotas da aplicação', () => {
       })
 
       expect(res.statusCode).toBe(400)
+    })
+
+    it('desdobramento sem preço é aceito e não exige preço nem total', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4', { quantity: 100, price: 20, date: '2024-01-02' })
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/transactions/new',
+        payload: {
+          ticker: 'PETR4',
+          type: 'DESDOBRAMENTO',
+          quantity: '100',
+          fees: '0',
+          date: '2024-06-01',
+          currency: 'BRL',
+        },
+      })
+
+      expect(res.statusCode).toBe(302)
+      // O custo total não muda; o preço médio cai pela metade.
+      const asset = await h.db.asset.findUniqueOrThrow({ where: { ticker: 'PETR4' } })
+      expect(asset.quantity).toBeCloseTo(200, 4)
+      expect(asset.totalCost).toBeCloseTo(2000, 4)
+      expect(asset.avgPrice).toBeCloseTo(10, 4)
+    })
+
+    it('agrupamento reduz a posição sem realizar resultado', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4', { quantity: 1000, price: 1, date: '2024-01-02' })
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/transactions/new',
+        payload: {
+          ticker: 'PETR4',
+          type: 'AGRUPAMENTO',
+          quantity: '900',
+          fees: '0',
+          date: '2024-06-01',
+          currency: 'BRL',
+        },
+      })
+
+      expect(res.statusCode).toBe(302)
+      const asset = await h.db.asset.findUniqueOrThrow({ where: { ticker: 'PETR4' } })
+      expect(asset.quantity).toBeCloseTo(100, 4)
+      expect(asset.avgPrice).toBeCloseTo(10, 4)
+      expect(asset.realizedPnl).toBe(0)
+    })
+
+    it('bonificação com custo atribuído entra no preço médio', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4', { quantity: 100, price: 20, date: '2024-01-02' })
+
+      await h.app.inject({
+        method: 'POST',
+        url: '/transactions/new',
+        payload: {
+          ticker: 'PETR4',
+          type: 'BONIFICACAO',
+          quantity: '10',
+          price: '5',
+          fees: '0',
+          date: '2024-06-01',
+          currency: 'BRL',
+        },
+      })
+
+      const asset = await h.db.asset.findUniqueOrThrow({ where: { ticker: 'PETR4' } })
+      expect(asset.quantity).toBeCloseTo(110, 4)
+      expect(asset.totalCost).toBeCloseTo(2050, 4)
+    })
+
+    it('redução de capital abate o preço médio sem mexer na quantidade', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4', { quantity: 100, price: 20, date: '2024-01-02' })
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/transactions/new',
+        payload: {
+          ticker: 'PETR4',
+          type: 'REDUCAO_CAPITAL',
+          quantity: '100',
+          total_price: '200',
+          fees: '0',
+          date: '2024-06-01',
+          currency: 'BRL',
+        },
+      })
+
+      expect(res.statusCode).toBe(302)
+      const asset = await h.db.asset.findUniqueOrThrow({ where: { ticker: 'PETR4' } })
+      expect(asset.quantity).toBeCloseTo(100, 4)
+      expect(asset.totalCost).toBeCloseTo(1800, 4)
+      expect(asset.avgPrice).toBeCloseTo(18, 4)
+      expect(asset.realizedPnl).toBe(0)
+    })
+
+    it('os formulários de criação e de edição oferecem todos os tipos', async () => {
+      const res = await h.app.inject({ method: 'GET', url: '/transactions/' })
+
+      // Um `select` no formulário novo e outro no modal de edição, ambos com os seis tipos.
+      for (const id of ['txType', 'editTxType']) {
+        expect(res.body).toContain(`id="${id}"`)
+      }
+      for (const value of TRANSACTION_TYPES) {
+        expect(res.body.match(new RegExp(`value="${value}"`, 'g'))).toHaveLength(2)
+      }
+    })
+
+    it('a lista mostra o badge de cada evento societário', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4', { type: 'BONIFICACAO', quantity: 10, price: 5 })
+      await createTransaction(h.db, 'PETR4', { type: 'DESDOBRAMENTO', quantity: 100, price: 0 })
+      await createTransaction(h.db, 'PETR4', { type: 'AGRUPAMENTO', quantity: -90, price: 0 })
+      await createTransaction(h.db, 'PETR4', { type: 'REDUCAO_CAPITAL', quantity: 10, price: 2 })
+
+      const res = await h.app.inject({ method: 'GET', url: '/transactions/' })
+
+      expect(res.body).toContain('Bonificação')
+      expect(res.body).toContain('Desdobramento')
+      expect(res.body).toContain('Agrupamento')
+      expect(res.body).toContain('Redução de Capital')
+    })
+
+    it('a API JSON aceita evento societário e recusa tipo inventado', async () => {
+      await createAsset(h.db, 'PETR4')
+
+      const ok = await h.app.inject({
+        method: 'POST',
+        url: '/transactions/api',
+        payload: {
+          assetId: 'PETR4',
+          type: 'AGRUPAMENTO',
+          quantity: 900,
+          price: 0,
+          date: '2024-06-01',
+        },
+      })
+      expect(ok.statusCode).toBe(201)
+      expect(await h.db.transaction.findFirstOrThrow()).toMatchObject({ quantity: -900 })
+
+      // Recusa sem gravar. O código é 500 porque o ZodError não carrega `statusCode` e o
+      // setErrorHandler cai no padrão — vale para toda validação Zod do app, não só aqui.
+      const bad = await h.app.inject({
+        method: 'POST',
+        url: '/transactions/api',
+        payload: { assetId: 'PETR4', type: 'XPTO', quantity: 1, price: 1, date: '2024-06-01' },
+      })
+      expect(bad.statusCode).toBeGreaterThanOrEqual(400)
+      expect(await h.db.transaction.count()).toBe(1)
+    })
+
+    it('a API JSON não deixa desdobramento gravar preço', async () => {
+      await createAsset(h.db, 'PETR4')
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/transactions/api',
+        payload: {
+          assetId: 'PETR4',
+          type: 'DESDOBRAMENTO',
+          quantity: 100,
+          price: 99,
+          fees: 7,
+          date: '2024-06-01',
+        },
+      })
+
+      expect(res.statusCode).toBe(201)
+      expect(await h.db.transaction.findFirstOrThrow()).toMatchObject({ price: 0, fees: 0 })
     })
 
     it('exclui e redireciona', async () => {

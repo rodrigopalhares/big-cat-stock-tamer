@@ -22,7 +22,19 @@ export type DividendType = (typeof DIVIDEND_TYPES)[number]
 export const VALID_CURRENCIES = ['BRL', 'USD'] as const
 export type Currency = (typeof VALID_CURRENCIES)[number]
 
-export const TRANSACTION_TYPES = ['BUY', 'SELL'] as const
+/**
+ * Compra e venda movimentam dinheiro; os três eventos societários só ajustam a posição.
+ * O que cada tipo faz com quantidade, custo e fluxo de caixa está em
+ * `src/shared/transaction-types.ts` — aqui fica só a lista.
+ */
+export const TRANSACTION_TYPES = [
+  'BUY',
+  'SELL',
+  'BONIFICACAO',
+  'DESDOBRAMENTO',
+  'AGRUPAMENTO',
+  'REDUCAO_CAPITAL',
+] as const
 export type TransactionType = (typeof TRANSACTION_TYPES)[number]
 
 /** Variações que as corretoras usam para o mesmo tipo de provento. */
@@ -42,6 +54,32 @@ export const DIVIDEND_TYPE_ALIASES: Readonly<Record<string, DividendType>> = {
   BONIFICACAO: 'BONIFICACAO',
   BONIFICAÇÃO: 'BONIFICACAO',
   BTC: 'BTC',
+}
+
+/** Variações que as corretoras e o CSV usam para o mesmo tipo de transação. */
+export const TRANSACTION_TYPE_ALIASES: Readonly<Record<string, TransactionType>> = {
+  C: 'BUY',
+  COMPRA: 'BUY',
+  BUY: 'BUY',
+  V: 'SELL',
+  VENDA: 'SELL',
+  SELL: 'SELL',
+  B: 'BONIFICACAO',
+  BN: 'BONIFICACAO',
+  BONIFICACAO: 'BONIFICACAO',
+  BONIFICAÇÃO: 'BONIFICACAO',
+  D: 'DESDOBRAMENTO',
+  DESDOBRAMENTO: 'DESDOBRAMENTO',
+  SPLIT: 'DESDOBRAMENTO',
+  A: 'AGRUPAMENTO',
+  AGRUPAMENTO: 'AGRUPAMENTO',
+  GRUPAMENTO: 'AGRUPAMENTO',
+  INPLIT: 'AGRUPAMENTO',
+  'R.CAP': 'REDUCAO_CAPITAL',
+  RCAP: 'REDUCAO_CAPITAL',
+  REDUCAO_CAPITAL: 'REDUCAO_CAPITAL',
+  'REDUCAO DE CAPITAL': 'REDUCAO_CAPITAL',
+  'REDUÇÃO DE CAPITAL': 'REDUCAO_CAPITAL',
 }
 
 export function isAssetType(value: string): value is AssetType {

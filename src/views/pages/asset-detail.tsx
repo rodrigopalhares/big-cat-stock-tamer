@@ -3,7 +3,7 @@ import type { DividendView } from '../../modules/dividend/dividend.schema.js'
 import type { AssetPosition } from '../../modules/portfolio/portfolio.schema.js'
 import type { TransactionView } from '../../modules/transaction/transaction.schema.js'
 import { date as fmtDate, money, percent, quantity, signClass } from '../../shared/format.js'
-import { AssetBadge, DividendBadge } from '../components/badge.js'
+import { AssetBadge, DividendBadge, TransactionBadge } from '../components/badge.js'
 import { Layout } from '../layout.js'
 import { EditTransactionModal } from './transactions.js'
 
@@ -168,9 +168,7 @@ function TransactionsTable({
             <tr>
               <td>{fmtDate(t.date)}</td>
               <td>
-                <span class={`badge ${t.type === 'BUY' ? 'bg-success' : 'bg-danger'}`}>
-                  {t.type === 'BUY' ? 'Compra' : 'Venda'}
-                </span>
+                <TransactionBadge type={t.type} />
               </td>
               <td class="text-end">{quantity(t.quantity)}</td>
               <td class="text-end">{money(t.price, t.currency)}</td>

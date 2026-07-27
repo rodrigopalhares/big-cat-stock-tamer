@@ -6,6 +6,8 @@
  * duas etapas chega via HTMX depois do load, e delegar é o que faz isso continuar funcionando.
  */
 
+import { transactionTypeMetaOrNull } from '../shared/transaction-types.js'
+
 type AssetDraft = {
   ticker: string
   name: string
@@ -27,6 +29,66 @@ const setValue = (id: string, value: string): void => {
   const el = byId<HTMLInputElement>(id)
   if (el !== null) el.value = value
 }
+
+// --- formulário: campos que cada tipo admite ---
+
+/**
+ * Mostra ou esconde preço, valor total e taxas conforme o tipo escolhido.
+ *
+ * Desdobramento e agrupamento não têm preço; bonificação tem só o custo atribuído. Esconder
+ * é conveniência — quem garante o valor gravado é `normalizePriceFees` no servidor, que
+ * também cobre a API e o CSV. Os campos ficam apenas ocultos, nunca `disabled`: o valor
+ * ainda é enviado e descartado lá.
+ */
+function applyTypeVisibility(prefix: string): void {
+  const select = byId<HTMLSelectElement>(`${prefix}Type`)
+  if (select === null) return
+
+  const meta = transactionTypeMetaOrNull(select.value)
+  const showPrice = meta === null || meta.priceFieldLabel !== null
+  // Valor total e taxas só fazem sentido onde dinheiro se move.
+  const showCashFields = meta === null || meta.cashFlow
+
+  toggleGroup(`${prefix}PriceCol`, showPrice)
+  toggleGroup(`${prefix}FeesCol`, showCashFields)
+  toggleGroup(`${prefix}MarketExtrasRow`, showCashFields)
+  toggleGroup(`${prefix}MarketRow`, showPrice || showCashFields)
+
+  const priceLabel = byId(`${prefix}PriceLabel`)
+  if (priceLabel !== null) priceLabel.textContent = meta?.priceFieldLabel ?? 'Preço Unit.'
+
+  // Campo obrigatório e escondido trava o submit sem dizer por quê.
+  const priceInput = byId<HTMLInputElement>(`${prefix}Price`)
+  if (priceInput !== null && priceInput.dataset['requiredWhenVisible'] === 'true') {
+    priceInput.required = showPrice
+  }
+
+  const hint = byId(`${prefix}TypeHint`)
+  if (hint !== null) hint.textContent = TYPE_HINTS[select.value] ?? ''
+}
+
+/** Texto de apoio: a regra de "quantidade é o delta" não é óbvia sem dizer. */
+const TYPE_HINTS: Record<string, string> = {
+  BONIFICACAO: 'Quantidade de ações recebidas. O custo atribuído entra no preço médio.',
+  DESDOBRAMENTO: 'Quantidade de ações ganhas no desdobramento, não a posição final.',
+  AGRUPAMENTO: 'Quantidade de ações reduzidas no agrupamento, não a posição final.',
+  REDUCAO_CAPITAL:
+    'Quantidade de ações que receberam a devolução — a posição não muda. ' +
+    'O valor recebido abate o preço médio.',
+}
+
+function toggleGroup(id: string, show: boolean): void {
+  byId(id)?.classList.toggle('d-none', !show)
+}
+
+document.addEventListener('change', (event) => {
+  const target = event.target
+  if (target instanceof HTMLSelectElement && target.matches('[data-tx-type-select]')) {
+    applyTypeVisibility(target.id.replace(/Type$/, ''))
+  }
+})
+
+document.addEventListener('DOMContentLoaded', () => applyTypeVisibility('tx'))
 
 // --- formulário: quantidade, preço, total e taxas se completam ---
 
@@ -86,10 +148,7 @@ document.addEventListener('click', (event) => {
   if (form === null) return
 
   form.action = `/transactions/${d['txId']}/edit`
-  const buy = byId<HTMLInputElement>('editTxTypeBuy')
-  const sell = byId<HTMLInputElement>('editTxTypeSell')
-  if (buy !== null) buy.checked = d['txType'] === 'BUY'
-  if (sell !== null) sell.checked = d['txType'] === 'SELL'
+  setValue('editTxType', d['txType'] || 'BUY')
   setValue('editTxCurrency', d['txCurrency'] || 'BRL')
   setValue('editTxQty', d['txQuantity'] ?? '')
   setValue('editTxPrice', d['txPrice'] ?? '')
@@ -97,6 +156,7 @@ document.addEventListener('click', (event) => {
   setValue('editTxDate', d['txDate'] ?? '')
   setValue('editTxBroker', d['txBroker'] ?? '')
   setValue('editTxNotes', d['txNotes'] ?? '')
+  applyTypeVisibility('editTx')
 
   const returnTo = trigger.dataset['returnTo']
   byId('editTxReturnTo')?.remove()

@@ -1,4 +1,5 @@
 import type { AssetStatus, CsvRow } from '../../domain/csv/transaction-csv.js'
+import { TRANSACTION_TYPE_LIST } from '../../shared/transaction-types.js'
 
 /**
  * Etapa 2 do import de CSV: revisão das transações.
@@ -108,13 +109,12 @@ function PreviewRow({ row }: { row: CsvRow }) {
         />
       </td>
       <td>
-        <select class="form-select form-select-sm csv-field" data-field="type" style="width:90px">
-          <option value="BUY" selected={row.type === 'BUY'}>
-            Compra
-          </option>
-          <option value="SELL" selected={row.type === 'SELL'}>
-            Venda
-          </option>
+        <select class="form-select form-select-sm csv-field" data-field="type" style="width:140px">
+          {TRANSACTION_TYPE_LIST.map((meta) => (
+            <option value={meta.type} selected={row.type === meta.type}>
+              {meta.labelPt}
+            </option>
+          ))}
         </select>
       </td>
       <td>
