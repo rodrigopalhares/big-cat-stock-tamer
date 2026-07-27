@@ -20,6 +20,17 @@ so you can make targeted changes without exploring the codebase.
 - **Dividend types**: DIVIDENDO, JCP, RENDIMENTO, BONIFICACAO, BTC (`DIVIDEND_TYPES` in
   `src/domain/constants.ts`). `DIVIDEND_TYPE_ALIASES` maps broker spellings (DIVIDENDOS,
   JSCP, "JUROS SOBRE CAPITAL PROPRIO", BONIFICAÇÃO…) onto those five for CSV import.
+- **"Bonificação" is ambiguous — check which one the request means.** There are two
+  unrelated records with that name, each with its own type list, alias table and CSV path:
+  - *Provento* `BONIFICACAO` (this skill): a cash amount received. Feeds `dividendPnl` and
+    the XIRR, and **never touches quantity or preço médio**.
+  - *Transação* `BONIFICACAO` (`TRANSACTION_TYPES` in `src/domain/constants.ts`, behaviour in
+    `src/shared/transaction-types.ts`): ações recebidas. Increases quantity and adds
+    `qtd × custo unitário atribuído` to the cost basis, with **no cash flow**.
+
+  A request about the *value received* belongs here; one about *shares received* or preço
+  médio belongs to the transactions side. Lançar nos dois conta o mesmo evento em dobro —
+  the app does not warn about it.
 - **Net amount**: `totalAmount - taxWithheld` — what the investor actually receives.
 - **BRL conversion**: dividends store both the original values (`totalAmount`, `taxWithheld`)
   and the converted ones (`totalAmountBrl`, `taxWithheldBrl`). For BRL assets they are equal.

@@ -7,7 +7,7 @@ import { TRANSACTION_TYPES, type TransactionType } from '../domain/constants.js'
  * Antes o comportamento estava espalhado: o sinal da quantidade era decidido em dois
  * ternários no service e num terceiro no schema, a cor e o rótulo do badge eram um
  * `type === 'BUY' ? ... : ...` duplicado em duas páginas, e o `calculatePosition` nem
- * olhava o tipo — deduzia compra ou venda pelo sinal. Com cinco tipos isso não fecha:
+ * olhava o tipo — deduzia compra ou venda pelo sinal. Com seis tipos isso não fecha:
  * agrupamento também reduz a quantidade e não pode realizar resultado. Um mapa só resolve,
  * na mesma linha do que `shared/asset-colors.ts` fez com a paleta.
  */

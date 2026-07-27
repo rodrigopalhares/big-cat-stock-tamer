@@ -274,7 +274,7 @@ function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageP
 }
 
 /**
- * Cinco tipos não cabem num grupo de botões — vira `select`, percorrendo o mesmo mapa que
+ * Seis tipos não cabem num grupo de botões — vira `select`, percorrendo o mesmo mapa que
  * o cálculo usa, como a página de proventos já faz com `DIVIDEND_TYPES`.
  */
 function TransactionTypeSelect({
