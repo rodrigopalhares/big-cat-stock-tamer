@@ -10,7 +10,8 @@ export default defineConfig({
     setupFiles: ['tests/setup.ts'],
     coverage: {
       provider: 'v8',
-      include: ['src/**'],
+      // `src/**` pegaria também o README de views, que o v8 tenta parsear como código.
+      include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/generated/**', 'src/main.ts', 'src/client/**'],
     },
   },
