@@ -177,16 +177,31 @@ describe('PriceHistoryService', () => {
       expect(await db.priceHistory.count()).toBe(3)
     })
 
-    it('retoma a partir do último preço gravado', async () => {
+    it('retoma a partir do último preço quando a série já cobre a primeira transação', async () => {
       server.use(yahooChart('yahoo_chart_historical.json'))
       await createAsset(db, 'PETR3', { yfTicker: 'PETR3.SA' })
       await createTransaction(db, 'PETR3', { date: '2024-01-01' })
+      await createPriceHistory(db, 'PETR3', '2023-12-20', 38)
       await createPriceHistory(db, 'PETR3', '2024-06-29', 40)
 
       await service.runBackfill(TODAY)
 
       // O fixture é de março; com o corte em 30/06 nada novo entra.
-      expect(await db.priceHistory.count()).toBe(1)
+      expect(await db.priceHistory.count()).toBe(2)
+    })
+
+    it('busca o histórico antigo quando a série começa depois da primeira transação', async () => {
+      server.use(yahooChart('yahoo_chart_historical.json'))
+      await createAsset(db, 'PETR3', { yfTicker: 'PETR3.SA' })
+      await createTransaction(db, 'PETR3', { date: '2024-01-01' })
+      // O que a atualização diária deixa para trás: só o preço de hoje.
+      await createPriceHistory(db, 'PETR3', TODAY, 40)
+
+      await service.runBackfill(TODAY)
+
+      // Tomando o preço de hoje como marca d'água, o março do fixture nunca seria buscado.
+      const dates = (await db.priceHistory.findMany({ select: { date: true } })).map((p) => p.date)
+      expect(dates).toContain('2024-03-04')
     })
   })
 

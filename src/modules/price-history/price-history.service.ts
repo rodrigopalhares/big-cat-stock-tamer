@@ -54,6 +54,15 @@ export class PriceHistoryService {
     return (row?.date as IsoDate | undefined) ?? null
   }
 
+  async getFirstStoredDate(assetTicker: string): Promise<IsoDate | null> {
+    const row = await this.db.priceHistory.findFirst({
+      where: { assetId: assetTicker },
+      orderBy: { date: 'asc' },
+      select: { date: true },
+    })
+    return (row?.date as IsoDate | undefined) ?? null
+  }
+
   /** Grava os preços, sobrescrevendo o que já existir na mesma data. */
   async upsertPrices(records: readonly PriceRecord[]): Promise<void> {
     if (records.length === 0) return
@@ -100,11 +109,21 @@ export class PriceHistoryService {
 
     for (const asset of assets) {
       if (asset.firstTransactionDate === null) continue
-      const lastStored = await this.getLastStoredDate(asset.ticker)
-      const start =
-        lastStored !== null
-          ? addDays(lastStored, 1)
-          : ((minDate([asset.firstTransactionDate, fiveYearsAgo]) ?? fiveYearsAgo) as IsoDate)
+
+      const fullStart = (minDate([asset.firstTransactionDate, fiveYearsAgo]) ??
+        fiveYearsAgo) as IsoDate
+      const [firstStored, lastStored] = await Promise.all([
+        this.getFirstStoredDate(asset.ticker),
+        this.getLastStoredDate(asset.ticker),
+      ])
+
+      // Retomar do último preço gravado só vale quando a série já cobre a primeira transação.
+      // A atualização diária grava só o preço de hoje, e uma transação pode ser lançada com
+      // data retroativa: nos dois casos o topo da série não diz nada sobre o começo dela.
+      // Tomá-lo como marca d'água deixaria o histórico antigo sem preço para sempre — e sem
+      // preço a evolução patrimonial pula o mês inteiro.
+      const coversHistory = firstStored !== null && firstStored <= asset.firstTransactionDate
+      const start = coversHistory && lastStored !== null ? addDays(lastStored, 1) : fullStart
       if (start > today) continue
 
       startDates.set(asset.ticker, start)
