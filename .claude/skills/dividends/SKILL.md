@@ -59,7 +59,10 @@ so you can make targeted changes without exploring the codebase.
 |------|------|
 | `src/modules/portfolio/portfolio.schema.ts` | `dividendPnl` on `AssetPosition` and `PortfolioSummary` |
 | `src/modules/portfolio/portfolio.service.ts` | Merges PnL and cash flows into positions and XIRR |
-| `src/views/pages/dashboard.tsx` | "Proventos Recebidos" card + "Proventos" column |
+| `src/views/pages/dashboard.tsx` | "Proventos Recebidos" card, "Proventos" column and the "Proventos por Mês" chart |
+| `src/modules/portfolio/portfolio.routes.ts` | `buildDividendChart()` — feeds the monthly chart |
+| `src/domain/chart.ts` | Pure `buildMonthlyDividendSeries()` + the `DividendFlow` type |
+| `src/client/dashboard.ts` | Draws the chart; `TYPE_COLORS` is shared with the evolution chart |
 | `src/modules/asset/asset.routes.ts` | Asset detail page lists the asset's dividends |
 | `src/views/pages/asset-detail.tsx` | `DividendsTable` on the asset page |
 | `src/modules/evolution/evolution.service.ts` | Queries `dividend` directly for accumulated net income |
@@ -70,7 +73,8 @@ so you can make targeted changes without exploring the codebase.
 
 | File | Role |
 |------|------|
-| `src/modules/dividend/dividend.service.test.ts` | 17 tests — CRUD, filters, USD conversion, PnL, cash flows |
+| `src/modules/dividend/dividend.service.test.ts` | CRUD, filters, USD conversion, PnL, cash flows, chart flows |
+| `src/domain/chart.test.ts` | `buildMonthlyDividendSeries()` — month gaps, per-type sums |
 | `src/domain/csv/dividend-csv.test.ts` | Pure parsing of the dividend CSV |
 | `src/modules/csv-import/csv-import.service.test.ts` | Batch import into the DB |
 | `tests/integration/routes.test.ts` | HTML/JSON routes and portfolio integration |
@@ -128,6 +132,9 @@ class DividendService {
   deleteDividend(id: number): Promise<void>                          // 404 if missing
   getDividendPnlByAsset(): Promise<Map<string, number>>              // groupBy + sum, in BRL
   getDividendCashFlowsByAsset(): Promise<Map<string, CashFlow[]>>    // net BRL, for XIRR
+  getNetFlowsByAssetType(): Promise<DividendFlow[]>                  // net BRL + asset type
+  // Joins `asset` for its type and feeds the dashboard's monthly chart. The dividend's own
+  // `type` column is NOT what that chart splits by — it splits by ASSET type (STOCK, ETF…).
 }
 ```
 
@@ -209,6 +216,41 @@ In `PortfolioService.buildPositions()`:
 - XIRR flows: `DividendService.getDividendCashFlowsByAsset()`
 - Merge point: `PortfolioService.buildPositions()`, around `allCashFlows`
 - Totals: `PortfolioService.aggregatePositions()`
+
+### Touching the "Proventos por Mês" chart
+Stacked bars, one series per **asset** type, on the dashboard below the evolution chart.
+The pipeline, in order:
+
+1. `DividendService.getNetFlowsByAssetType()` — net BRL joined with `asset.type`.
+2. `buildMonthlyDividendSeries(flows, currentMonth)` in `src/domain/chart.ts` — pure; sums
+   per month and type, fills every gap month with zero, and runs the axis from the first
+   dividend to `currentMonth` (further, if a dividend is dated in the future). Also returns
+   `movingAverage`: one point per month, each the mean of the trailing 12 months, all types
+   summed. Near the start of the axis the window has not filled yet and the division is by
+   the months that exist — always dividing by 12 would draw a rising ramp that describes the
+   age of the history instead of what was received. Test it here.
+3. `buildDividendChart()` in `portfolio.routes.ts` — passes `yearMonth(today())`, labels via
+   `monthLabel()`; returns `null` when there are no dividends, and then no card is rendered.
+4. `#dividends-data` in `src/views/pages/dashboard.tsx` — `data-dividend-labels`,
+   `data-dividend-datasets` and `data-dividend-moving-average`. The names are prefixed so
+   they don't collide with the evolution chart's `data-labels`/`data-datasets`, which the
+   route tests read by regex.
+5. `buildDividendsChart()` in `src/client/dashboard.ts` — colours come from
+   `shared/asset-colors.ts` (see below). The moving average is a dashed line pinned to the
+   hidden `yAverage` scale, which mirrors `y`'s min/max so a stacked axis doesn't pile it
+   onto the bars; it is excluded from the tooltip's total and skipped entirely when every
+   point is zero.
+
+Because the axis reaches the current month, a route test cannot assert a fixed label list —
+assert the ends (`labels[0]`, `labels.at(-1) === monthLabel(today())`) and the leading
+values, and leave the arithmetic to `domain/chart.test.ts`.
+
+### Asset-type colours
+`src/shared/asset-colors.ts` is the single source: `assetTypeColor()` (solid),
+`assetTypeFill()` (translucent, for chart areas and bars) and `assetTypeTextColor()`
+(black or white by perceived luminance). Both dashboard charts and `AssetBadge` read from
+it, so STOCK is the same blue everywhere. Adding an asset type means adding one rgb triple
+there — there is no second palette and no Bootstrap `bg-*` mapping for asset types anymore.
 
 ### Changing badge colours
 Edit `DIVIDEND_BADGE_CLASSES` in `src/views/components/badge.tsx`. Current mapping:

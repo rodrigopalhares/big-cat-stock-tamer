@@ -13,6 +13,13 @@ export type ChartData = {
   cdi: Array<number | null>
 }
 
+/** Proventos por mês, uma série por tipo de ativo — barras empilhadas + média móvel. */
+export type DividendChartData = {
+  labels: string[]
+  datasets: Array<{ label: string; data: number[] }>
+  movingAverage: number[]
+}
+
 export type DashboardPageProps = {
   positions: AssetPosition[]
   assetTypes: string[]
@@ -26,10 +33,11 @@ export type DashboardPageProps = {
   hasUsd: boolean
   usdRate: number | null
   chart: ChartData | null
+  dividendChart: DividendChartData | null
 }
 
 export function DashboardPage(props: DashboardPageProps) {
-  const { positions, hasUsd, usdRate, chart } = props
+  const { positions, hasUsd, usdRate, chart, dividendChart } = props
 
   return (
     <Layout title="Dashboard — Carteira" path="/portfolio/">
@@ -71,6 +79,19 @@ export function DashboardPage(props: DashboardPageProps) {
             </div>
             <div class="card-body">
               <canvas id="evolutionChart" height={100} />
+            </div>
+          </div>
+        )}
+
+        {dividendChart !== null && (
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+              <span class="fw-semibold">
+                <i class="bi bi-bar-chart-line" /> Proventos por Mês
+              </span>
+            </div>
+            <div class="card-body">
+              <canvas id="dividendsChart" height={100} />
             </div>
           </div>
         )}
@@ -124,6 +145,15 @@ export function DashboardPage(props: DashboardPageProps) {
           data-invested={JSON.stringify(chart.invested)}
           data-ibov={JSON.stringify(chart.ibov)}
           data-cdi={JSON.stringify(chart.cdi)}
+        />
+      )}
+      {dividendChart !== null && (
+        <div
+          id="dividends-data"
+          hidden
+          data-dividend-labels={JSON.stringify(dividendChart.labels)}
+          data-dividend-datasets={JSON.stringify(dividendChart.datasets)}
+          data-dividend-moving-average={JSON.stringify(dividendChart.movingAverage)}
         />
       )}
       <script src="/js/dashboard.js" defer />

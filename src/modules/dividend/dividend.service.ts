@@ -1,4 +1,5 @@
 import type { Db } from '../../config/db.js'
+import type { DividendFlow } from '../../domain/chart.js'
 import type { CashFlow } from '../../domain/xirr.js'
 import type { Dividend } from '../../generated/prisma/client.js'
 import { HttpError } from '../../shared/http-error.js'
@@ -129,6 +130,27 @@ export class DividendService {
       else list.push(flow)
     }
     return byAsset
+  }
+
+  /**
+   * Proventos líquidos em reais com o tipo do ativo que os pagou — insumo do gráfico
+   * mensal do dashboard.
+   */
+  async getNetFlowsByAssetType(): Promise<DividendFlow[]> {
+    const dividends = await this.db.dividend.findMany({
+      select: {
+        date: true,
+        totalAmountBrl: true,
+        taxWithheldBrl: true,
+        asset: { select: { type: true } },
+      },
+      orderBy: { date: 'asc' },
+    })
+    return dividends.map((d) => ({
+      date: d.date as IsoDate,
+      assetType: d.asset.type,
+      net: d.totalAmountBrl - d.taxWithheldBrl,
+    }))
   }
 
   private async convertToBrl(

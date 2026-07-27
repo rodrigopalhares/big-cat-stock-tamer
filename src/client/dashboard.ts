@@ -1,22 +1,19 @@
 /**
- * Gráfico de evolução e ordenação/filtro da tabela de posições.
- * Porte de static/js/dashboard.js e static/js/dashboard-table.js.
+ * Gráficos do dashboard (evolução patrimonial e proventos por mês) e ordenação/filtro da
+ * tabela de posições. Porte de static/js/dashboard.js e static/js/dashboard-table.js.
  *
  * O Chart.js vem da CDN como global; só o que este arquivo usa é declarado.
  */
 
+import { assetTypeColor, assetTypeFill } from '../shared/asset-colors.js'
+
 type ChartDataset = Record<string, unknown>
 declare const Chart: new (el: Element, config: Record<string, unknown>) => unknown
 
-const TYPE_COLORS: Record<string, { bg: string; border: string }> = {
-  BDR: { bg: 'rgba(255, 159, 64, 0.6)', border: 'rgb(255, 159, 64)' },
-  ETF: { bg: 'rgba(75, 192, 192, 0.6)', border: 'rgb(75, 192, 192)' },
-  REIT: { bg: 'rgba(153, 102, 255, 0.6)', border: 'rgb(153, 102, 255)' },
-  STOCK: { bg: 'rgba(54, 162, 235, 0.6)', border: 'rgb(54, 162, 235)' },
-  TESOURO_DIRETO: { bg: 'rgba(255, 205, 86, 0.6)', border: 'rgb(255, 205, 86)' },
+/** Lê um `data-*` que a view entrega como JSON. */
+function parse<T>(raw: string | undefined, fallback: T): T {
+  return raw === undefined || raw === '' ? fallback : (JSON.parse(raw) as T)
 }
-
-const FALLBACK_COLOR = { bg: 'rgba(201, 203, 207, 0.6)', border: 'rgb(201, 203, 207)' }
 
 /** Linha tracejada sobreposta às áreas — referência, não composição do patrimônio. */
 function referenceLine(label: string, data: Array<number | null>, color: string): ChartDataset {
@@ -40,6 +37,7 @@ const brl = (value: number, digits = 0) =>
 
 document.addEventListener('DOMContentLoaded', () => {
   buildChart()
+  buildDividendsChart()
   wireTable()
 })
 
@@ -47,9 +45,6 @@ function buildChart(): void {
   const dataEl = document.getElementById('evolution-data')
   const canvas = document.getElementById('evolutionChart')
   if (dataEl === null || canvas === null) return
-
-  const parse = <T>(raw: string | undefined, fallback: T): T =>
-    raw === undefined || raw === '' ? fallback : (JSON.parse(raw) as T)
 
   const labels = parse<string[]>(dataEl.dataset['labels'], [])
   const rawDatasets = parse<Array<{ label: string; data: number[] }>>(
@@ -60,20 +55,17 @@ function buildChart(): void {
   const ibov = parse<Array<number | null>>(dataEl.dataset['ibov'], [])
   const cdi = parse<Array<number | null>>(dataEl.dataset['cdi'], [])
 
-  const datasets: ChartDataset[] = rawDatasets.map((ds) => {
-    const colors = TYPE_COLORS[ds.label] ?? FALLBACK_COLOR
-    return {
-      label: ds.label,
-      data: ds.data,
-      fill: true,
-      backgroundColor: colors.bg,
-      borderColor: colors.border,
-      borderWidth: 1,
-      pointRadius: 0,
-      pointHitRadius: 10,
-      order: 2,
-    }
-  })
+  const datasets: ChartDataset[] = rawDatasets.map((ds) => ({
+    label: ds.label,
+    data: ds.data,
+    fill: true,
+    backgroundColor: assetTypeFill(ds.label),
+    borderColor: assetTypeColor(ds.label),
+    borderWidth: 1,
+    pointRadius: 0,
+    pointHitRadius: 10,
+    order: 2,
+  }))
 
   datasets.push(referenceLine('Total Investido', invested, 'rgb(220, 53, 69)'))
   if (ibov.some((v) => v !== null))
@@ -116,6 +108,96 @@ function buildChart(): void {
               `${ctx.dataset.label}: ${brl(ctx.parsed.y)}`,
             afterBody: (items: Array<{ parsed: { y: number } }>) => [
               `\nTotal: ${brl(items.reduce((sum, item) => sum + item.parsed.y, 0))}`,
+            ],
+          },
+        },
+        legend: { position: 'bottom' },
+      },
+    },
+  })
+}
+
+/** Proventos mês a mês, empilhados por tipo de ativo, com a média móvel de 12 meses. */
+function buildDividendsChart(): void {
+  const dataEl = document.getElementById('dividends-data')
+  const canvas = document.getElementById('dividendsChart')
+  if (dataEl === null || canvas === null) return
+
+  const labels = parse<string[]>(dataEl.dataset['dividendLabels'], [])
+  const rawDatasets = parse<Array<{ label: string; data: number[] }>>(
+    dataEl.dataset['dividendDatasets'],
+    [],
+  )
+  const movingAverage = parse<number[]>(dataEl.dataset['dividendMovingAverage'], [])
+
+  const datasets: ChartDataset[] = rawDatasets.map((ds) => ({
+    label: ds.label,
+    data: ds.data,
+    backgroundColor: assetTypeFill(ds.label),
+    borderColor: assetTypeColor(ds.label),
+    borderWidth: 1,
+  }))
+
+  // Média toda zerada é carteira que nunca recebeu nada: a linha não diria nada.
+  if (movingAverage.some((value) => value > 0)) {
+    datasets.push({
+      type: 'line',
+      label: 'Média móvel 12 meses',
+      data: movingAverage,
+      borderColor: 'rgb(220, 53, 69)',
+      borderWidth: 2,
+      borderDash: [6, 3],
+      pointRadius: 0,
+      pointHitRadius: 10,
+      fill: false,
+      yAxisID: 'yAverage',
+    })
+  }
+
+  new Chart(canvas, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: {
+          stacked: true,
+          position: 'right',
+          ticks: { callback: (v: number) => brl(v) },
+        },
+        // Mesmo truque do gráfico de evolução: eixo invisível para a linha não entrar no
+        // empilhamento das barras, mas ainda compartilhar a escala delas.
+        yAverage: {
+          display: false,
+          stacked: false,
+          afterBuildTicks: (axis: {
+            chart: { scales: { y: { min: number; max: number } } }
+            min: number
+            max: number
+          }) => {
+            axis.min = axis.chart.scales.y.min
+            axis.max = axis.chart.scales.y.max
+          },
+        },
+      },
+      plugins: {
+        tooltip: {
+          bodyAlign: 'right',
+          // A maioria dos meses só tem um ou dois tipos; os zerados só poluiriam.
+          filter: (item: { parsed: { y: number } }) => item.parsed.y !== 0,
+          callbacks: {
+            label: (ctx: { dataset: { label: string }; parsed: { y: number } }) =>
+              `${ctx.dataset.label}: ${brl(ctx.parsed.y, 2)}`,
+            // A média é referência, não parcela: somá-la inflaria o total do mês.
+            afterBody: (items: Array<{ dataset: { type?: string }; parsed: { y: number } }>) => [
+              `\nTotal: ${brl(
+                items
+                  .filter((item) => item.dataset.type !== 'line')
+                  .reduce((sum, item) => sum + item.parsed.y, 0),
+                2,
+              )}`,
             ],
           },
         },

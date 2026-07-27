@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { monthLabel } from '../../src/shared/format.js'
+import { today } from '../../src/shared/iso-date.js'
 import { createHarness, type Harness } from '../app-harness.js'
 import { clearAllData } from '../db.js'
 import { createAsset, createDividend, createPriceHistory, createTransaction } from '../factories.js'
@@ -165,6 +167,54 @@ describe('rotas da aplicação', () => {
       // As linhas de referência entram com um ponto por mês; o cálculo é testado em domain/chart.
       expect(chartAttr(res.body, 'data-ibov')).toHaveLength(1)
       expect(chartAttr(res.body, 'data-cdi')).toHaveLength(1)
+    })
+
+    it('com proventos monta o gráfico mensal por tipo de ativo', async () => {
+      await createAsset(h.db, 'PETR4', { type: 'STOCK' })
+      await createAsset(h.db, 'HGLG11', { type: 'REIT' })
+      await createDividend(h.db, 'PETR4', { date: '2024-01-10', totalAmount: 100 })
+      await createDividend(h.db, 'PETR4', { date: '2024-03-10', totalAmount: 40, taxWithheld: 6 })
+      await createDividend(h.db, 'HGLG11', { date: '2024-02-10', totalAmount: 80 })
+
+      const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Proventos por Mês')
+
+      // O eixo vai do primeiro provento até o mês corrente, então o tamanho depende de
+      // quando o teste roda — o que dá para fixar são as pontas e os três primeiros meses.
+      const labels = chartAttr(res.body, 'data-dividend-labels') as string[]
+      expect(labels[0]).toBe('01/2024')
+      expect(labels.at(-1)).toBe(monthLabel(today()))
+
+      // Uma série por tipo de ativo, com o líquido do mês e zero onde não houve provento.
+      const datasets = chartAttr(res.body, 'data-dividend-datasets') as Array<{
+        label: string
+        data: number[]
+      }>
+      expect(datasets.map((d) => d.label)).toEqual(['REIT', 'STOCK'])
+      expect(datasets[0]?.data.slice(0, 3)).toEqual([0, 80, 0])
+      expect(datasets[1]?.data.slice(0, 3)).toEqual([100, 0, 34])
+      for (const dataset of datasets) expect(dataset.data).toHaveLength(labels.length)
+      expect(chartAttr(res.body, 'data-dividend-moving-average')).toHaveLength(labels.length)
+    })
+
+    it('a média móvel acompanha as séries', async () => {
+      await createAsset(h.db, 'PETR4', { type: 'STOCK' })
+      await createDividend(h.db, 'PETR4', { date: today(), totalAmount: 300, taxWithheld: 45 })
+
+      const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+      // Com um mês só no eixo, a média é o próprio líquido do mês.
+      expect(chartAttr(res.body, 'data-dividend-labels')).toEqual([monthLabel(today())])
+      expect(chartAttr(res.body, 'data-dividend-moving-average')).toEqual([255])
+    })
+
+    it('sem proventos não desenha o gráfico mensal', async () => {
+      const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.body).not.toContain('Proventos por Mês')
     })
   })
 

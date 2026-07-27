@@ -236,5 +236,23 @@ describe('DividendService', () => {
         { date: '2024-02-10', value: 42.5 },
       ])
     })
+
+    it('getNetFlowsByAssetType marca cada provento com o tipo do ativo', async () => {
+      await createAsset(db, 'PETR4', { type: 'STOCK' })
+      await createAsset(db, 'HGLG11', { type: 'REIT' })
+      await createDividend(db, 'PETR4', { date: '2024-02-10', totalAmount: 50, taxWithheld: 7.5 })
+      await createDividend(db, 'HGLG11', { date: '2024-01-10', totalAmount: 80, taxWithheld: 0 })
+
+      const flows = await service.getNetFlowsByAssetType()
+
+      expect(flows).toEqual([
+        { date: '2024-01-10', assetType: 'REIT', net: 80 },
+        { date: '2024-02-10', assetType: 'STOCK', net: 42.5 },
+      ])
+    })
+
+    it('getNetFlowsByAssetType devolve vazio sem proventos', async () => {
+      expect(await service.getNetFlowsByAssetType()).toEqual([])
+    })
   })
 })

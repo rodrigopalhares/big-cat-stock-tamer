@@ -1,10 +1,18 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { Container } from '../../container.js'
-import { buildCdiChartLine, buildIbovChartLine } from '../../domain/chart.js'
+import {
+  buildCdiChartLine,
+  buildIbovChartLine,
+  buildMonthlyDividendSeries,
+} from '../../domain/chart.js'
 import { monthLabel } from '../../shared/format.js'
 import { HttpError } from '../../shared/http-error.js'
-import type { IsoDate } from '../../shared/iso-date.js'
-import { type ChartData, DashboardPage } from '../../views/pages/dashboard.js'
+import { firstDayOf, type IsoDate, today, yearMonth } from '../../shared/iso-date.js'
+import {
+  type ChartData,
+  DashboardPage,
+  type DividendChartData,
+} from '../../views/pages/dashboard.js'
 import type { AssetPosition } from './portfolio.schema.js'
 
 /** Porte de src/main/kotlin/com/stocks/controller/PortfolioController.kt. */
@@ -31,6 +39,7 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
           hasUsd: positions.some((p) => p.currency === 'USD'),
           usdRate: usdPosition?.exchangeRate ?? null,
           chart: await buildChart(c),
+          dividendChart: await buildDividendChart(c),
         }),
       )
     })
@@ -95,6 +104,22 @@ async function buildChart(c: Container): Promise<ChartData | null> {
     invested,
     ibov: buildIbovChartLine(months as IsoDate[], invested, ibovPrices),
     cdi: buildCdiChartLine(invested, cdiAnnual),
+  }
+}
+
+/**
+ * Proventos recebidos mês a mês, uma série por tipo de ativo.
+ * Null quando não há provento nenhum — aí a página nem desenha o gráfico.
+ */
+async function buildDividendChart(c: Container): Promise<DividendChartData | null> {
+  const flows = await c.dividends.getNetFlowsByAssetType()
+  const series = buildMonthlyDividendSeries(flows, yearMonth(today()))
+  if (series.months.length === 0) return null
+
+  return {
+    labels: series.months.map((month) => monthLabel(firstDayOf(month))),
+    datasets: series.datasets,
+    movingAverage: series.movingAverage,
   }
 }
 
