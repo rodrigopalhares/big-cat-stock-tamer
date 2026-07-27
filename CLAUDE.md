@@ -75,6 +75,8 @@ Verificadas pelo `dependency-cruiser` no CI, não só combinadas:
 - Sem `export default` — sempre nomeado.
 - `any` proibido; use `unknown` + validação Zod na fronteira externa.
 - Erros de aplicação via `HttpError`; um único `setErrorHandler` decide HTML ou JSON.
+- Cor de tipo de ativo sai de `src/shared/asset-colors.ts` — gráficos e badges leem do mesmo
+  mapa, então STOCK é o mesmo azul em toda a interface. Tipo novo entra lá, e só lá.
 
 ## Decisões que valem conhecer antes de mexer
 

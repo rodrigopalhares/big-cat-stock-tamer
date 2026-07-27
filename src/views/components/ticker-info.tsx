@@ -2,6 +2,7 @@ import type { AssetType } from '../../domain/constants.js'
 import { ASSET_TYPES } from '../../domain/constants.js'
 import type { AssetInfo } from '../../integrations/yahoo/yahoo.client.js'
 import type { TickerLookupResult } from '../../modules/transaction/transaction.service.js'
+import { AssetBadge } from './badge.js'
 
 /**
  * Respostas HTMX do preenchimento automático de ticker.
@@ -93,8 +94,7 @@ export function TransactionTickerInfo({ result }: { result: TickerLookupResult }
         <div class="alert alert-success small p-2 mb-0">
           <i class="bi bi-check-circle-fill me-1" />
           <strong>{result.ticker}</strong>
-          {result.name !== null ? ` — ${result.name}` : ''}{' '}
-          <span class="badge bg-secondary">{result.type}</span>
+          {result.name !== null ? ` — ${result.name}` : ''} <AssetBadge type={result.type} />
           <span class="text-muted ms-2">já cadastrado</span>
         </div>
       )
@@ -102,8 +102,7 @@ export function TransactionTickerInfo({ result }: { result: TickerLookupResult }
       return (
         <div class="alert alert-info small p-2 mb-0">
           <i class="bi bi-cloud-download me-1" />
-          <strong>{result.ticker}</strong> — {result.name}{' '}
-          <span class="badge bg-secondary">{result.type}</span>
+          <strong>{result.ticker}</strong> — {result.name} <AssetBadge type={result.type} />
           <span class="text-muted ms-2">será cadastrado automaticamente</span>
         </div>
       )

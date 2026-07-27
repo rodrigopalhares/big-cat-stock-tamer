@@ -1,14 +1,6 @@
-/** Porte de src/main/resources/templates/fragments/badge.html. */
+import { assetTypeColor, assetTypeTextColor } from '../../shared/asset-colors.js'
 
-const ASSET_BADGE_CLASSES: Record<string, string> = {
-  STOCK: 'bg-primary',
-  REIT: 'bg-success',
-  ETF: 'bg-info',
-  TESOURO_DIRETO: 'bg-warning text-dark',
-  CRYPTO: 'bg-dark',
-  RENDA_FIXA: 'text-bg-info',
-  OUTROS: 'bg-secondary',
-}
+/** Porte de src/main/resources/templates/fragments/badge.html. */
 
 const DIVIDEND_BADGE_CLASSES: Record<string, string> = {
   DIVIDENDO: 'bg-success',
@@ -18,8 +10,17 @@ const DIVIDEND_BADGE_CLASSES: Record<string, string> = {
   BTC: 'bg-secondary',
 }
 
-export function AssetBadge({ type }: { type: string }) {
-  return <span class={`badge ${ASSET_BADGE_CLASSES[type] ?? 'bg-secondary'}`}>{type}</span>
+/** Mesma cor que o tipo tem nos gráficos do dashboard — ver `shared/asset-colors.ts`. */
+export function AssetBadge({ type }: { type: string | null }) {
+  if (type === null) return null
+  return (
+    <span
+      class="badge"
+      style={`background-color: ${assetTypeColor(type)}; color: ${assetTypeTextColor(type)}`}
+    >
+      {type}
+    </span>
+  )
 }
 
 export function DividendBadge({ type }: { type: string }) {

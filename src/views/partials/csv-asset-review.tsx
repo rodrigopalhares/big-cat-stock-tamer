@@ -1,6 +1,7 @@
 import { ASSET_TYPES } from '../../domain/constants.js'
 import type { AssetStatus } from '../../domain/csv/transaction-csv.js'
 import type { CsvAssetRow } from '../../modules/csv-import/csv-import.service.js'
+import { AssetBadge } from '../components/badge.js'
 
 /**
  * Etapa 1 do import de CSV: revisão dos ativos.
@@ -118,7 +119,7 @@ function AssetRow({ row }: { row: CsvAssetRow }) {
       </td>
       <td>
         {exists ? (
-          <span class="text-muted">{row.type}</span>
+          <AssetBadge type={row.type} />
         ) : (
           <select
             class="form-select form-select-sm asset-field"
