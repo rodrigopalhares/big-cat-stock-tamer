@@ -2,10 +2,26 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createHarness, type Harness } from '../app-harness.js'
 import { clearAllData } from '../db.js'
 import { createAsset, createDividend, createPriceHistory, createTransaction } from '../factories.js'
-import { server, yahooChart } from '../msw.js'
+import { bcbSeries, server, yahooChart } from '../msw.js'
 
 // Porte de PortfolioControllerTest, TransactionControllerTest, DividendControllerTest
 // e MonthlyEvolutionControllerTest.
+
+/**
+ * Lê um `data-*` do bloco `#evolution-data`, que o dashboard entrega como JSON escapado
+ * para o Chart.js montar no cliente.
+ */
+function chartAttr(html: string, attr: string): unknown {
+  const match = new RegExp(`${attr}="([^"]*)"`).exec(html)
+  if (match?.[1] === undefined) throw new Error(`atributo ${attr} não encontrado`)
+  const json = match[1]
+    .replaceAll('&quot;', '"')
+    .replaceAll('&#39;', "'")
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&amp;', '&')
+  return JSON.parse(json)
+}
 
 describe('rotas da aplicação', () => {
   let h: Harness
@@ -48,6 +64,27 @@ describe('rotas da aplicação', () => {
       expect(res.body).toContain('15.000,00')
     })
 
+    it('ordena as posições por tipo e depois por ticker', async () => {
+      server.use(yahooChart('yahoo_chart_empty.json'))
+      for (const [ticker, type] of [
+        ['VALE3', 'STOCK'],
+        ['HGLG11', 'REIT'],
+        ['PETR4', 'STOCK'],
+      ] as const) {
+        await createAsset(h.db, ticker, { type })
+        await createTransaction(h.db, ticker, { quantity: 10, price: 10, date: '2024-01-02' })
+        await h.container.assets.refreshPositionFields(ticker)
+        await createPriceHistory(h.db, ticker, '2024-06-01', 12)
+      }
+
+      const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+      // REIT antes de STOCK; dentro do mesmo tipo, por ticker.
+      expect(res.body.indexOf('HGLG11')).toBeGreaterThan(-1)
+      expect(res.body.indexOf('HGLG11')).toBeLessThan(res.body.indexOf('PETR4'))
+      expect(res.body.indexOf('PETR4')).toBeLessThan(res.body.indexOf('VALE3'))
+    })
+
     it('GET /portfolio/api devolve o resumo', async () => {
       const res = await h.app.inject({ method: 'GET', url: '/portfolio/api' })
       expect(res.statusCode).toBe(200)
@@ -57,6 +94,77 @@ describe('rotas da aplicação', () => {
     it('GET /portfolio/api/:ticker devolve 404 para ativo inexistente', async () => {
       const res = await h.app.inject({ method: 'GET', url: '/portfolio/api/XXXX9' })
       expect(res.statusCode).toBe(404)
+    })
+
+    it('GET /portfolio/api/:ticker devolve a posição do ativo', async () => {
+      server.use(yahooChart('yahoo_chart_empty.json'))
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4', { quantity: 100, price: 20, date: '2024-01-02' })
+      await h.container.assets.refreshPositionFields('PETR4')
+      await createPriceHistory(h.db, 'PETR4', '2024-06-01', 25)
+
+      const res = await h.app.inject({ method: 'GET', url: '/portfolio/api/PETR4' })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.json()).toMatchObject({ ticker: 'PETR4', quantity: 100, currentPrice: 25 })
+    })
+
+    it('GET /portfolio/api/:ticker devolve 404 para ativo cadastrado sem transação', async () => {
+      // 404 por outro motivo que o anterior: o ativo existe, mas não tem posição a montar.
+      server.use(yahooChart('yahoo_chart_empty.json'))
+      await createAsset(h.db, 'PETR4')
+
+      const res = await h.app.inject({ method: 'GET', url: '/portfolio/api/PETR4' })
+
+      expect(res.statusCode).toBe(404)
+    })
+
+    it('com snapshots monta os dados do gráfico', async () => {
+      server.use(
+        yahooChart('yahoo_chart_empty.json'),
+        bcbSeries([{ data: '01/06/2024', valor: '10,50' }]),
+      )
+      await createAsset(h.db, 'PETR4', { type: 'STOCK' })
+      await createAsset(h.db, 'HGLG11', { type: 'REIT' })
+      await h.db.monthlySnapshot.createMany({
+        data: [
+          {
+            assetId: 'PETR4',
+            month: '2024-01-01',
+            quantity: 10,
+            avgPrice: 10,
+            marketPrice: 12,
+            totalCost: 100,
+            marketValue: 120,
+          },
+          {
+            assetId: 'HGLG11',
+            month: '2024-01-01',
+            quantity: 1,
+            avgPrice: 150,
+            marketPrice: 160,
+            totalCost: 150,
+            marketValue: 160,
+          },
+        ],
+      })
+      await h.db.benchmarkPrice.create({
+        data: { ticker: 'IBOV', month: '2024-01-01', close: 130000 },
+      })
+
+      const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+      expect(res.statusCode).toBe(200)
+      expect(chartAttr(res.body, 'data-labels')).toEqual(['01/2024'])
+      // Uma série por tipo de ativo, somando o valor de mercado dos snapshots do mês.
+      expect(chartAttr(res.body, 'data-datasets')).toEqual([
+        { label: 'REIT', data: [160] },
+        { label: 'STOCK', data: [120] },
+      ])
+      expect(chartAttr(res.body, 'data-invested')).toEqual([250])
+      // As linhas de referência entram com um ponto por mês; o cálculo é testado em domain/chart.
+      expect(chartAttr(res.body, 'data-ibov')).toHaveLength(1)
+      expect(chartAttr(res.body, 'data-cdi')).toHaveLength(1)
     })
   })
 
@@ -78,6 +186,21 @@ describe('rotas da aplicação', () => {
       const res = await h.app.inject({ method: 'GET', url: '/assets/XXXX9' })
       expect(res.statusCode).toBe(404)
     })
+
+    it('com posição aberta mostra os cartões de posição', async () => {
+      await createAsset(h.db, 'PETR4', { name: 'Petrobras' })
+      await createTransaction(h.db, 'PETR4', { quantity: 100, price: 20, date: '2024-01-02' })
+      // Sem isso o ativo fica com `hasPosition = false` e os cartões nem renderizam.
+      await h.container.assets.refreshPositionFields('PETR4')
+      await createPriceHistory(h.db, 'PETR4', '2024-06-01', 25)
+
+      const res = await h.app.inject({ method: 'GET', url: '/assets/PETR4' })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Preço Médio')
+      expect(res.body).toContain('20,00')
+      expect(res.body).toContain('25,00')
+    })
   })
 
   describe('transações', () => {
@@ -85,6 +208,25 @@ describe('rotas da aplicação', () => {
       const res = await h.app.inject({ method: 'GET', url: '/transactions/' })
       expect(res.statusCode).toBe(200)
       expect(res.body).toContain('Nenhuma transação registrada')
+    })
+
+    it('a lista renderiza a linha da transação', async () => {
+      await createAsset(h.db, 'PETR4', { name: 'Petrobras' })
+      await createTransaction(h.db, 'PETR4', {
+        quantity: 100,
+        price: 25.5,
+        fees: 10,
+        date: '2024-06-01',
+        broker: 'XP',
+      })
+
+      const res = await h.app.inject({ method: 'GET', url: '/transactions/' })
+
+      expect(res.body).toContain('01/06/2024')
+      expect(res.body).toContain('25,50')
+      expect(res.body).toContain('XP')
+      // 100 × 25,50 + 10 de taxas.
+      expect(res.body).toContain('2.560,00')
     })
 
     it('cria via formulário e redireciona', async () => {
@@ -291,6 +433,43 @@ describe('rotas da aplicação', () => {
 
       const res = await h.app.inject({ method: 'GET', url: '/dividends/' })
       expect(res.body).toContain('85,00')
+    })
+
+    it('edita e volta para a origem informada', async () => {
+      await createAsset(h.db, 'PETR4')
+      const dividend = await createDividend(h.db, 'PETR4', { totalAmount: 100, taxWithheld: 0 })
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: `/dividends/${dividend.id}/edit`,
+        payload: {
+          type: 'JCP',
+          total_amount: '200',
+          tax_withheld: '30',
+          date: '2024-07-01',
+          currency: 'BRL',
+          returnTo: '/assets/PETR4',
+        },
+      })
+
+      expect(res.statusCode).toBe(302)
+      // O provento é editado tanto pela lista quanto pelo detalhe do ativo — o formulário
+      // diz para onde voltar.
+      expect(res.headers.location).toBe('/assets/PETR4')
+
+      const updated = await h.db.dividend.findUniqueOrThrow({ where: { id: dividend.id } })
+      expect(updated).toMatchObject({ type: 'JCP', totalAmount: 200, taxWithheld: 30 })
+    })
+
+    it('exclui e volta para a lista quando não há origem', async () => {
+      await createAsset(h.db, 'PETR4')
+      const dividend = await createDividend(h.db, 'PETR4')
+
+      const res = await h.app.inject({ method: 'POST', url: `/dividends/${dividend.id}/delete` })
+
+      expect(res.statusCode).toBe(302)
+      expect(res.headers.location).toBe('/dividends/')
+      expect(await h.db.dividend.count()).toBe(0)
     })
 
     it('parse-csv marca ativo não cadastrado', async () => {
