@@ -62,6 +62,12 @@ const USER_PROMPT =
 
 export type BrokerNoteExtraction = {
   readonly note: BrokerNoteData
+  /**
+   * O bloco de texto da resposta, sem tocar em nada — é o JSON da saída estruturada.
+   * Fica arquivado na nota: o CSV importado é derivado dele, e sem o original não dá
+   * para saber depois se um número errado veio da leitura ou da nossa conta.
+   */
+  readonly rawResponse: string
   /** Taxas discriminadas, como a corretora listou. Vai para a prévia, não para o cálculo. */
   readonly fees: readonly NoteFee[]
   /** Conferência feita pelo próprio modelo — a nossa é a do domínio. */
@@ -141,7 +147,8 @@ export class AnthropicClient {
       throw HttpError.badGateway('A nota é longa demais para uma resposta só.')
     }
 
-    return toExtraction(parseContent(response.content))
+    const rawResponse = textBlock(response.content)
+    return toExtraction(parseContent(rawResponse), rawResponse)
   }
 }
 
@@ -163,12 +170,16 @@ function documentBlock(
       }
 }
 
-function parseContent(content: readonly Anthropic.ContentBlock[]): NoteExtraction {
+/** O texto da resposta, verbatim — é ele que fica arquivado na nota. */
+function textBlock(content: readonly Anthropic.ContentBlock[]): string {
   const text = content.find((block) => block.type === 'text')?.text
   if (text === undefined || text.trim() === '') {
     throw HttpError.badGateway('A Anthropic respondeu sem conteúdo.')
   }
+  return text
+}
 
+function parseContent(text: string): NoteExtraction {
   let raw: unknown
   try {
     raw = JSON.parse(text)
@@ -183,7 +194,7 @@ function parseContent(content: readonly Anthropic.ContentBlock[]): NoteExtractio
   return parsed.data
 }
 
-function toExtraction(extracted: NoteExtraction): BrokerNoteExtraction {
+function toExtraction(extracted: NoteExtraction, rawResponse: string): BrokerNoteExtraction {
   const date = isoDateOrNull(extracted.tradeDate)
   if (date === null) {
     throw HttpError.badGateway(`Data do pregão inválida na nota: ${extracted.tradeDate}`)
@@ -222,6 +233,7 @@ function toExtraction(extracted: NoteExtraction): BrokerNoteExtraction {
 
   return {
     note,
+    rawResponse,
     fees,
     checkedTotal: extracted.checkedTotal,
     checkNotes: extracted.checkNotes,

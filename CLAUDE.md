@@ -117,9 +117,10 @@ taxas rateadas pelo **valor operado** de cada papel. O resultado vira o mesmo CS
 importação manual — não existe um segundo caminho de importação.
 
 O arquivo enviado fica em `${APP_NOTES_DIR}/<ano>/<yyyyMMdd>_<id>.<ext>` (padrão
-`./data/notas`, fora do versionamento) e o CSV extraído fica na coluna `csv` de
-`broker_notes`. As transações criadas guardam `broker_note_id`, que é o que dá o link de
-download na linha do histórico.
+`./data/notas`, fora do versionamento) e a resposta do modelo, verbatim, na coluna
+`ai_response` de `broker_notes` — o CSV é derivado dela e não é gravado, então é a resposta
+que permite refazer a conta e separar erro de leitura de erro de cálculo. As transações
+criadas guardam `broker_note_id`, que é o que dá o link de download na linha do histórico.
 
 Chave em `APP_ANTHROPIC_API_KEY`; em branco, a aba fica desativada. O total da nota é
 conferido (`Σ quantidade × preço ± taxas` contra o líquido declarado) — divergência avisa e

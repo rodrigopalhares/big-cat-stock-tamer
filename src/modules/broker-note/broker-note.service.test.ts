@@ -46,12 +46,15 @@ const NOTE_SEM_TICKER: BrokerNoteData = {
   ].map((t) => ({ ...t, ticker: '', tickerSource: 'NONE' as const, side: 'C' as const })),
 }
 
+const RAW_RESPONSE = '{"tradeDate":"2026-07-15","broker":"XP","trades":[/* … */]}'
+
 function fakeAnthropic(extraction: Partial<BrokerNoteExtraction> = {}): AnthropicClient {
   const stub = {
     enabled: true,
     extractBrokerNote: () =>
       Promise.resolve({
         note: NOTE,
+        rawResponse: RAW_RESPONSE,
         fees: [{ label: 'Taxa de liquidação', value: 6.75 }],
         checkedTotal: 30160.98,
         checkNotes: 'Confere.',
@@ -101,7 +104,7 @@ describe('BrokerNoteService', () => {
     expect(readFileSync(path)).toEqual(upload.file)
   })
 
-  it('persiste a nota com o CSV extraído', async () => {
+  it('persiste a nota com a resposta crua do modelo', async () => {
     const result = await serviceIn(tempDir()).importNote(upload)
     const saved = await db.brokerNote.findUniqueOrThrow({ where: { id: result.id } })
 
@@ -114,10 +117,17 @@ describe('BrokerNoteService', () => {
       totalFees: 9.03,
       warning: null,
     })
-    expect(saved.csv).toBe(
+    // Verbatim: é a resposta do modelo que fica arquivada, não o CSV derivado dela.
+    expect(saved.aiResponse).toBe(RAW_RESPONSE)
+    expect(saved.fileName).toBe(`20260715_${result.id}.pdf`)
+  })
+
+  it('deriva o CSV sem gravá-lo — quem vai para o banco é a resposta', async () => {
+    const result = await serviceIn(tempDir()).importNote(upload)
+
+    expect(result.csv).toBe(
       'XPLG11\t15/07/2026\tC\t329\t91,64726444\t9,03\tXP\t0\tBRL\tNota 140232205',
     )
-    expect(saved.fileName).toBe(`20260715_${result.id}.pdf`)
   })
 
   it('agrupa as execuções num único grupo, com as taxas inteiras', async () => {
@@ -160,14 +170,14 @@ describe('BrokerNoteService', () => {
     expect(file.fileName).toBe(`20260715_${id}.pdf`)
   })
 
-  it('devolve o retorno da Anthropic como CSV para download', async () => {
+  it('devolve a resposta da Anthropic para download', async () => {
     const service = serviceIn(tempDir())
-    const { id, csv } = await service.importNote(upload)
+    const { id } = await service.importNote(upload)
 
-    const file = await service.readCsv(id)
-    expect(file.content.toString('utf8')).toBe(csv)
-    expect(file.fileName).toBe(`20260715_${id}.csv`)
-    expect(file.contentType).toContain('text/csv')
+    const file = await service.readAiResponse(id)
+    expect(file.content.toString('utf8')).toBe(RAW_RESPONSE)
+    expect(file.fileName).toBe(`20260715_${id}.json`)
+    expect(file.contentType).toContain('application/json')
   })
 
   it('404 em nota inexistente', async () => {

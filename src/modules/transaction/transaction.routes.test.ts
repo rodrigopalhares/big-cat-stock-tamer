@@ -36,11 +36,14 @@ const NOTE: BrokerNoteData = {
 
 const PDF = Buffer.from('%PDF-1.4 conteúdo da nota')
 
+const RAW_RESPONSE = '{"tradeDate":"2026-07-15","noteNumber":"140232205"}'
+
 const fakeAnthropic = {
   enabled: true,
   extractBrokerNote: () =>
     Promise.resolve({
       note: NOTE,
+      rawResponse: RAW_RESPONSE,
       fees: [{ label: 'Taxa de liquidação', value: 6.75 }],
       checkedTotal: 30160.98,
       checkNotes: 'A soma bate com o líquido da nota.',
@@ -143,14 +146,16 @@ describe('rotas de nota de negociação', () => {
       expect(res.rawPayload).toEqual(PDF)
     })
 
-    it('baixa o retorno da Anthropic como CSV', async () => {
+    it('baixa a resposta da Anthropic como JSON', async () => {
       await parse()
-      const { id, csv } = await db.brokerNote.findFirstOrThrow()
+      const { id, aiResponse } = await db.brokerNote.findFirstOrThrow()
 
-      const res = await app.inject({ method: 'GET', url: `/transactions/notes/${id}/csv` })
+      const res = await app.inject({ method: 'GET', url: `/transactions/notes/${id}/response` })
       expect(res.statusCode).toBe(200)
-      expect(res.headers['content-type']).toContain('text/csv')
-      expect(res.body).toBe(csv)
+      expect(res.headers['content-type']).toContain('application/json')
+      expect(res.headers['content-disposition']).toContain(`20260715_${id}.json`)
+      expect(res.body).toBe(aiResponse)
+      expect(aiResponse).toBe(RAW_RESPONSE)
     })
 
     it('404 em nota inexistente', async () => {

@@ -65,6 +65,14 @@ describe('AnthropicClient', () => {
     expect(result.fees[0]).toEqual({ label: 'Taxa de liquidação', value: 6.75 })
   })
 
+  it('devolve o texto da resposta sem tocar em nada', async () => {
+    // Espaçamento e ordem das chaves preservados: é isso que vai para o banco.
+    const raw = JSON.stringify(EXTRACTION, null, 2)
+    server.use(http.post(MESSAGES, () => reply(raw)))
+
+    expect((await extract()).rawResponse).toBe(raw)
+  })
+
   it('envia o PDF como documento base64 junto do schema de saída', async () => {
     let sent: Record<string, unknown> = {}
     server.use(

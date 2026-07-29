@@ -176,8 +176,8 @@ export function transactionRoutes(c: Container): FastifyPluginAsync {
       return download(reply, await c.brokerNotes.readFile(noteId(req.params)))
     })
 
-    app.get<{ Params: { id: string } }>('/transactions/notes/:id/csv', async (req, reply) => {
-      return download(reply, await c.brokerNotes.readCsv(noteId(req.params)))
+    app.get<{ Params: { id: string } }>('/transactions/notes/:id/response', async (req, reply) => {
+      return download(reply, await c.brokerNotes.readAiResponse(noteId(req.params)))
     })
 
     app.post('/transactions/batch', async (req) => {

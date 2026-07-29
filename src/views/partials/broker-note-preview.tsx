@@ -42,10 +42,11 @@ export function BrokerNotePreview({ result }: { result: BrokerNoteImport }) {
           </a>
           <a
             class="btn btn-sm btn-outline-secondary"
-            href={`/transactions/notes/${result.id}/csv`}
+            href={`/transactions/notes/${result.id}/response`}
+            title="O JSON que o modelo devolveu, sem edição"
             download
           >
-            <i class="bi bi-filetype-csv" /> CSV
+            <i class="bi bi-filetype-json" /> Resposta da IA
           </a>
         </div>
       </div>

@@ -65,9 +65,9 @@ model Transaction {
 }
 
 /**
- * Nota de negociação importada de PDF. Guarda o que a corretora declarou e o CSV
- * extraído pela Anthropic — é o CSV que vira transação, então ele fica arquivado
- * junto para conferência posterior.
+ * Nota de negociação importada de PDF. Guarda o que a corretora declarou e a resposta
+ * crua da Anthropic — o CSV importado é derivado dela, então arquivar a resposta é o
+ * que permite refazer a conta e auditar o que o modelo de fato leu.
  *
  * O PDF em si mora em `${APP_DATA_DIR}/notas/<ano>/<file_name>`.
  */
@@ -80,7 +80,8 @@ model BrokerNote {
   originalName String   @map("original_name")
   totalAmount  Float    @map("total_amount")
   totalFees    Float    @default(0) @map("total_fees")
-  csv          String
+  /// JSON da saída estruturada, exatamente como o modelo devolveu.
+  aiResponse   String   @map("ai_response")
   /// Preenchido quando a conferência do total não fecha — o import segue, mas avisa.
   warning      String?
   createdAt    DateTime @default(now()) @map("created_at")

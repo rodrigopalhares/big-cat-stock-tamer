@@ -141,7 +141,7 @@ type AssetBatchRow(ticker, name, type, yfTicker, currency)
 | POST | `/transactions/batch` | JSON `{ inserted: N }` — optional `brokerNoteId` links the rows to a note |
 | POST | `/transactions/parse-note` | multipart `file` → fragment `broker-note-preview` |
 | GET | `/transactions/notes/:id` | The original PDF/image, as a download |
-| GET | `/transactions/notes/:id/csv` | The extracted CSV, as a download |
+| GET | `/transactions/notes/:id/response` | The model's raw JSON response, as a download |
 | GET | `/transactions/asset-info?ticker=X` | JSON `{ name, type, yfTicker, currency }` |
 | GET | `/transactions/ticker-info?ticker=X` | HTML snippet with ticker status |
 
@@ -151,9 +151,14 @@ A nota de negociação lists every execution separately — a single 329-share p
 19 lines across 2 pages. The import turns that into one transaction per ticker.
 
 ```
-upload -> AnthropicClient.extractBrokerNote() -> groupTrades() -> allocateFees()
-       -> checkTotal() -> toCsv() -> persist BrokerNote + file -> preview fragment
+upload -> AnthropicClient.extractBrokerNote() -> resolveTickers() -> groupTrades()
+       -> allocateFees() -> checkTotal() -> toCsv() -> persist BrokerNote + file
+       -> preview fragment
 ```
+
+`broker_notes.ai_response` stores the model's answer **verbatim**, not the derived CSV. The
+CSV is recomputed from it on demand; keeping the original is what lets you tell a reading
+mistake apart from an arithmetic one after the fact.
 
 Rules that matter when changing this:
 

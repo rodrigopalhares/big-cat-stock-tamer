@@ -100,7 +100,7 @@ export class BrokerNoteService {
         originalName: upload.fileName,
         totalAmount: note.totalAmount,
         totalFees: note.totalFees,
-        csv,
+        aiResponse: extracted.rawResponse,
         warning: checkWarning(check),
       },
     })
@@ -170,13 +170,13 @@ export class BrokerNoteService {
     }
   }
 
-  /** O retorno da Anthropic, servido como arquivo CSV. */
-  async readCsv(id: number): Promise<BrokerNoteFile> {
+  /** A resposta da Anthropic como o modelo devolveu, servida para download. */
+  async readAiResponse(id: number): Promise<BrokerNoteFile> {
     const note = await this.findNote(id)
     return {
-      content: Buffer.from(note.csv, 'utf8'),
-      fileName: `${baseName(note.fileName) || String(note.id)}.csv`,
-      contentType: 'text/csv; charset=utf-8',
+      content: Buffer.from(note.aiResponse, 'utf8'),
+      fileName: `${baseName(note.fileName) || String(note.id)}.json`,
+      contentType: 'application/json; charset=utf-8',
     }
   }
 
