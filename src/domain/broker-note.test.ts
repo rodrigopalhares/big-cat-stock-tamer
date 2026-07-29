@@ -6,7 +6,10 @@ import {
   checkTotal,
   checkWarning,
   groupTrades,
+  isSubtotalFee,
   type NoteTrade,
+  resolveTotalFees,
+  sumItemizedFees,
   summarizeNote,
   toCsv,
 } from './broker-note.js'
@@ -123,6 +126,58 @@ describe('allocateFees', () => {
 
   it('não quebra com nota sem operações', () => {
     expect(allocateFees([], 10)).toEqual([])
+  })
+})
+
+describe('sumItemizedFees', () => {
+  /** O Resumo Financeiro da nota 139054003: três parcelas e um subtotal no meio. */
+  const FEES = [
+    { label: 'Taxa de liquidação', value: 6.35 },
+    { label: 'Emolumentos', value: 1.41 },
+    { label: 'Taxa de Transf. de Ativos', value: 0.73 },
+    { label: 'Total Bovespa / Soma', value: 2.14 },
+  ]
+
+  it('descarta o subtotal que repete as parcelas', () => {
+    // Somar tudo daria 10,63 e a nota fecharia R$ 2,14 acima do líquido declarado.
+    expect(sumItemizedFees(FEES)).toBe(8.49)
+  })
+
+  it('corrige o total quando o subtotal foi somado junto', () => {
+    expect(resolveTotalFees(FEES, 10.63)).toBe(8.49)
+  })
+
+  it('mantém o total declarado quando a lista de taxas está incompleta', () => {
+    // 6,75 sozinho não explica 9,03: faltam parcelas, e subtrair aqui seria pior.
+    expect(resolveTotalFees([{ label: 'Taxa de liquidação', value: 6.75 }], 9.03)).toBe(9.03)
+  })
+
+  it('não mexe numa nota sem subtotal na lista', () => {
+    const fees = [
+      { label: 'Taxa de liquidação', value: 6.75 },
+      { label: 'Emolumentos', value: 1.5 },
+      { label: 'Taxa de Transf. de Ativos', value: 0.78 },
+    ]
+
+    expect(resolveTotalFees(fees, 9.03)).toBe(9.03)
+  })
+
+  it.each(['Total CBLC', 'Total Bovespa / Soma', 'Total Custos / Despesas', ' total geral'])(
+    'reconhece "%s" como subtotal',
+    (label) => {
+      expect(isSubtotalFee(label)).toBe(true)
+    },
+  )
+
+  it.each(['Taxa de liquidação', 'Emolumentos', 'Taxa Operacional', 'I.R.R.F. s/ operações'])(
+    'não confunde "%s" com subtotal',
+    (label) => {
+      expect(isSubtotalFee(label)).toBe(false)
+    },
+  )
+
+  it('devolve zero quando a nota não cobrou taxa', () => {
+    expect(sumItemizedFees([])).toBe(0)
   })
 })
 

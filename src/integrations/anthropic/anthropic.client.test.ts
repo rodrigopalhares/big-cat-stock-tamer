@@ -102,6 +102,36 @@ describe('AnthropicClient', () => {
     expect(mediaType).toBe('image/png')
   })
 
+  it('descarta o subtotal do resumo financeiro e recalcula as taxas', async () => {
+    // Caso real da nota 139054003: o modelo devolveu "Total Bovespa / Soma 2,14", que é a
+    // soma de emolumentos + transferência, e um totalFees de 10,63 contando tudo duas vezes.
+    server.use(
+      http.post(MESSAGES, () =>
+        reply({
+          ...EXTRACTION,
+          fees: [
+            { label: 'Taxa de liquidação', value: 6.35 },
+            { label: 'Emolumentos', value: 1.41 },
+            { label: 'Taxa de Transf. de Ativos', value: 0.73 },
+            { label: 'Total Bovespa / Soma', value: 2.14 },
+          ],
+          totalFees: 10.63,
+        }),
+      ),
+    )
+
+    const result = await extract()
+
+    expect(result.note.totalFees).toBe(8.49)
+    expect(result.fees.map((f) => f.label)).not.toContain('Total Bovespa / Soma')
+  })
+
+  it('mantém o total do modelo quando ele não discriminou as taxas', async () => {
+    server.use(http.post(MESSAGES, () => reply({ ...EXTRACTION, fees: [], totalFees: 9.03 })))
+
+    expect((await extract()).note.totalFees).toBe(9.03)
+  })
+
   it('recusa tipo de arquivo que o modelo não lê', async () => {
     await expect(client().extractBrokerNote(pdf, 'application/zip')).rejects.toMatchObject({
       statusCode: 400,

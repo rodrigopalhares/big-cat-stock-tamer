@@ -6,12 +6,13 @@ import {
   checkTotal,
   checkWarning,
   type NoteCheck,
+  type NoteFee,
   type NoteGroup,
   summarizeNote,
   toCsv,
 } from '../../domain/broker-note.js'
 import type { BrokerNote } from '../../generated/prisma/client.js'
-import type { AnthropicClient, NoteFee } from '../../integrations/anthropic/anthropic.client.js'
+import type { AnthropicClient } from '../../integrations/anthropic/anthropic.client.js'
 import { HttpError } from '../../shared/http-error.js'
 
 /**

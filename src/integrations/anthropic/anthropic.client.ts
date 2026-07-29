@@ -1,5 +1,11 @@
 import Anthropic from '@anthropic-ai/sdk'
-import type { BrokerNoteData, NoteTrade } from '../../domain/broker-note.js'
+import {
+  type BrokerNoteData,
+  isSubtotalFee,
+  type NoteFee,
+  type NoteTrade,
+  resolveTotalFees,
+} from '../../domain/broker-note.js'
 import { HttpError } from '../../shared/http-error.js'
 import { isoDateOrNull } from '../../shared/iso-date.js'
 import { type Logger, silentLogger } from '../http.js'
@@ -36,6 +42,9 @@ const SYSTEM_PROMPT = [
   '- O ticker é o código de negociação (XPLG11, PETR4), não a descrição do papel',
   '  ("FII XP LOG"). Ignore sufixos de classe como "CI", "ON", "PN" e "UNT".',
   '- Ignore as linhas do "Resumo dos Negócios": elas são totais, não operações.',
+  '- No "Resumo Financeiro", toda linha que começa com "Total" é subtotal do bloco acima',
+  '  ("Total CBLC", "Total Bovespa / Soma", "Total Custos / Despesas"): nunca devolva',
+  '  essas linhas em `fees`, senão a mesma taxa entra duas vezes.',
   '- Números da nota usam vírgula decimal e ponto de milhar: "1.234,56" é 1234.56.',
   '- O líquido da nota é o campo "Líquido para <data>"; devolva sempre positivo.',
   '- Confira o seu próprio resultado antes de responder: quantidade × preço de todas as',
@@ -46,11 +55,6 @@ const SYSTEM_PROMPT = [
 
 const USER_PROMPT =
   'Extraia os dados desta nota de negociação e confira os cálculos conforme as regras.'
-
-export type NoteFee = {
-  readonly label: string
-  readonly value: number
-}
 
 export type BrokerNoteExtraction = {
   readonly note: BrokerNoteData
@@ -191,18 +195,23 @@ function toExtraction(extracted: NoteExtraction): BrokerNoteExtraction {
     throw HttpError.badRequest('Nenhuma operação encontrada na nota.')
   }
 
+  // O subtotal do "Resumo Financeiro" repete parcelas que já vieram na lista; somá-lo
+  // cobraria a mesma taxa duas vezes.
+  const totalFees = resolveTotalFees(extracted.fees, extracted.totalFees)
+  const fees = extracted.fees.filter((fee) => !isSubtotalFee(fee.label))
+
   const note: BrokerNoteData = {
     date,
     broker: extracted.broker.trim(),
     noteNumber: extracted.noteNumber.trim(),
-    totalFees: Math.abs(extracted.totalFees),
+    totalFees,
     totalAmount: Math.abs(extracted.totalAmount),
     trades,
   }
 
   return {
     note,
-    fees: extracted.fees,
+    fees,
     checkedTotal: extracted.checkedTotal,
     checkNotes: extracted.checkNotes,
   }
