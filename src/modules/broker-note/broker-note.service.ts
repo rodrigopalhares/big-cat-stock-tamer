@@ -60,6 +60,8 @@ export type BrokerNoteImport = {
   readonly check: NoteCheck
   readonly checkedTotal: number
   readonly checkNotes: string
+  /** A resposta do modelo como veio — a prévia mostra e o download serve esta string. */
+  readonly rawResponse: string
   readonly csv: string
   readonly fileName: string
 }
@@ -115,6 +117,7 @@ export class BrokerNoteService {
       check,
       checkedTotal: extracted.checkedTotal,
       checkNotes: extracted.checkNotes,
+      rawResponse: extracted.rawResponse,
       csv,
       fileName,
     }

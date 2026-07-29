@@ -111,6 +111,25 @@ describe('rotas de nota de negociação', () => {
       expect(res.body).toContain('91,64726444')
     })
 
+    it('traz a resposta da IA recolhida, com destaque de sintaxe', async () => {
+      const res = await parse()
+
+      expect(res.body).toContain('Resposta da IA')
+      // `collapse` sem `show`: começa fechada.
+      expect(res.body).toContain('<div class="collapse" id="aiResponseBox">')
+      expect(res.body).toContain('<span class="json-key">&quot;tradeDate&quot;</span>')
+      expect(res.body).toContain('<span class="json-string">&quot;2026-07-15&quot;</span>')
+    })
+
+    it('não oferece download do arquivo que o usuário acabou de enviar', async () => {
+      const res = await parse()
+      const { id } = await db.brokerNote.findFirstOrThrow()
+
+      expect(res.body).not.toContain(`href="/transactions/notes/${id}"`)
+      // O da resposta fica, dentro do painel — é o único jeito de obtê-la como arquivo.
+      expect(res.body).toContain(`href="/transactions/notes/${id}/response"`)
+    })
+
     it('registra a nota no banco', async () => {
       await parse()
 

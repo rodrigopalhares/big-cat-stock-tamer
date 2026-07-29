@@ -7,6 +7,7 @@ import {
   quantity as fmtQuantity,
   money,
 } from '../../shared/format.js'
+import { prettyJson, tokenizeJson } from '../../shared/json-view.js'
 
 /**
  * Prévia da nota lida pela Anthropic, antes de virar CSV.
@@ -21,37 +22,19 @@ export function BrokerNotePreview({ result }: { result: BrokerNoteImport }) {
 
   return (
     <div id="notePreview" data-broker-note-id={String(result.id)} data-csv={result.csv}>
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <div>
-          <span class="fw-semibold">
-            {note.broker || 'Corretora não identificada'}
-            {note.noteNumber !== '' && <span class="text-muted"> · nota {note.noteNumber}</span>}
-          </span>
-          <span class="text-muted ms-2 small">
-            pregão de {fmtDate(note.date)} · {note.trades.length} execuções agrupadas em{' '}
-            {groups.length} {groups.length === 1 ? 'ticker' : 'tickers'}
-          </span>
-        </div>
-        <div class="d-flex gap-2">
-          <a
-            class="btn btn-sm btn-outline-secondary"
-            href={`/transactions/notes/${result.id}`}
-            download
-          >
-            <i class="bi bi-file-earmark-pdf" /> Arquivo
-          </a>
-          <a
-            class="btn btn-sm btn-outline-secondary"
-            href={`/transactions/notes/${result.id}/response`}
-            title="O JSON que o modelo devolveu, sem edição"
-            download
-          >
-            <i class="bi bi-filetype-json" /> Resposta da IA
-          </a>
-        </div>
+      <div class="mb-3">
+        <span class="fw-semibold">
+          {note.broker || 'Corretora não identificada'}
+          {note.noteNumber !== '' && <span class="text-muted"> · nota {note.noteNumber}</span>}
+        </span>
+        <span class="text-muted ms-2 small">
+          pregão de {fmtDate(note.date)} · {note.trades.length} execuções agrupadas em{' '}
+          {groups.length} {groups.length === 1 ? 'ticker' : 'tickers'}
+        </span>
       </div>
 
       <Conference result={result} />
+      <AiResponse raw={result.rawResponse} noteId={result.id} />
 
       {groups.some((g) => g.tickerSource === 'NONE') && (
         <div class="alert alert-danger py-2 small">
@@ -127,6 +110,45 @@ export function BrokerNotePreview({ result }: { result: BrokerNoteImport }) {
         <button type="button" class="btn btn-primary" data-note-use-csv>
           <i class="bi bi-arrow-right-circle" /> Usar no CSV
         </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A resposta do modelo, recolhida por padrão.
+ *
+ * Fica logo abaixo da conferência porque é ali que ela é útil: quando o total não fecha, a
+ * primeira pergunta é o que o modelo leu de fato. O `collapse` do Bootstrap funciona por
+ * delegação, então continua respondendo mesmo com o fragmento injetado por innerHTML.
+ */
+function AiResponse({ raw, noteId }: { raw: string; noteId: number }) {
+  const tokens = tokenizeJson(prettyJson(raw))
+
+  return (
+    <div class="mb-3">
+      <button
+        type="button"
+        class="btn btn-sm btn-link p-0 text-decoration-none"
+        data-bs-toggle="collapse"
+        data-bs-target="#aiResponseBox"
+        aria-expanded="false"
+        aria-controls="aiResponseBox"
+      >
+        <i class="bi bi-chevron-right json-caret" /> Resposta da IA
+      </button>
+      {/* O download fica aqui dentro: quem quer o arquivo já abriu o painel. */}
+      <a
+        class="btn btn-sm btn-link p-0 text-decoration-none ms-3 small"
+        href={`/transactions/notes/${noteId}/response`}
+        download
+      >
+        <i class="bi bi-download" /> Baixar
+      </a>
+      <div class="collapse" id="aiResponseBox">
+        {/* Tudo numa linha: quebra dentro do <pre> viraria espaço em branco na tela. */}
+        {/* biome-ignore format: o <pre> preserva o que o formatador acrescentaria */}
+        <pre class="json-view border rounded p-3 mt-2 mb-0"><code>{tokens.map((token) => (token.type === 'plain' ? token.text : <span class={`json-${token.type}`}>{token.text}</span>))}</code></pre>
       </div>
     </div>
   )
