@@ -7,7 +7,9 @@ import {
   checkWarning,
   groupTrades,
   isSubtotalFee,
+  matchSecurity,
   type NoteTrade,
+  normalizeSecurityName,
   resolveTotalFees,
   sumItemizedFees,
   summarizeNote,
@@ -35,7 +37,14 @@ const XPLG11_TRADES: NoteTrade[] = [
   [11, 91.62],
   [11, 91.66],
   [11, 91.67],
-].map(([quantity = 0, price = 0]) => ({ ticker: 'XPLG11', side: 'C' as const, quantity, price }))
+].map(([quantity = 0, price = 0]) => ({
+  ticker: 'XPLG11',
+  security: 'FII XP LOG',
+  tickerSource: 'NOTE' as const,
+  side: 'C' as const,
+  quantity,
+  price,
+}))
 
 const XP_NOTE: BrokerNoteData = {
   date: isoDate('2026-07-15'),
@@ -51,8 +60,11 @@ const trade = (
   quantity: number,
   price: number,
   side: 'C' | 'V' = 'C',
+  security = ticker,
 ): NoteTrade => ({
   ticker,
+  security,
+  tickerSource: ticker === '' ? 'NONE' : 'NOTE',
   side,
   quantity,
   price,
@@ -75,11 +87,71 @@ describe('groupTrades', () => {
     expect(groups.map((g) => g.side)).toEqual(['C', 'V'])
   })
 
-  it('normaliza o ticker e ignora linha sem papel', () => {
+  it('normaliza o ticker e ignora linha sem papel nenhum', () => {
     const groups = groupTrades([trade(' xplg11 ', 10, 91), trade('', 5, 10)])
 
     expect(groups).toHaveLength(1)
     expect(groups[0]?.ticker).toBe('XPLG11')
+  })
+
+  it('agrupa pelo nome quando a nota não imprime o código', () => {
+    // A 139054003 traz só "CSU DIGITAL": sem isso cada execução viraria uma linha solta.
+    const groups = groupTrades([
+      trade('', 100, 15.15, 'C', 'CSU DIGITAL'),
+      trade('', 600, 15.17, 'C', 'CSU DIGITAL'),
+    ])
+
+    expect(groups).toHaveLength(1)
+    expect(groups[0]).toMatchObject({ ticker: '', security: 'CSU DIGITAL', tickerSource: 'NONE' })
+    expect(groups[0]?.quantity).toBe(700)
+  })
+})
+
+describe('normalizeSecurityName', () => {
+  it.each([
+    ['CSU DIGITAL ON NM', 'CSU DIGITAL'],
+    ['CSU Digital S.A.', 'CSU DIGITAL'],
+    ['MAHLE Metal Leve S.A.', 'MAHLE METAL LEVE'],
+    ['FII XP LOG CI', 'XP LOG'],
+    ['Petróleo Brasileiro S.A. - Petrobras', 'PETROLEO BRASILEIRO PETROBRAS'],
+  ])('%s → %s', (raw, expected) => {
+    expect(normalizeSecurityName(raw)).toBe(expected)
+  })
+})
+
+describe('matchSecurity', () => {
+  const ASSETS = [
+    { ticker: 'CSUD3', name: 'CSU Digital S.A.' },
+    { ticker: 'LEVE3', name: 'MAHLE Metal Leve S.A.' },
+    { ticker: 'GGBR3', name: 'Gerdau S.A.' },
+    { ticker: 'GGBR4', name: 'Gerdau S.A.' },
+    { ticker: 'ITSA3', name: 'Itaúsa S.A.' },
+    { ticker: 'XXXX3', name: null },
+  ]
+
+  it('casa o nome exato depois de normalizar', () => {
+    expect(matchSecurity('CSU DIGITAL', ASSETS)).toBe('CSUD3')
+  })
+
+  it('casa o nome abreviado da nota', () => {
+    expect(matchSecurity('METAL LEVE', ASSETS)).toBe('LEVE3')
+  })
+
+  it('recusa nome ambíguo em vez de chutar', () => {
+    // "GERDAU" é o nome de GGBR3 e GGBR4: escolher uma classe seria chutar.
+    expect(matchSecurity('GERDAU', ASSETS)).toBeNull()
+  })
+
+  it('ignora o acento na comparação', () => {
+    expect(matchSecurity('ITAUSA', ASSETS)).toBe('ITSA3')
+  })
+
+  it('devolve null para papel que não está cadastrado', () => {
+    expect(matchSecurity('EMPRESA DESCONHECIDA', ASSETS)).toBeNull()
+  })
+
+  it('devolve null para nome vazio', () => {
+    expect(matchSecurity('   ', ASSETS)).toBeNull()
   })
 })
 

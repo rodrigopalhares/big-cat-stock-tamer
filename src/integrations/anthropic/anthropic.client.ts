@@ -41,6 +41,10 @@ const SYSTEM_PROMPT = [
   '  linha, sem agrupar e sem somar. O mesmo papel aparece repetido — é esperado.',
   '- O ticker é o código de negociação (XPLG11, PETR4), não a descrição do papel',
   '  ("FII XP LOG"). Ignore sufixos de classe como "CI", "ON", "PN" e "UNT".',
+  '- Muitas notas NÃO imprimem o código, só o nome ("CSU DIGITAL ON NM"). Nesse caso',
+  '  devolva `ticker` vazio e o nome em `security`. Não deduza o código: um palpite',
+  '  errado importa a empresa errada, e como quantidade e preço estão certos a',
+  '  conferência do total fecha assim mesmo e ninguém percebe.',
   '- Ignore as linhas do "Resumo dos Negócios": elas são totais, não operações.',
   '- No "Resumo Financeiro", toda linha que começa com "Total" é subtotal do bloco acima',
   '  ("Total CBLC", "Total Bovespa / Soma", "Total Custos / Despesas"): nunca devolva',
@@ -185,12 +189,19 @@ function toExtraction(extracted: NoteExtraction): BrokerNoteExtraction {
     throw HttpError.badGateway(`Data do pregão inválida na nota: ${extracted.tradeDate}`)
   }
 
-  const trades: NoteTrade[] = extracted.trades.map((t) => ({
-    ticker: t.ticker.trim().toUpperCase(),
-    side: t.side,
-    quantity: Math.abs(t.quantity),
-    price: Math.abs(t.price),
-  }))
+  const trades: NoteTrade[] = extracted.trades.map((t) => {
+    const ticker = t.ticker.trim().toUpperCase()
+    return {
+      ticker,
+      security: t.security.trim(),
+      // Aqui só existem duas origens: o que veio impresso e o que ainda não tem código.
+      // Quem promove 'NONE' para 'NAME' é o service, que enxerga os ativos cadastrados.
+      tickerSource: ticker === '' ? ('NONE' as const) : ('NOTE' as const),
+      side: t.side,
+      quantity: Math.abs(t.quantity),
+      price: Math.abs(t.price),
+    }
+  })
   if (trades.length === 0) {
     throw HttpError.badRequest('Nenhuma operação encontrada na nota.')
   }

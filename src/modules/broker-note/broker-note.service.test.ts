@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { clearAllData, createTestDb, type TestDb } from '../../../tests/db.js'
+import { createAsset } from '../../../tests/factories.js'
 import type { BrokerNoteData } from '../../domain/broker-note.js'
 import type {
   AnthropicClient,
@@ -19,10 +20,30 @@ const NOTE: BrokerNoteData = {
   totalFees: 9.03,
   totalAmount: 30160.98,
   trades: [
-    { ticker: 'XPLG11', side: 'C', quantity: 100, price: 91.67 },
-    { ticker: 'XPLG11', side: 'C', quantity: 200, price: 91.63695 },
-    { ticker: 'XPLG11', side: 'C', quantity: 29, price: 91.64 },
-  ],
+    [100, 91.67],
+    [200, 91.63695],
+    [29, 91.64],
+  ].map(([quantity = 0, price = 0]) => ({
+    ticker: 'XPLG11',
+    security: 'FII XP LOG',
+    tickerSource: 'NOTE' as const,
+    side: 'C' as const,
+    quantity,
+    price,
+  })),
+}
+
+/** A 139054003: a nota não imprime o código, só "CSU DIGITAL" e "METAL LEVE". */
+const NOTE_SEM_TICKER: BrokerNoteData = {
+  date: isoDate('2026-06-26'),
+  broker: 'XP',
+  noteNumber: '139054003',
+  totalFees: 8.49,
+  totalAmount: 28384.49,
+  trades: [
+    { security: 'CSU DIGITAL', quantity: 1000, price: 15.168 },
+    { security: 'METAL LEVE', quantity: 400, price: 33.02 },
+  ].map((t) => ({ ...t, ticker: '', tickerSource: 'NONE' as const, side: 'C' as const })),
 }
 
 function fakeAnthropic(extraction: Partial<BrokerNoteExtraction> = {}): AnthropicClient {
@@ -160,6 +181,50 @@ describe('BrokerNoteService', () => {
     rmSync(join(dir, '2026', fileName))
 
     await expect(service.readFile(id)).rejects.toMatchObject({ statusCode: 404 })
+  })
+
+  describe('nota sem o código de negociação impresso', () => {
+    const serviceSemTicker = (dir: string) =>
+      new BrokerNoteService(db, fakeAnthropic({ note: NOTE_SEM_TICKER }), dir)
+
+    it('resolve o ticker pelo nome do papel contra os ativos cadastrados', async () => {
+      await createAsset(db, 'CSUD3', { name: 'CSU Digital S.A.' })
+      await createAsset(db, 'LEVE3', { name: 'MAHLE Metal Leve S.A.' })
+
+      const result = await serviceSemTicker(tempDir()).importNote(upload)
+
+      expect(result.groups.map((g) => [g.ticker, g.tickerSource])).toEqual([
+        ['CSUD3', 'NAME'],
+        ['LEVE3', 'NAME'],
+      ])
+      expect(result.csv).toContain('CSUD3\t26/06/2026\tC\t1000')
+      expect(result.csv).toContain('LEVE3\t26/06/2026\tC\t400')
+    })
+
+    it('deixa o ticker em branco quando o nome não bate com nada', async () => {
+      const result = await serviceSemTicker(tempDir()).importNote(upload)
+
+      expect(result.groups.map((g) => g.tickerSource)).toEqual(['NONE', 'NONE'])
+      // Sem ticker a linha vai para a revisão em branco, com o papel nas observações.
+      expect(result.csv.split('\n')[0]).toBe(
+        '\t26/06/2026\tC\t1000\t15,168\t4,54\tXP\t0\tBRL\tNota 139054003 · CSU DIGITAL',
+      )
+    })
+
+    it('não chuta entre duas classes da mesma empresa', async () => {
+      await createAsset(db, 'CSUD3', { name: 'CSU Digital S.A.' })
+      await createAsset(db, 'CSUD4', { name: 'CSU Digital S.A.' })
+
+      const result = await serviceSemTicker(tempDir()).importNote(upload)
+
+      expect(result.groups[0]).toMatchObject({ ticker: '', tickerSource: 'NONE' })
+    })
+
+    it('não vai ao banco quando a nota já traz todos os códigos', async () => {
+      const result = await serviceIn(tempDir()).importNote(upload)
+
+      expect(result.groups[0]?.tickerSource).toBe('NOTE')
+    })
   })
 
   it('segue desabilitado quando o cliente da Anthropic não tem chave', () => {

@@ -157,8 +157,20 @@ upload -> AnthropicClient.extractBrokerNote() -> groupTrades() -> allocateFees()
 
 Rules that matter when changing this:
 
-- **Grouping key is ticker + side.** Day trade lists a buy and a sell of the same paper;
-  merging them would produce a meaningless average price.
+- **Not every note prints the ticker.** Some list only the security name ("CSU DIGITAL ON
+  NM"). Asked for a code that isn't there, the model invents one — it returned CSUD11 and
+  GGBR4 (Gerdau) for CSUD3 and LEVE3, and the total check passed because quantity and price
+  were right. So the prompt forbids deducing: no printed code means empty `ticker` plus the
+  printed `security`, and `BrokerNoteService.resolveTickers()` matches the name against
+  registered assets (`matchSecurity`). Ambiguous or unknown stays blank on purpose and goes
+  to manual review — `tickerSource` (`NOTE` / `NAME` / `NONE`) carries that to the preview.
+- **Grouping key is ticker + side**, falling back to the security name when there is no
+  ticker. Day trade lists a buy and a sell of the same paper; merging them would produce a
+  meaningless average price.
+- **Fee subtotals are dropped.** The "Resumo Financeiro" interleaves line items with
+  subtotals ("Total CBLC", "Total Bovespa / Soma"). The model summed both and overstated
+  fees by R$ 2,14. `resolveTotalFees()` fixes it arithmetically — see the comment there for
+  why it only corrects when the declared total equals the sum of *everything*.
 - **Fees are allocated by traded value** (`price × quantity` per ticker), never by quantity.
   The rounding residue goes to the largest ticker so the allocated fees sum exactly to the
   note's total.

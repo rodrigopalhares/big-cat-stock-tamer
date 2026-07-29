@@ -5,9 +5,11 @@ import {
   type BrokerNoteData,
   checkTotal,
   checkWarning,
+  matchSecurity,
   type NoteCheck,
   type NoteFee,
   type NoteGroup,
+  type NoteTrade,
   summarizeNote,
   toCsv,
 } from '../../domain/broker-note.js'
@@ -84,19 +86,20 @@ export class BrokerNoteService {
     // durante uma chamada HTTP travaria a aplicação inteira.
     const extracted = await this.anthropic.extractBrokerNote(upload.file, upload.contentType)
 
-    const groups = summarizeNote(extracted.note)
-    const check = checkTotal(groups, extracted.note)
-    const csv = toCsv(extracted.note, groups)
+    const note = { ...extracted.note, trades: await this.resolveTickers(extracted.note.trades) }
+    const groups = summarizeNote(note)
+    const check = checkTotal(groups, note)
+    const csv = toCsv(note, groups)
 
     const saved = await this.db.brokerNote.create({
       data: {
-        date: extracted.note.date,
-        broker: extracted.note.broker || null,
-        noteNumber: extracted.note.noteNumber || null,
+        date: note.date,
+        broker: note.broker || null,
+        noteNumber: note.noteNumber || null,
         fileName: '',
         originalName: upload.fileName,
-        totalAmount: extracted.note.totalAmount,
-        totalFees: extracted.note.totalFees,
+        totalAmount: note.totalAmount,
+        totalFees: note.totalFees,
         csv,
         warning: checkWarning(check),
       },
@@ -106,7 +109,7 @@ export class BrokerNoteService {
 
     return {
       id: saved.id,
-      note: extracted.note,
+      note,
       groups,
       fees: extracted.fees,
       check,
@@ -115,6 +118,30 @@ export class BrokerNoteService {
       csv,
       fileName,
     }
+  }
+
+  /**
+   * Completa o ticker das operações que a nota não identificou, pelo nome do papel contra
+   * os ativos já cadastrados: "METAL LEVE" acha "MAHLE Metal Leve S.A." e vira LEVE3.
+   *
+   * Nome ambíguo ou desconhecido fica sem ticker de propósito — a linha entra na revisão
+   * em branco, que é ruído de menos do que importar a empresa errada em silêncio.
+   */
+  private async resolveTickers(trades: readonly NoteTrade[]): Promise<NoteTrade[]> {
+    if (trades.every((t) => t.ticker !== '')) return [...trades]
+
+    const assets = await this.db.asset.findMany({ select: { ticker: true, name: true } })
+    const resolved = new Map<string, string | null>()
+
+    return trades.map((trade) => {
+      if (trade.ticker !== '') return trade
+
+      const key = trade.security.toUpperCase()
+      if (!resolved.has(key)) resolved.set(key, matchSecurity(trade.security, assets))
+
+      const ticker = resolved.get(key) ?? null
+      return ticker === null ? trade : { ...trade, ticker, tickerSource: 'NAME' as const }
+    })
   }
 
   async findNote(id: number): Promise<BrokerNote> {

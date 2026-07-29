@@ -11,9 +11,30 @@ import { type IsoDate, toBrazilianDate } from '../shared/iso-date.js'
 
 export type NoteSide = 'C' | 'V'
 
+/**
+ * De onde veio o ticker da operação.
+ *
+ * Nem toda nota imprime o código de negociação: a 139054003 traz só "CSU DIGITAL ON NM" e
+ * "METAL LEVE ON NM". Pedir o código nesse caso é pedir um chute — e o modelo chutou
+ * CSUD11 e GGBR4 (Gerdau!) no lugar de CSUD3 e LEVE3, com a conferência do total fechando
+ * assim mesmo, porque quantidade e preço estavam certos. Por isso a origem viaja junto:
+ * ticker deduzido não pode parecer ticker lido.
+ */
+export type TickerSource =
+  /** Impresso na nota, ao lado do papel. */
+  | 'NOTE'
+  /** Deduzido do nome do papel contra os ativos já cadastrados. */
+  | 'NAME'
+  /** Não identificado — a linha vai para revisão com o ticker em branco. */
+  | 'NONE'
+
 /** Uma execução da nota, como sai do PDF. */
 export type NoteTrade = {
+  /** Vazio quando a nota não imprime o código — aí quem manda é [security]. */
   readonly ticker: string
+  /** Nome do papel como impresso na nota: "CSU DIGITAL", "FII XP LOG". */
+  readonly security: string
+  readonly tickerSource: TickerSource
   readonly side: NoteSide
   readonly quantity: number
   readonly price: number
@@ -39,6 +60,8 @@ export type BrokerNoteData = {
 /** Uma linha do CSV: o consolidado de um ticker dentro da nota. */
 export type NoteGroup = {
   readonly ticker: string
+  readonly security: string
+  readonly tickerSource: TickerSource
   readonly side: NoteSide
   readonly quantity: number
   /** Médio ponderado — `value / quantity`, sem arredondar. */
@@ -99,17 +122,24 @@ export function resolveTotalFees(fees: readonly NoteFee[], declaredTotal: number
  * A ordem de saída é a da primeira aparição na nota.
  */
 export function groupTrades(trades: readonly NoteTrade[]): NoteGroup[] {
-  const groups = new Map<
-    string,
-    { ticker: string; side: NoteSide; quantity: number; value: number }
-  >()
+  type Accumulator = Omit<NoteGroup, 'price' | 'fees'>
+  const groups = new Map<string, Accumulator>()
 
   for (const trade of trades) {
     const ticker = trade.ticker.trim().toUpperCase()
-    if (ticker === '') continue
+    const security = trade.security.trim()
+    // Sem ticker o papel ainda é identificável pelo nome; sem os dois, não há o que agrupar.
+    if (ticker === '' && security === '') continue
 
-    const key = `${ticker}|${trade.side}`
-    const current = groups.get(key) ?? { ticker, side: trade.side, quantity: 0, value: 0 }
+    const key = `${ticker === '' ? security.toUpperCase() : ticker}|${trade.side}`
+    const current = groups.get(key) ?? {
+      ticker,
+      security,
+      tickerSource: trade.tickerSource,
+      side: trade.side,
+      quantity: 0,
+      value: 0,
+    }
     groups.set(key, {
       ...current,
       quantity: current.quantity + trade.quantity,
@@ -118,13 +148,56 @@ export function groupTrades(trades: readonly NoteTrade[]): NoteGroup[] {
   }
 
   return [...groups.values()].map((g) => ({
-    ticker: g.ticker,
-    side: g.side,
-    quantity: g.quantity,
+    ...g,
     price: g.quantity === 0 ? 0 : g.value / g.quantity,
-    value: g.value,
     fees: 0,
   }))
+}
+
+const CORPORATE_NOISE =
+  /\b(S\.?\/?A\.?|SA|LTDA|CIA|COMPANHIA|HOLDING|PARTICIPACOES|PARTICIPACAO|FII|FUNDO|INVESTIMENTO|IMOBILIARIO|ON|PN|PNA|PNB|NM|N1|N2|EJ|CI|UNT|EDJ|ED)\b/g
+
+/**
+ * Nome de papel comparável: sem acento, sem pontuação e sem o ruído societário que só um
+ * dos lados escreve. "CSU DIGITAL ON NM" e "CSU Digital S.A." caem os dois em "CSU DIGITAL".
+ */
+export function normalizeSecurityName(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9/. ]/g, ' ')
+    .replace(CORPORATE_NOISE, ' ')
+    .replace(/[/.]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Acha o ticker do papel entre os ativos já cadastrados, pelo nome impresso na nota.
+ *
+ * Devolve null quando não acha **ou quando acha mais de um**: "GERDAU" casa com GGBR4 e
+ * GOAU4, e chutar entre os dois é o erro que esta função existe para evitar. Ambíguo vai
+ * para revisão manual.
+ */
+export function matchSecurity(
+  security: string,
+  assets: readonly { readonly ticker: string; readonly name: string | null }[],
+): string | null {
+  const target = normalizeSecurityName(security)
+  if (target === '') return null
+
+  const named = assets
+    .filter((a) => a.name !== null && a.name.trim() !== '')
+    .map((a) => ({ ticker: a.ticker, name: normalizeSecurityName(a.name ?? '') }))
+
+  const exact = named.filter((a) => a.name === target)
+  if (exact.length === 1) return exact[0]?.ticker ?? null
+  if (exact.length > 1) return null
+
+  // A nota abrevia ("METAL LEVE" para "MAHLE Metal Leve S.A."), então vale conter.
+  const partial = named.filter((a) => a.name.includes(target) || target.includes(a.name))
+  return partial.length === 1 ? (partial[0]?.ticker ?? null) : null
 }
 
 /**
@@ -176,7 +249,7 @@ export function summarizeNote(note: BrokerNoteData): NoteGroup[] {
  */
 export function toCsv(note: BrokerNoteData, groups: readonly NoteGroup[]): string {
   const date = toBrazilianDate(note.date)
-  const notes = note.noteNumber.trim() === '' ? '' : `Nota ${note.noteNumber.trim()}`
+  const base = note.noteNumber.trim() === '' ? '' : `Nota ${note.noteNumber.trim()}`
 
   return groups
     .map((g) =>
@@ -190,7 +263,9 @@ export function toCsv(note: BrokerNoteData, groups: readonly NoteGroup[]): strin
         note.broker.trim(),
         '0',
         'BRL',
-        notes,
+        // Sem ticker a linha entra na revisão em branco: o nome do papel vai junto para
+        // dizer qual código digitar.
+        g.ticker === '' ? [base, g.security].filter((p) => p !== '').join(' · ') : base,
       ].join('\t'),
     )
     .join('\n')

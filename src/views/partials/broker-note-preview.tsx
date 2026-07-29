@@ -1,3 +1,4 @@
+import type { TickerSource } from '../../domain/broker-note.js'
 import type { BrokerNoteImport } from '../../modules/broker-note/broker-note.service.js'
 import {
   currencySymbol,
@@ -51,11 +52,21 @@ export function BrokerNotePreview({ result }: { result: BrokerNoteImport }) {
 
       <Conference result={result} />
 
+      {groups.some((g) => g.tickerSource === 'NONE') && (
+        <div class="alert alert-danger py-2 small">
+          <i class="bi bi-exclamation-octagon" /> Esta nota não imprime o código de negociação de
+          todos os papéis, e o nome não bateu com nenhum ativo cadastrado. Preencha o ticker das
+          linhas marcadas na etapa de revisão — o total da nota fecha mesmo com o papel errado,
+          então a conferência acima não protege contra isso.
+        </div>
+      )}
+
       <div class="table-responsive mb-3">
         <table class="table table-sm table-bordered align-middle small mb-0">
           <thead class="table-light">
             <tr>
               <th>Ticker</th>
+              <th>Papel na nota</th>
               <th>Operação</th>
               <th class="text-end">Qtd</th>
               <th class="text-end">Preço médio</th>
@@ -66,7 +77,11 @@ export function BrokerNotePreview({ result }: { result: BrokerNoteImport }) {
           <tbody>
             {groups.map((group) => (
               <tr>
-                <td class="fw-semibold">{group.ticker}</td>
+                <td class="fw-semibold">
+                  {group.ticker === '' ? <span class="text-danger">—</span> : group.ticker}
+                  <TickerOrigin source={group.tickerSource} />
+                </td>
+                <td class="text-muted">{group.security || '—'}</td>
                 <td>{group.side === 'C' ? 'Compra' : 'Venda'}</td>
                 <td class="text-end">{fmtQuantity(group.quantity)}</td>
                 {/* Quatro casas: o médio ponderado quase nunca cai num centavo redondo. */}
@@ -80,7 +95,7 @@ export function BrokerNotePreview({ result }: { result: BrokerNoteImport }) {
           </tbody>
           <tfoot class="table-light">
             <tr>
-              <td colspan={4} class="text-end fw-semibold">
+              <td colspan={5} class="text-end fw-semibold">
                 Total
               </td>
               <td class="text-end fw-semibold">
@@ -113,6 +128,23 @@ export function BrokerNotePreview({ result }: { result: BrokerNoteImport }) {
         </button>
       </div>
     </div>
+  )
+}
+
+/**
+ * Ticker lido da nota não leva selo — é o caso normal. Os outros dois levam, porque
+ * deduzido e não identificado exigem conferência humana antes de virar transação.
+ */
+function TickerOrigin({ source }: { source: TickerSource }) {
+  if (source === 'NOTE') return null
+  return source === 'NAME' ? (
+    <span class="badge bg-info-subtle text-info-emphasis ms-1" title="Deduzido do nome do papel">
+      pelo nome
+    </span>
+  ) : (
+    <span class="badge bg-danger ms-1" title="A nota não imprime o código de negociação">
+      preencher
+    </span>
   )
 }
 

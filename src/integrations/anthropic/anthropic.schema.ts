@@ -14,7 +14,17 @@ import { z } from 'zod'
 export const NoteTradeExtraction = z.strictObject({
   ticker: z
     .string()
-    .describe('Código de negociação do papel, ex.: XPLG11, PETR4. Só o código, sem o nome.'),
+    .describe(
+      'Código de negociação impresso na nota, ex.: XPLG11, PETR4. Devolva string vazia ' +
+        'quando a nota NÃO imprimir o código — nunca deduza o código a partir do nome ' +
+        'do papel.',
+    ),
+  security: z
+    .string()
+    .describe(
+      'Nome do papel exatamente como impresso na coluna "Especificação do título", sem ' +
+        'a classe: "CSU DIGITAL", "METAL LEVE", "FII XP LOG".',
+    ),
   side: z.enum(['C', 'V']).describe('C para compra, V para venda, como na coluna C/V da nota.'),
   quantity: z.number().describe('Quantidade desta execução.'),
   price: z.number().describe('Preço unitário desta execução.'),

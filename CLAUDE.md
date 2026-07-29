@@ -121,9 +121,15 @@ O arquivo enviado fica em `${APP_NOTES_DIR}/<ano>/<yyyyMMdd>_<id>.<ext>` (padrã
 `broker_notes`. As transações criadas guardam `broker_note_id`, que é o que dá o link de
 download na linha do histórico.
 
-Chave em `APP_ANTHROPIC_API_KEY`; em branco, a aba some. O total da nota é conferido
-(`Σ quantidade × preço ± taxas` contra o líquido declarado) — divergência avisa e deixa
-seguir, porque o preview do CSV é editável.
+Chave em `APP_ANTHROPIC_API_KEY`; em branco, a aba fica desativada. O total da nota é
+conferido (`Σ quantidade × preço ± taxas` contra o líquido declarado) — divergência avisa e
+deixa seguir, porque o preview do CSV é editável.
+
+**A conferência do total não protege contra ticker errado.** Nota que não imprime o código
+de negociação — só "CSU DIGITAL ON NM" — fecha no centavo com o papel trocado, porque
+quantidade e preço estão certos. Por isso o modelo é proibido de deduzir o código: sem código
+impresso ele devolve o nome, e o service resolve contra os ativos cadastrados. Nome ambíguo
+ou desconhecido fica em branco e vai para a revisão manual.
 
 ## Autenticação
 

@@ -12,8 +12,8 @@ const EXTRACTION = {
   broker: 'XP',
   noteNumber: '140232205',
   trades: [
-    { ticker: 'XPLG11', side: 'C', quantity: 100, price: 91.67 },
-    { ticker: 'xplg11 ', side: 'C', quantity: 229, price: 91.63 },
+    { ticker: 'XPLG11', security: 'FII XP LOG', side: 'C', quantity: 100, price: 91.67 },
+    { ticker: 'xplg11 ', security: 'FII XP LOG', side: 'C', quantity: 229, price: 91.63 },
   ],
   fees: [{ label: 'Taxa de liquidação', value: 6.75 }],
   totalFees: 9.03,
@@ -60,6 +60,7 @@ describe('AnthropicClient', () => {
     expect(result.note.trades).toHaveLength(2)
     // Ticker normalizado já na fronteira, não lá no domínio.
     expect(result.note.trades[1]?.ticker).toBe('XPLG11')
+    expect(result.note.trades[1]?.tickerSource).toBe('NOTE')
     expect(result.checkNotes).toBe('Confere.')
     expect(result.fees[0]).toEqual({ label: 'Taxa de liquidação', value: 6.75 })
   })
@@ -130,6 +131,21 @@ describe('AnthropicClient', () => {
     server.use(http.post(MESSAGES, () => reply({ ...EXTRACTION, fees: [], totalFees: 9.03 })))
 
     expect((await extract()).note.totalFees).toBe(9.03)
+  })
+
+  it('marca como não identificado o papel sem código impresso', async () => {
+    server.use(
+      http.post(MESSAGES, () =>
+        reply({
+          ...EXTRACTION,
+          trades: [{ ticker: '', security: 'CSU DIGITAL', side: 'C', quantity: 100, price: 15.15 }],
+        }),
+      ),
+    )
+
+    const [trade] = (await extract()).note.trades
+
+    expect(trade).toMatchObject({ ticker: '', security: 'CSU DIGITAL', tickerSource: 'NONE' })
   })
 
   it('recusa tipo de arquivo que o modelo não lê', async () => {

@@ -22,7 +22,16 @@ const NOTE: BrokerNoteData = {
   noteNumber: '140232205',
   totalFees: 9.03,
   totalAmount: 30160.98,
-  trades: [{ ticker: 'XPLG11', side: 'C', quantity: 329, price: 91.64726443768997 }],
+  trades: [
+    {
+      ticker: 'XPLG11',
+      security: 'FII XP LOG',
+      tickerSource: 'NOTE',
+      side: 'C',
+      quantity: 329,
+      price: 91.64726443768997,
+    },
+  ],
 }
 
 const PDF = Buffer.from('%PDF-1.4 conteúdo da nota')
