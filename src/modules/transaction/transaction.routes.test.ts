@@ -244,7 +244,8 @@ describe('sem APP_ANTHROPIC_API_KEY', () => {
     // A aba continua visível: escondê-la faria o usuário procurar uma funcionalidade
     // que ele nem sabe que existe.
     expect(res.body).toContain('Nota de negociação')
-    expect(res.body).toContain('title="Leitura de nota desativada')
+    // O title fica no <span> de fora: botão desativado não recebe hover no Bootstrap.
+    expect(res.body).toContain('<span class="d-inline-block" title="Leitura de nota desativada')
     expect(res.body).toContain('aria-disabled="true"')
     expect(res.body).toContain('configure APP_ANTHROPIC_API_KEY para habilitar')
     // Sem chave o formulário de envio não vai junto.

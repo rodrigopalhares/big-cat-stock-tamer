@@ -101,21 +101,7 @@ function CsvImportModal({ noteImportEnabled }: { noteImportEnabled: boolean }) {
               >
                 <i class="bi bi-file-earmark-spreadsheet" /> CSV
               </button>
-              {/* Sem chave a aba aparece desativada, com o motivo no title: some da tela
-                  é o usuário procurando uma funcionalidade que ele não sabe que existe. */}
-              <button
-                type="button"
-                class={`nav-link${noteImportEnabled ? '' : ' disabled'}`}
-                data-bs-toggle="tab"
-                data-bs-target="#noteTabPane"
-                role="tab"
-                disabled={!noteImportEnabled}
-                aria-disabled={noteImportEnabled ? undefined : 'true'}
-                title={noteImportEnabled ? undefined : NOTE_DISABLED_REASON}
-              >
-                <i class="bi bi-file-earmark-pdf" /> Nota de negociação
-                {!noteImportEnabled && <i class="bi bi-lock ms-1" />}
-              </button>
+              <NoteTab enabled={noteImportEnabled} />
             </div>
             <div class="tab-content flex-grow-1 min-h-0">
               <div
@@ -167,6 +153,38 @@ function CsvImportModal({ noteImportEnabled }: { noteImportEnabled: boolean }) {
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * A aba nunca some — sumir faria o usuário procurar uma funcionalidade que ele nem sabe
+ * que existe. Sem chave ela fica desativada, com o motivo.
+ *
+ * O `title` vai no `<span>` de fora, não no botão: o Bootstrap aplica
+ * `pointer-events: none` em `.nav-link:disabled`, então o botão não recebe o hover e a
+ * dica nunca apareceria. O envoltório recebe o evento no lugar dele.
+ */
+function NoteTab({ enabled }: { enabled: boolean }) {
+  const tab = (
+    <button
+      type="button"
+      class={`nav-link${enabled ? '' : ' disabled'}`}
+      data-bs-toggle="tab"
+      data-bs-target="#noteTabPane"
+      role="tab"
+      disabled={!enabled}
+      aria-disabled={enabled ? undefined : 'true'}
+    >
+      <i class="bi bi-file-earmark-pdf" /> Nota de negociação
+      {!enabled && <i class="bi bi-lock ms-1" />}
+    </button>
+  )
+
+  if (enabled) return tab
+  return (
+    <span class="d-inline-block" title={NOTE_DISABLED_REASON}>
+      {tab}
+    </span>
   )
 }
 
