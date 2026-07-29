@@ -6,9 +6,12 @@ description: >
   of transactions — adding/removing columns, changing validations, adjusting the
   UI of the import modal, modifying how assets are reviewed or transactions are
   previewed, changing the batch submit logic, or fixing bugs in the import flow.
+  Also covers importing a broker note (nota de negociacao) PDF, which is read by
+  the Anthropic API and feeds the same CSV pipeline.
   Trigger on mentions of: CSV import, importacao CSV, batch import, parse CSV,
   colar transacoes, importar planilha, etapa 1/2 do CSV, asset review, preview
-  de transacoes.
+  de transacoes, nota de negociacao, nota de corretagem, importar PDF, Anthropic,
+  broker note.
 ---
 
 # CSV Transaction Import Flow
@@ -19,7 +22,9 @@ feature so you can make targeted changes without exploring the codebase.
 ## Flow Overview
 
 ```
-User pastes CSV -> Step 1: Asset Review -> Step 2: Transaction Preview -> Batch Submit
+User pastes CSV ----------------------┐
+                                      ├-> Step 1: Asset Review -> Step 2: Preview -> Batch Submit
+User uploads broker note PDF -> CSV --┘
 ```
 
 1. User pastes tab-separated text into a modal textarea
@@ -30,6 +35,11 @@ User pastes CSV -> Step 1: Asset Review -> Step 2: Transaction Preview -> Batch 
    editable and pre-marked as ignored. Ignored assets from step 1 carry over.
 4. **Submit** sends valid, non-ignored rows + new assets as JSON to the backend, which
    persists everything in a single batch
+
+The modal has two tabs. The **Nota de negociação** tab (hidden when `APP_ANTHROPIC_API_KEY`
+is blank) uploads a broker note PDF, shows a preview, and the **Usar no CSV** button drops
+the extracted CSV into the same textarea — from there the flow above is unchanged. See
+[Broker Note Import](#broker-note-import-pdf) below.
 
 ## File Map
 
@@ -43,6 +53,11 @@ User pastes CSV -> Step 1: Asset Review -> Step 2: Transaction Preview -> Batch 
 | `src/views/partials/csv-asset-review.tsx` | Step 1 UI — asset review table (JSX fragment) |
 | `src/views/partials/csv-preview.tsx` | Step 2 UI — transaction preview table (JSX fragment) |
 | `src/client/transactions.ts` | Client-side logic: `csvNextStep()`, `batchSubmit()`, ignore toggles, ticker change handlers |
+| `src/domain/broker-note.ts` | Broker note: `groupTrades()`, `allocateFees()`, `checkTotal()`, `toCsv()` — pure |
+| `src/integrations/anthropic/anthropic.client.ts` | Reads the note PDF with `claude-haiku-4-5` + structured output |
+| `src/integrations/anthropic/anthropic.schema.ts` | Zod schema of the extraction; also the JSON Schema sent to the API |
+| `src/modules/broker-note/broker-note.service.ts` | Saves the file, persists `BrokerNote`, serves the downloads |
+| `src/views/partials/broker-note-preview.tsx` | Note preview fragment (grouped table + total check) |
 
 ## CSV Input Format
 
@@ -123,9 +138,47 @@ type AssetBatchRow(ticker, name, type, yfTicker, currency)
 |--------|------|---------|
 | POST | `/transactions/parse-csv` | Fragment `csv-asset-review :: csvAssetReview` |
 | POST | `/transactions/parse-csv-step2` | Fragment `csv-preview :: csvPreview` |
-| POST | `/transactions/batch` | JSON `{ inserted: N }` |
+| POST | `/transactions/batch` | JSON `{ inserted: N }` — optional `brokerNoteId` links the rows to a note |
+| POST | `/transactions/parse-note` | multipart `file` → fragment `broker-note-preview` |
+| GET | `/transactions/notes/:id` | The original PDF/image, as a download |
+| GET | `/transactions/notes/:id/csv` | The extracted CSV, as a download |
 | GET | `/transactions/asset-info?ticker=X` | JSON `{ name, type, yfTicker, currency }` |
 | GET | `/transactions/ticker-info?ticker=X` | HTML snippet with ticker status |
+
+## Broker Note Import (PDF)
+
+A nota de negociação lists every execution separately — a single 329-share purchase can span
+19 lines across 2 pages. The import turns that into one transaction per ticker.
+
+```
+upload -> AnthropicClient.extractBrokerNote() -> groupTrades() -> allocateFees()
+       -> checkTotal() -> toCsv() -> persist BrokerNote + file -> preview fragment
+```
+
+Rules that matter when changing this:
+
+- **Grouping key is ticker + side.** Day trade lists a buy and a sell of the same paper;
+  merging them would produce a meaningless average price.
+- **Fees are allocated by traded value** (`price × quantity` per ticker), never by quantity.
+  The rounding residue goes to the largest ticker so the allocated fees sum exactly to the
+  note's total.
+- **The average price keeps 8 decimals in the CSV** (`91,64726444`). Two decimals would throw
+  real money out of the position cost.
+- **The total check is advisory.** `checkTotal()` compares `Σ value ± fees` against the
+  declared net (plus on a buy note, minus on a sell note). A mismatch shows a warning, is
+  stored in `broker_notes.warning`, and still lets the user import — the preview is editable.
+- **Network before writes.** The Anthropic call happens before any DB write; SQLite has a
+  single writer and holding the lock across an HTTP call would freeze the app.
+- **The file name needs the row id**, so the row is inserted first and the file written
+  after, at `${APP_NOTES_DIR}/<year>/<yyyyMMdd>_<id>.<ext>` (default `./data/notas`). If the
+  write fails the row is deleted — a note without a file is a permanently broken download.
+
+The extraction prompt lives in `SYSTEM_PROMPT` (`anthropic.client.ts`) and the field
+descriptions in `anthropic.schema.ts` — those descriptions go into the JSON Schema and are
+what actually steer the extraction, so changing them changes the result.
+
+`Transaction.brokerNoteId` is what puts the download icon next to the broker in the history
+table; it flows from the client's `pendingBrokerNoteId` through `/transactions/batch`.
 
 ## Common Modification Patterns
 

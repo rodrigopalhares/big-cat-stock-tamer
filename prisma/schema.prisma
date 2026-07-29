@@ -40,24 +40,55 @@ model Asset {
 }
 
 model Transaction {
-  id        Int      @id @default(autoincrement())
-  assetId   String   @map("asset_id")
-  type      String
-  quantity  Float
-  price     Float
-  fees      Float    @default(0)
-  priceBrl  Float    @default(0) @map("price_brl")
-  feesBrl   Float    @default(0) @map("fees_brl")
-  currency  String   @default("BRL")
-  date      String
-  broker    String?
-  notes     String?
-  createdAt DateTime @default(now()) @map("created_at")
+  id           Int      @id @default(autoincrement())
+  assetId      String   @map("asset_id")
+  type         String
+  quantity     Float
+  price        Float
+  fees         Float    @default(0)
+  priceBrl     Float    @default(0) @map("price_brl")
+  feesBrl      Float    @default(0) @map("fees_brl")
+  currency     String   @default("BRL")
+  date         String
+  broker       String?
+  notes        String?
+  brokerNoteId Int?     @map("broker_note_id")
+  createdAt    DateTime @default(now()) @map("created_at")
 
   asset Asset @relation(fields: [assetId], references: [ticker], onDelete: Cascade)
+  // SetNull de propósito: apagar a nota não pode levar as transações junto.
+  brokerNote BrokerNote? @relation(fields: [brokerNoteId], references: [id], onDelete: SetNull)
 
   @@index([assetId])
+  @@index([brokerNoteId])
   @@map("transactions")
+}
+
+/**
+ * Nota de negociação importada de PDF. Guarda o que a corretora declarou e o CSV
+ * extraído pela Anthropic — é o CSV que vira transação, então ele fica arquivado
+ * junto para conferência posterior.
+ *
+ * O PDF em si mora em `${APP_DATA_DIR}/notas/<ano>/<file_name>`.
+ */
+model BrokerNote {
+  id           Int      @id @default(autoincrement())
+  date         String
+  broker       String?
+  noteNumber   String?  @map("note_number")
+  fileName     String   @map("file_name")
+  originalName String   @map("original_name")
+  totalAmount  Float    @map("total_amount")
+  totalFees    Float    @default(0) @map("total_fees")
+  csv          String
+  /// Preenchido quando a conferência do total não fecha — o import segue, mas avisa.
+  warning      String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  transactions Transaction[]
+
+  @@index([date])
+  @@map("broker_notes")
 }
 
 model Dividend {

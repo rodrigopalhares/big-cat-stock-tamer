@@ -1,12 +1,14 @@
 import type { Db } from './config/db.js'
 import type { Env } from './config/env.js'
 import { BackupService } from './infra/backup.js'
+import { AnthropicClient } from './integrations/anthropic/anthropic.client.js'
 import { BcbClient } from './integrations/bcb/bcb.client.js'
 import { BROWSER_USER_AGENT, HttpClient, type Logger, silentLogger } from './integrations/http.js'
 import { TesouroClient } from './integrations/tesouro/tesouro.client.js'
 import { YahooClient } from './integrations/yahoo/yahoo.client.js'
 import { AssetService } from './modules/asset/asset.service.js'
 import { AuthService } from './modules/auth/auth.service.js'
+import { BrokerNoteService } from './modules/broker-note/broker-note.service.js'
 import { CsvImportService } from './modules/csv-import/csv-import.service.js'
 import { DividendService } from './modules/dividend/dividend.service.js'
 import { EvolutionService } from './modules/evolution/evolution.service.js'
@@ -42,6 +44,9 @@ export function buildContainer(db: Db, env: Env, logger: Logger = silentLogger) 
   const riskMetrics = new RiskMetricsService(db, benchmarks, logger)
   const csvImport = new CsvImportService(db, yahoo, transactions, dividends)
 
+  const anthropic = new AnthropicClient({ apiKey: env.APP_ANTHROPIC_API_KEY, logger })
+  const brokerNotes = new BrokerNoteService(db, anthropic, env.notesDir)
+
   const auth = new AuthService({
     password: env.APP_AUTH_PASSWORD,
     keyFile: env.authKeyFile,
@@ -72,6 +77,8 @@ export function buildContainer(db: Db, env: Env, logger: Logger = silentLogger) 
     benchmarks,
     riskMetrics,
     csvImport,
+    anthropic,
+    brokerNotes,
     auth,
     backup,
   } as const

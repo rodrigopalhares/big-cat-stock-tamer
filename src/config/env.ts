@@ -18,6 +18,9 @@ const EnvSchema = z.object({
   APP_AUTH_PASSWORD: z.string().default(''),
   APP_AUTH_SESSION_DAYS: z.coerce.number().int().positive().default(365),
 
+  // Em branco desabilita a leitura de notas em PDF — mesma convenção da senha.
+  APP_ANTHROPIC_API_KEY: z.string().default(''),
+
   APP_BACKUP_ENABLED: z
     .enum(['true', 'false'])
     .default('true')
@@ -30,6 +33,7 @@ export type Env = z.infer<typeof EnvSchema> & {
   readonly authEnabled: boolean
   readonly backupDir: string
   readonly authKeyFile: string
+  readonly notesDir: string
 }
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
@@ -46,5 +50,6 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     authEnabled: env.APP_AUTH_PASSWORD.length > 0,
     backupDir: source['APP_BACKUP_DIR'] ?? `${env.APP_DATA_DIR}/backups`,
     authKeyFile: source['APP_AUTH_KEY_FILE'] ?? `${env.APP_DATA_DIR}/auth.key`,
+    notesDir: source['APP_NOTES_DIR'] ?? `${env.APP_DATA_DIR}/notas`,
   }
 }

@@ -115,8 +115,17 @@ export class CsvImportService {
     return rows
   }
 
-  /** Cadastra os ativos novos e insere as transações. Devolve quantas foram inseridas. */
-  async batchImport(rows: readonly BatchRowRequest[], newAssets: readonly AssetBatchRow[] = []) {
+  /**
+   * Cadastra os ativos novos e insere as transações. Devolve quantas foram inseridas.
+   *
+   * [brokerNoteId] liga as transações à nota de negociação que as originou, quando o CSV
+   * veio de um PDF importado — é o que dá o link de download na linha do histórico.
+   */
+  async batchImport(
+    rows: readonly BatchRowRequest[],
+    newAssets: readonly AssetBatchRow[] = [],
+    brokerNoteId: number | null = null,
+  ) {
     for (const asset of newAssets) {
       const ticker = asset.ticker.trim().toUpperCase()
       const exists = await this.db.asset.count({ where: { ticker } })
@@ -144,6 +153,7 @@ export class CsvImportService {
         broker: row.broker,
         notes: row.notes,
         inputCurrency: row.currency,
+        brokerNoteId,
       })
       inserted++
     }

@@ -50,6 +50,8 @@ export type TransactionView = {
   date: IsoDate
   broker: string | null
   notes: string | null
+  /** Quando presente, a linha ganha o link para a nota de negociação de origem. */
+  brokerNoteId: number | null
   total: number
   currency: string
   priceBrl: number
@@ -70,6 +72,7 @@ export function toTransactionView(tx: Transaction): TransactionView {
     date: tx.date as IsoDate,
     broker: tx.broker,
     notes: tx.notes,
+    brokerNoteId: tx.brokerNoteId,
     total: absQuantity * tx.price + sign * tx.fees,
     currency: tx.currency,
     priceBrl: tx.priceBrl,

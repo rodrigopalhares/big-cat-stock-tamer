@@ -8,6 +8,9 @@ import { Layout } from '../layout.js'
 
 /** Porte de src/main/resources/templates/transactions.html. */
 
+const NOTE_DISABLED_REASON =
+  'Leitura de nota desativada: configure APP_ANTHROPIC_API_KEY para habilitar.'
+
 export type TransactionsPageProps = {
   transactions: TransactionView[]
   assets: Array<{ ticker: string; name: string }>
@@ -15,6 +18,8 @@ export type TransactionsPageProps = {
   selectedType: string
   selectedPosition: string
   today: IsoDate
+  /** Falso sem APP_ANTHROPIC_API_KEY — a aba de nota aparece desativada, com o motivo. */
+  noteImportEnabled: boolean
 }
 
 export function TransactionsPage(props: TransactionsPageProps) {
@@ -33,11 +38,11 @@ export function TransactionsPage(props: TransactionsPageProps) {
             data-bs-toggle="modal"
             data-bs-target="#csvImportModal"
           >
-            <i class="bi bi-file-earmark-spreadsheet" /> Importar CSV
+            <i class="bi bi-file-earmark-spreadsheet" /> Importar
           </button>
         </div>
 
-        <CsvImportModal />
+        <CsvImportModal noteImportEnabled={props.noteImportEnabled} />
 
         <div class="row g-4">
           <div class="col-lg-4">
@@ -72,57 +77,141 @@ export function TransactionsPage(props: TransactionsPageProps) {
   )
 }
 
-function CsvImportModal() {
+function CsvImportModal({ noteImportEnabled }: { noteImportEnabled: boolean }) {
   return (
     <div class="modal fade" id="csvImportModal" tabindex={-1} aria-hidden="true">
       <div class="modal-dialog modal-fullscreen">
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
-              <i class="bi bi-file-earmark-spreadsheet" /> Importar Transações via CSV
+              <i class="bi bi-file-earmark-spreadsheet" /> Importar Transações
             </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar" />
           </div>
           <div class="modal-body d-flex flex-column overflow-hidden">
-            <div class="flex-shrink-0 mb-3">
-              <label class="form-label">Cole os dados do CSV (separado por tab):</label>
-              <textarea
-                id="csvTextarea"
-                name="csv"
-                class="form-control font-monospace"
-                rows={6}
-                placeholder="PETR4&#9;01/01/2024&#9;C&#9;100&#9;25,50&#9;10,00&#9;XP&#9;0&#9;BRL&#9;"
-              />
-              <div class="form-text">
-                Formato: ticker &lt;tab&gt; data &lt;tab&gt; C/V/B/D/A/R.CAP &lt;tab&gt; qtd
-                &lt;tab&gt; preço &lt;tab&gt; taxas &lt;tab&gt; corretora &lt;tab&gt; irrf
-                &lt;tab&gt; moeda &lt;tab&gt; notas
-                <br />B = bonificação, D = desdobramento, A = agrupamento. Nesses três a quantidade
-                é o delta de ações; o preço só vale na bonificação, como custo atribuído.
-                <br />
-                R.CAP = redução de capital: a quantidade é a base de ações e o preço é o valor
-                devolvido por ação, que abate o preço médio.
-              </div>
-            </div>
-            <div class="flex-shrink-0 mb-3">
+            {/* div em vez de ul/li: o Bootstrap aceita as duas formas e o lint não quer
+                papel interativo em lista. */}
+            <div class="nav nav-tabs flex-shrink-0 mb-3" role="tablist">
               <button
                 type="button"
-                class="btn btn-secondary"
-                hx-post="/transactions/parse-csv"
-                hx-include="#csvTextarea"
-                hx-target="#csv-preview-area"
-                hx-indicator="#csv-spinner"
+                class="nav-link active"
+                data-bs-toggle="tab"
+                data-bs-target="#csvTabPane"
+                role="tab"
               >
-                <i class="bi bi-arrow-repeat" /> Processar
+                <i class="bi bi-file-earmark-spreadsheet" /> CSV
               </button>
-              <span id="csv-spinner" class="htmx-indicator">
-                <span class="spinner-border spinner-border-sm" role="status" /> Processando...
-              </span>
+              {/* Sem chave a aba aparece desativada, com o motivo no title: some da tela
+                  é o usuário procurando uma funcionalidade que ele não sabe que existe. */}
+              <button
+                type="button"
+                class={`nav-link${noteImportEnabled ? '' : ' disabled'}`}
+                data-bs-toggle="tab"
+                data-bs-target="#noteTabPane"
+                role="tab"
+                disabled={!noteImportEnabled}
+                aria-disabled={noteImportEnabled ? undefined : 'true'}
+                title={noteImportEnabled ? undefined : NOTE_DISABLED_REASON}
+              >
+                <i class="bi bi-file-earmark-pdf" /> Nota de negociação
+                {!noteImportEnabled && <i class="bi bi-lock ms-1" />}
+              </button>
             </div>
-            <div id="csv-preview-area" class="flex-grow-1 overflow-auto min-h-0" />
+            <div class="tab-content flex-grow-1 min-h-0">
+              <div
+                class="tab-pane fade show active h-100 overflow-auto"
+                id="csvTabPane"
+                role="tabpanel"
+              >
+                <div class="flex-shrink-0 mb-3">
+                  <label class="form-label">Cole os dados do CSV (separado por tab):</label>
+                  <textarea
+                    id="csvTextarea"
+                    name="csv"
+                    class="form-control font-monospace"
+                    rows={6}
+                    placeholder="PETR4&#9;01/01/2024&#9;C&#9;100&#9;25,50&#9;10,00&#9;XP&#9;0&#9;BRL&#9;"
+                  />
+                  <div class="form-text">
+                    Formato: ticker &lt;tab&gt; data &lt;tab&gt; C/V/B/D/A/R.CAP &lt;tab&gt; qtd
+                    &lt;tab&gt; preço &lt;tab&gt; taxas &lt;tab&gt; corretora &lt;tab&gt; irrf
+                    &lt;tab&gt; moeda &lt;tab&gt; notas
+                    <br />B = bonificação, D = desdobramento, A = agrupamento. Nesses três a
+                    quantidade é o delta de ações; o preço só vale na bonificação, como custo
+                    atribuído.
+                    <br />
+                    R.CAP = redução de capital: a quantidade é a base de ações e o preço é o valor
+                    devolvido por ação, que abate o preço médio.
+                  </div>
+                </div>
+                <div class="flex-shrink-0 mb-3">
+                  <button
+                    type="button"
+                    class="btn btn-secondary"
+                    hx-post="/transactions/parse-csv"
+                    hx-include="#csvTextarea"
+                    hx-target="#csv-preview-area"
+                    hx-indicator="#csv-spinner"
+                  >
+                    <i class="bi bi-arrow-repeat" /> Processar
+                  </button>
+                  <span id="csv-spinner" class="htmx-indicator">
+                    <span class="spinner-border spinner-border-sm" role="status" /> Processando...
+                  </span>
+                </div>
+                <div id="csv-preview-area" />
+              </div>
+              <NoteImportPane enabled={noteImportEnabled} />
+            </div>
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Aba da nota de negociação: envia o PDF, mostra a prévia e joga o CSV extraído no
+ * textarea da aba ao lado — daí em diante o fluxo é o mesmo do CSV colado à mão.
+ */
+function NoteImportPane({ enabled }: { enabled: boolean }) {
+  if (!enabled) {
+    return (
+      <div class="tab-pane fade h-100 overflow-auto" id="noteTabPane" role="tabpanel">
+        <div class="alert alert-secondary">
+          <i class="bi bi-lock" /> {NOTE_DISABLED_REASON}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div class="tab-pane fade h-100 overflow-auto" id="noteTabPane" role="tabpanel">
+      <div class="mb-3">
+        <label class="form-label" for="noteFile">
+          Envie o arquivo da nota de negociação:
+        </label>
+        <input
+          type="file"
+          class="form-control"
+          id="noteFile"
+          accept="application/pdf,image/png,image/jpeg,image/webp"
+        />
+        <div class="form-text">
+          A nota é lida pela Anthropic, agrupada por ticker e com as taxas rateadas
+          proporcionalmente ao valor operado de cada papel. O arquivo enviado e o CSV extraído ficam
+          salvos e podem ser baixados depois pela própria transação.
+        </div>
+      </div>
+      <div class="mb-3">
+        <button type="button" class="btn btn-secondary" data-note-parse>
+          <i class="bi bi-stars" /> Ler nota
+        </button>
+        <span id="note-spinner" class="d-none ms-2">
+          <span class="spinner-border spinner-border-sm" role="status" /> Lendo a nota...
+        </span>
+      </div>
+      <div id="note-preview-area" />
     </div>
   )
 }
@@ -384,7 +473,19 @@ function TransactionRow({ transaction: t }: { transaction: TransactionView }) {
       <td class="text-end">{dual(t.price, t.priceBrl)}</td>
       <td class="text-end text-muted">{dual(t.fees, t.feesBrl)}</td>
       <td class="text-end fw-semibold">{dual(t.total, t.totalBrl)}</td>
-      <td class="text-muted">{t.broker ?? '—'}</td>
+      <td class="text-muted">
+        {t.broker ?? '—'}
+        {t.brokerNoteId !== null && (
+          <a
+            href={`/transactions/notes/${t.brokerNoteId}`}
+            class="ms-1 text-decoration-none"
+            title="Baixar a nota de negociação"
+            download
+          >
+            <i class="bi bi-file-earmark-pdf" />
+          </a>
+        )}
+      </td>
       <td class="text-center text-nowrap">
         <button
           type="button"

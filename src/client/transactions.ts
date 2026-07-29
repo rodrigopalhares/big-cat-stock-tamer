@@ -18,6 +18,8 @@ type AssetDraft = {
 
 let pendingNewAssets: AssetDraft[] = []
 let ignoredTickers = new Set<string>()
+/** Nota que originou o CSV em revisão; vai junto no lote para ligar as transações a ela. */
+let pendingBrokerNoteId: number | null = null
 /** Distingue preço digitado de preço derivado do total — muda o que o total recalcula. */
 let priceIsUserSet = false
 
@@ -181,8 +183,13 @@ document.addEventListener('DOMContentLoaded', () => {
     setValue('csvTextarea', '')
     const preview = byId('csv-preview-area')
     if (preview !== null) preview.innerHTML = ''
+    const notePreview = byId('note-preview-area')
+    if (notePreview !== null) notePreview.innerHTML = ''
+    const noteFile = byId<HTMLInputElement>('noteFile')
+    if (noteFile !== null) noteFile.value = ''
     pendingNewAssets = []
     ignoredTickers = new Set()
+    pendingBrokerNoteId = null
   })
 })
 
@@ -204,7 +211,56 @@ document.addEventListener('click', (event) => {
   const target = event.target as Element | null
   if (target?.closest('[data-csv-next-step]') !== null) void goToPreviewStep()
   else if (target?.closest('[data-csv-batch-submit]') !== null) void submitBatch()
+  else if (target?.closest('[data-note-parse]') !== null) void parseNote()
+  else if (target?.closest('[data-note-use-csv]') !== null) useNoteCsv()
 })
+
+/** Envia o PDF da nota e mostra a prévia devolvida pelo servidor. */
+async function parseNote(): Promise<void> {
+  const input = byId<HTMLInputElement>('noteFile')
+  const file = input?.files?.[0]
+  const area = byId('note-preview-area')
+  if (area === null) return
+  if (file === undefined) {
+    setError(area, new Error('Selecione o arquivo da nota.'))
+    return
+  }
+
+  const spinner = byId('note-spinner')
+  const button = document.querySelector<HTMLButtonElement>('[data-note-parse]')
+  if (button !== null) button.disabled = true
+  spinner?.classList.remove('d-none')
+  area.innerHTML = ''
+
+  const body = new FormData()
+  body.append('file', file)
+
+  try {
+    const response = await fetch('/transactions/parse-note', { method: 'POST', body })
+    const text = await response.text()
+    if (!response.ok) throw new Error(text === '' ? `Erro ${response.status}` : text)
+    area.innerHTML = text
+  } catch (error) {
+    setError(area, error)
+  } finally {
+    if (button !== null) button.disabled = false
+    spinner?.classList.add('d-none')
+  }
+}
+
+/** Joga o CSV da nota no textarea da aba CSV e devolve o usuário para o fluxo normal. */
+function useNoteCsv(): void {
+  const preview = byId('notePreview')
+  const csv = preview?.dataset['csv']
+  if (preview === undefined || preview === null || csv === undefined) return
+
+  setValue('csvTextarea', csv)
+  const noteId = Number.parseInt(preview.dataset['brokerNoteId'] ?? '', 10)
+  pendingBrokerNoteId = Number.isNaN(noteId) ? null : noteId
+
+  document.querySelector<HTMLElement>('[data-bs-target="#csvTabPane"]')?.click()
+  byId('csvTextarea')?.focus()
+}
 
 /** Preenche nome, tipo e moeda a partir do Yahoo; falha marca o ativo como desconhecido. */
 async function lookupAsset(input: HTMLInputElement, isTicker: boolean): Promise<void> {
@@ -415,6 +471,7 @@ async function submitBatch(): Promise<void> {
 
   const payload: Record<string, unknown> = { rows }
   if (pendingNewAssets.length > 0) payload['assets'] = pendingNewAssets
+  if (pendingBrokerNoteId !== null) payload['brokerNoteId'] = pendingBrokerNoteId
 
   try {
     const response = await fetch('/transactions/batch', {
@@ -435,13 +492,15 @@ function setPreview(html: string): void {
 }
 
 function setPreviewError(error: unknown): void {
-  const message = error instanceof Error ? error.message : String(error)
   const area = byId('csv-preview-area')
-  if (area !== null) {
-    area.textContent = ''
-    const alert = document.createElement('div')
-    alert.className = 'alert alert-danger'
-    alert.textContent = message
-    area.appendChild(alert)
-  }
+  if (area !== null) setError(area, error)
+}
+
+/** textContent, não innerHTML: a mensagem pode vir do servidor e não é HTML confiável. */
+function setError(area: HTMLElement, error: unknown): void {
+  area.textContent = ''
+  const alert = document.createElement('div')
+  alert.className = 'alert alert-danger'
+  alert.textContent = error instanceof Error ? error.message : String(error)
+  area.appendChild(alert)
 }
