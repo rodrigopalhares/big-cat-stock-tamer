@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import formbody from '@fastify/formbody'
+import multipart from '@fastify/multipart'
 import fastifyStatic from '@fastify/static'
 import Fastify, { type FastifyInstance } from 'fastify'
 import type { Db } from './config/db.js'
@@ -39,6 +40,9 @@ export async function buildApp({ env, db, container }: AppDeps): Promise<Fastify
 
   // Os formulários da aplicação são todos form-urlencoded; o Fastify só trata JSON por padrão.
   await app.register(formbody)
+  // Só o upload da nota de negociação usa multipart. O limite é generoso para nota
+  // escaneada, mas fechado o bastante para não virar porta de entrada de arquivo grande.
+  await app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024, files: 1 } })
   await app.register(viewsPlugin)
   await app.register(authPlugin, { auth: c.auth })
   await app.register(errorsPlugin)

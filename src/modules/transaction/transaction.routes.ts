@@ -1,11 +1,14 @@
-import type { FastifyPluginAsync } from 'fastify'
+import type { FastifyPluginAsync, FastifyReply } from 'fastify'
 import { z } from 'zod'
 import type { Container } from '../../container.js'
+import { HttpError } from '../../shared/http-error.js'
 import { isoDate, today as todayIso } from '../../shared/iso-date.js'
 import { TransactionTickerInfo } from '../../views/components/ticker-info.js'
 import { TransactionsPage } from '../../views/pages/transactions.js'
+import { BrokerNotePreview } from '../../views/partials/broker-note-preview.js'
 import { CsvAssetReview } from '../../views/partials/csv-asset-review.js'
 import { CsvPreview } from '../../views/partials/csv-preview.js'
+import type { BrokerNoteFile } from '../broker-note/broker-note.service.js'
 import type { AssetBatchRow, BatchRowRequest } from '../csv-import/csv-import.service.js'
 import {
   TransactionApiRequest,
@@ -28,7 +31,25 @@ const CsvForm = z.object({ csv: z.string().default('') })
 const BatchImportBody = z.object({
   rows: z.array(z.custom<BatchRowRequest>()),
   assets: z.array(z.custom<AssetBatchRow>()).nullish(),
+  brokerNoteId: z.number().int().positive().nullish(),
 })
+
+const IdParam = z.object({ id: z.coerce.number().int().positive() })
+
+/** Id fora de forma é pedido malfeito, não erro interno — o `.parse()` cru viraria 500. */
+function noteId(params: unknown): number {
+  const parsed = IdParam.safeParse(params)
+  if (!parsed.success) throw HttpError.badRequest('Id de nota inválido')
+  return parsed.data.id
+}
+
+/** O nome do arquivo vem do banco, nunca da URL — não há caminho para o usuário forjar. */
+function download(reply: FastifyReply, file: BrokerNoteFile): FastifyReply {
+  return reply
+    .type(file.contentType)
+    .header('Content-Disposition', `attachment; filename="${file.fileName}"`)
+    .send(file.content)
+}
 
 export function transactionRoutes(c: Container): FastifyPluginAsync {
   return async (app) => {
@@ -70,6 +91,7 @@ export function transactionRoutes(c: Container): FastifyPluginAsync {
           selectedType: query.type ?? '',
           selectedPosition: query.position ?? '',
           today: todayIso(),
+          noteImportEnabled: c.brokerNotes.enabled,
         }),
       )
     })
@@ -136,9 +158,35 @@ export function transactionRoutes(c: Container): FastifyPluginAsync {
       return reply.partial(CsvPreview({ rows }))
     })
 
+    // --- Importação de nota de negociação ---
+
+    app.post('/transactions/parse-note', async (req, reply) => {
+      const upload = await req.file()
+      if (upload === undefined) throw HttpError.badRequest('Nenhum arquivo enviado.')
+
+      const result = await c.brokerNotes.importNote({
+        file: await upload.toBuffer(),
+        fileName: upload.filename,
+        contentType: upload.mimetype,
+      })
+      return reply.partial(BrokerNotePreview({ result }))
+    })
+
+    app.get<{ Params: { id: string } }>('/transactions/notes/:id', async (req, reply) => {
+      return download(reply, await c.brokerNotes.readFile(noteId(req.params)))
+    })
+
+    app.get<{ Params: { id: string } }>('/transactions/notes/:id/response', async (req, reply) => {
+      return download(reply, await c.brokerNotes.readAiResponse(noteId(req.params)))
+    })
+
     app.post('/transactions/batch', async (req) => {
       const body = BatchImportBody.parse(req.body)
-      const inserted = await c.csvImport.batchImport(body.rows, body.assets ?? [])
+      const inserted = await c.csvImport.batchImport(
+        body.rows,
+        body.assets ?? [],
+        body.brokerNoteId ?? null,
+      )
 
       // Recalcula a posição só dos ativos que a importação tocou.
       for (const ticker of new Set(body.rows.map((r) => r.ticker.trim().toUpperCase()))) {

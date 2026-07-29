@@ -10,6 +10,9 @@ for (const key of [
   'APP_DATA_DIR',
   'APP_BACKUP_DIR',
   'APP_BACKUP_ENABLED',
+  // Com a chave do ambiente carregada, um teste distraído chamaria a Anthropic de verdade.
+  'APP_ANTHROPIC_API_KEY',
+  'APP_NOTES_DIR',
 ]) {
   delete process.env[key]
 }

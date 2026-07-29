@@ -12,13 +12,14 @@ describe('banco de teste', () => {
     await db.$disconnect()
   })
 
-  it('cria as 8 tabelas', async () => {
+  it('cria as 9 tabelas', async () => {
     const tables = await db.$queryRawUnsafe<Array<{ name: string }>>(
       "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
     )
     expect(tables.map((t) => t.name)).toEqual([
       'assets',
       'benchmark_prices',
+      'broker_notes',
       'dividends',
       'exchange_rates',
       'monthly_snapshots',

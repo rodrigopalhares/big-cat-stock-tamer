@@ -36,6 +36,8 @@ export type TransactionInput = {
   broker?: string | null | undefined
   notes?: string | null | undefined
   inputCurrency?: string | null | undefined
+  /** Nota de negociação que originou a transação, quando veio de um PDF importado. */
+  brokerNoteId?: number | null | undefined
 }
 
 export type TransactionFilters = {
@@ -287,6 +289,7 @@ export class TransactionService {
         date: input.date,
         broker: blankToNull(input.broker),
         notes: blankToNull(input.notes),
+        brokerNoteId: input.brokerNoteId ?? null,
       },
     })
   }

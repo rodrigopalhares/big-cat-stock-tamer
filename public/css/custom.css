@@ -60,3 +60,31 @@ body {
 .min-h-0 {
     min-height: 0;
 }
+
+/* Resposta da IA na prévia da nota: JSON identado com destaque de sintaxe. */
+.json-view {
+    max-height: 22rem;
+    overflow: auto;
+    font-size: 0.8125rem;
+    background-color: var(--bs-tertiary-bg);
+}
+
+.json-key     { color: #0550ae; }
+.json-string  { color: #0a7f3f; }
+.json-number  { color: #953800; }
+.json-literal { color: #8250df; }
+
+[data-bs-theme="dark"] .json-key     { color: #79c0ff; }
+[data-bs-theme="dark"] .json-string  { color: #7ee787; }
+[data-bs-theme="dark"] .json-number  { color: #ffa657; }
+[data-bs-theme="dark"] .json-literal { color: #d2a8ff; }
+
+/* A seta acompanha o estado do collapse, em vez de apontar sempre para o mesmo lado. */
+.json-caret {
+    display: inline-block;
+    transition: transform 0.15s ease-in-out;
+}
+
+[aria-expanded="true"] .json-caret {
+    transform: rotate(90deg);
+}

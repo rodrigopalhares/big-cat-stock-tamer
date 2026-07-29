@@ -18,11 +18,13 @@ describe('container', () => {
 
   it('monta todos os services', () => {
     expect(Object.keys(container).sort()).toEqual([
+      'anthropic',
       'assets',
       'auth',
       'backup',
       'bcb',
       'benchmarks',
+      'brokerNotes',
       'csvImport',
       'db',
       'dividends',

@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { FastifyInstance } from 'fastify'
 import { buildApp } from '../src/app.js'
 import { loadEnv } from '../src/config/env.js'
@@ -12,12 +15,21 @@ export type Harness = {
   app: FastifyInstance
   db: TestDb
   container: Container
+  notesDir: string
   close: () => Promise<void>
 }
 
-export async function createHarness(): Promise<Harness> {
+export async function createHarness(overrides: Record<string, string> = {}): Promise<Harness> {
   const db = await createTestDb()
-  const env = loadEnv({ ...process.env, DATABASE_URL: ':memory:', LOG_LEVEL: 'silent' })
+  const notesDir = mkdtempSync(join(tmpdir(), 'stocks-notas-'))
+  const env = loadEnv({
+    ...process.env,
+    DATABASE_URL: ':memory:',
+    LOG_LEVEL: 'silent',
+    // Pasta temporária por harness: nota importada em teste não encosta em ./data.
+    APP_NOTES_DIR: notesDir,
+    ...overrides,
+  })
   const container = buildContainer(db, env)
   const app = await buildApp({ env, db, container })
   await app.ready()
@@ -26,9 +38,11 @@ export async function createHarness(): Promise<Harness> {
     app,
     db,
     container,
+    notesDir,
     close: async () => {
       await app.close()
       await db.$disconnect()
+      rmSync(notesDir, { recursive: true, force: true })
     },
   }
 }

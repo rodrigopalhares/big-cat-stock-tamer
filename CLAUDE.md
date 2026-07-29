@@ -34,7 +34,7 @@ Aplicação pessoal de acompanhamento de carteira de investimentos, em TypeScrip
 | Views | JSX no servidor (`preact-render-to-string`) + HTMX |
 | CSS | Bootstrap 5 (CDN) |
 | Validação | Zod |
-| HTTP client | `fetch` nativo |
+| HTTP client | `fetch` nativo · `@anthropic-ai/sdk` (leitura de nota) |
 | Scheduler | croner |
 | Testes | Vitest + MSW |
 | Lint/format | Biome + typescript-eslint + dependency-cruiser |
@@ -108,6 +108,29 @@ aplicados no boot — o segundo é obrigatório, senão o SQLite ignora silencio
 dia não duplica nada. Banco em memória é no-op. Configuração em `APP_BACKUP_*`.
 O arquivo é gzip de um `.db`, não um zip — restaurar é parar a aplicação e rodar
 `gunzip -c <backup> > ${APP_DATA_DIR}/stocks.db`.
+
+## Nota de negociação
+
+A aba "Nota de negociação" do modal de importação manda o PDF para a Anthropic
+(`claude-haiku-4-5`, saída estruturada) e devolve as operações agrupadas por ticker, com as
+taxas rateadas pelo **valor operado** de cada papel. O resultado vira o mesmo CSV da
+importação manual — não existe um segundo caminho de importação.
+
+O arquivo enviado fica em `${APP_NOTES_DIR}/<ano>/<yyyyMMdd>_<id>.<ext>` (padrão
+`./data/notas`, fora do versionamento) e a resposta do modelo, verbatim, na coluna
+`ai_response` de `broker_notes` — o CSV é derivado dela e não é gravado, então é a resposta
+que permite refazer a conta e separar erro de leitura de erro de cálculo. As transações
+criadas guardam `broker_note_id`, que é o que dá o link de download na linha do histórico.
+
+Chave em `APP_ANTHROPIC_API_KEY`; em branco, a aba fica desativada. O total da nota é
+conferido (`Σ quantidade × preço ± taxas` contra o líquido declarado) — divergência avisa e
+deixa seguir, porque o preview do CSV é editável.
+
+**A conferência do total não protege contra ticker errado.** Nota que não imprime o código
+de negociação — só "CSU DIGITAL ON NM" — fecha no centavo com o papel trocado, porque
+quantidade e preço estão certos. Por isso o modelo é proibido de deduzir o código: sem código
+impresso ele devolve o nome, e o service resolve contra os ativos cadastrados. Nome ambíguo
+ou desconhecido fica em branco e vai para a revisão manual.
 
 ## Autenticação
 
