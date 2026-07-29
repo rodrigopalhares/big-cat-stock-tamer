@@ -22,6 +22,7 @@ public/js/
 # direnv / mise / env
 .direnv/
 .env
+.envrc
 .ai-jail
 
 # OS
