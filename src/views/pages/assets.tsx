@@ -98,9 +98,9 @@ function CreateAssetForm() {
               name="ticker"
               id="assetTicker"
               class="form-control"
-              placeholder="Ex: PETR4"
+              placeholder="Ex: PETR4 ou TD:IPCA2035"
               required
-              maxLength={10}
+              maxLength={20}
               data-uppercase
               hx-get="/assets/ticker-info"
               hx-trigger="change, keyup changed delay:600ms"

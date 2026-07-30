@@ -1,4 +1,5 @@
 import type { AssetType, Currency } from './constants.js'
+import { isTesouroTicker } from './tesouro-ticker.js'
 
 /** Porte de src/main/kotlin/com/stocks/service/TickerClassification.kt. */
 export type TickerClassification = {
@@ -17,7 +18,7 @@ const INTERNATIONAL = /^[A-Z]{1,5}$/
 const CRYPTO_QUOTES = new Set(['USD', 'BRL', 'EUR'])
 
 export function classifyTicker(ticker: string): TickerClassification {
-  if (ticker.includes(';') || ticker.startsWith('TD:')) {
+  if (isTesouroTicker(ticker)) {
     return { suggestedType: 'TESOURO_DIRETO', yfCandidates: [ticker], defaultCurrency: 'BRL' }
   }
 

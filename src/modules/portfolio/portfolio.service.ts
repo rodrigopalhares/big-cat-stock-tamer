@@ -7,7 +7,11 @@ import {
   calculateXirr,
 } from '../../domain/calculation.js'
 import { type AssetType, NO_QUOTE_TYPES } from '../../domain/constants.js'
-import { type PriceRecord, resolveYfTicker } from '../../domain/price-history.js'
+import {
+  type PriceRecord,
+  resolveTesouroSymbol,
+  resolveYfTicker,
+} from '../../domain/price-history.js'
 import { annualToMonthlyRate } from '../../domain/regression.js'
 import type { CashFlow } from '../../domain/xirr.js'
 import type { Asset, Transaction } from '../../generated/prisma/client.js'
@@ -155,7 +159,8 @@ export class PortfolioService {
       if (asset.type !== null && NO_QUOTE_TYPES.has(asset.type as AssetType)) continue
 
       if (asset.type === 'TESOURO_DIRETO') {
-        if (asset.yfTicker !== null) tdToAsset.set(asset.yfTicker, asset.ticker)
+        const symbol = resolveTesouroSymbol(asset.ticker, asset.yfTicker)
+        if (symbol !== null) tdToAsset.set(symbol, asset.ticker)
       } else {
         yfToAsset.set(resolveYfTicker(asset.ticker, asset.yfTicker), asset.ticker)
       }
@@ -233,7 +238,7 @@ export class PortfolioService {
 
 /** Chave usada para achar a cotação viva do ativo; null quando ele não tem cotação. */
 function quoteKey(asset: Asset): string | null {
-  if (asset.type === 'TESOURO_DIRETO') return asset.yfTicker
+  if (asset.type === 'TESOURO_DIRETO') return resolveTesouroSymbol(asset.ticker, asset.yfTicker)
   if (asset.type !== null && NO_QUOTE_TYPES.has(asset.type as AssetType)) return null
   return resolveYfTicker(asset.ticker, asset.yfTicker)
 }

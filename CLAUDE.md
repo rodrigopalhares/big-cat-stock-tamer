@@ -85,6 +85,14 @@ substitui o `LocalDate` do Java. Toda aritmética passa por `Date.UTC`, então n
 fuso do processo. Usar `Date` para data de transação reintroduz o bug de "o dia 1º aparece
 como dia 31 do mês anterior".
 
+**Título do Tesouro tem dois códigos.** O ativo é cadastrado pelo código curto `TD:IPCA2026`
+— que é a chave primária, aparece em tabela e URL — e o código do CSV
+(`Tesouro IPCA+;15/08/2026`) fica em `yfTicker`, que é o que os clientes de cotação
+consultam. `src/domain/tesouro-ticker.ts` traduz um no outro contra o CSV já em cache.
+O sufixo `J` marca "com Juros Semestrais": `TD:IPCA2035` é o principal e `TD:IPCAJ2035` é o
+de cupom — mesmo vencimento, PU quase o dobro, então trocar um pelo outro erra a carteira
+em silêncio.
+
 **Nada de rede dentro de transação.** O SQLite tem escritor único; segurar o lock durante uma
 chamada HTTP trava a aplicação inteira. Busque primeiro, escreva depois.
 

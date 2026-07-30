@@ -64,7 +64,7 @@ export function transactionRoutes(c: Container): FastifyPluginAsync {
 
     app.get('/transactions/asset-info', async (req) => {
       const { ticker } = z.object({ ticker: z.string() }).parse(req.query)
-      const info = await c.yahoo.fetchAssetInfo(ticker)
+      const info = await c.assetInfo.fetchAssetInfo(ticker)
       return { name: info.name, type: info.type, yfTicker: info.yfTicker, currency: info.currency }
     })
 
