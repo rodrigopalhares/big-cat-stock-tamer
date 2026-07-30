@@ -31,3 +31,4 @@ Thumbs.db
 
 # claude
 .claude/*.local.*
+.claude/worktrees/
