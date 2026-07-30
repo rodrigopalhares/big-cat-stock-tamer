@@ -274,6 +274,9 @@ Parsing is pure and lives in `src/domain/csv/dividend-csv.ts` (no I/O, test it d
 The I/O half is `parseDividendCsv()` / `batchImportDividends()` in `csv-import.service.ts`.
 The two-step modal UI mirrors the transaction importer — see the `csv-import` skill for the
 flow, and note the dividend version uses the `div-csv-*` class and id prefixes.
+The preview comes sorted by `sortByImportOrder()` (`src/domain/csv/import-order.ts`): linha
+com erro primeiro, depois tipo e ticker. Provento exige ativo cadastrado, então só existem
+os status `ERROR` e `EXISTS` aqui.
 
 ## Test Patterns
 

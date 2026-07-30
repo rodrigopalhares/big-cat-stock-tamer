@@ -1,6 +1,7 @@
 import type { Db } from '../../config/db.js'
 import type { DividendCsvRow } from '../../domain/csv/dividend-csv.js'
 import { parseDividendCsvRows } from '../../domain/csv/dividend-csv.js'
+import { sortByImportOrder } from '../../domain/csv/import-order.js'
 import {
   type AssetStatus,
   type CsvRow,
@@ -79,7 +80,12 @@ export class CsvImportService {
       statuses.set(ticker, info.name === ticker ? 'UNKNOWN' : 'WILL_CREATE')
     }
 
-    return parseCsvRows(rawCsv, existing, (ticker) => statuses.get(ticker) ?? 'UNKNOWN')
+    const rows = parseCsvRows(rawCsv, existing, (ticker) => statuses.get(ticker) ?? 'UNKNOWN')
+    return sortByImportOrder(rows, (row) => ({
+      status: row.error === null ? row.assetStatus : 'ERROR',
+      type: row.type,
+      name: row.ticker,
+    }))
   }
 
   /** Ativos distintos do CSV, com os dados que serão usados no cadastro. */
@@ -112,7 +118,12 @@ export class CsvImportService {
         assetStatus: found ? 'WILL_CREATE' : 'UNKNOWN',
       })
     }
-    return rows
+    // Ativo desconhecido não tem nome; o ticker é o que sobra para desempatar.
+    return sortByImportOrder(rows, (row) => ({
+      status: row.assetStatus,
+      type: row.type,
+      name: row.name || row.ticker,
+    }))
   }
 
   /**
@@ -161,7 +172,13 @@ export class CsvImportService {
   }
 
   async parseDividendCsv(rawCsv: string): Promise<DividendCsvRow[]> {
-    return parseDividendCsvRows(rawCsv, await this.existingTickers())
+    const rows = parseDividendCsvRows(rawCsv, await this.existingTickers())
+    // Provento exige ativo cadastrado: o que não está vira erro, então só há esses dois status.
+    return sortByImportOrder(rows, (row) => ({
+      status: row.error === null ? 'EXISTS' : 'ERROR',
+      type: row.type,
+      name: row.ticker,
+    }))
   }
 
   async batchImportDividends(rows: readonly DividendBatchRowRequest[]): Promise<number> {

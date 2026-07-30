@@ -36,6 +36,12 @@ User uploads broker note PDF -> CSV --┘
 4. **Submit** sends valid, non-ignored rows + new assets as JSON to the backend, which
    persists everything in a single batch
 
+Both tables come sorted by `sortByImportOrder()` (`src/domain/csv/import-order.ts`): status
+first (erro → desconhecido → novo → existente), then type, then name — ticker where there is
+no name. What needs attention is always at the top, and the ordering is the same in the
+dividend preview. The sort is stable, so tied rows keep the order they had in the CSV; the
+`#` column still shows the original line number.
+
 The modal has two tabs. The **Nota de negociação** tab (hidden when `APP_ANTHROPIC_API_KEY`
 is blank) uploads a broker note PDF, shows a preview, and the **Usar no CSV** button drops
 the extracted CSV into the same textarea — from there the flow above is unchanged. See
@@ -52,6 +58,7 @@ the extracted CSV into the same textarea — from there the flow above is unchan
 | `src/integrations/yahoo/yahoo.client.ts` | `fetchAssetInfo()` — Yahoo Finance lookup for unknown tickers |
 | `src/domain/tesouro-ticker.ts` | `resolveTesouroCode()` — `TD:IPCA2026` → `Tesouro IPCA+;15/08/2026` |
 | `src/domain/ticker-classification.ts` | `classifyTicker()` — detects asset type from ticker pattern |
+| `src/domain/csv/import-order.ts` | `sortByImportOrder()` — ordering of the review lists (status → type → name) |
 | `src/views/partials/csv-asset-review.tsx` | Step 1 UI — asset review table (JSX fragment) |
 | `src/views/partials/csv-preview.tsx` | Step 2 UI — transaction preview table (JSX fragment) |
 | `src/client/transactions.ts` | Client-side logic: `csvNextStep()`, `batchSubmit()`, ignore toggles, ticker change handlers |
