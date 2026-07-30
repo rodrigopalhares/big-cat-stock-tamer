@@ -3,6 +3,7 @@ import { isoDate } from '../shared/iso-date.js'
 import {
   buildCashFlows,
   calculateIrr,
+  calculateNetContribution,
   calculatePosition,
   calculateUnrealizedPnl,
   calculateXirr,
@@ -331,6 +332,55 @@ describe('buildCashFlows', () => {
     const flows = buildCashFlows(txs)
     expect(flows.cashFlows).toEqual(position.cashFlows)
     expect(flows.cashFlowsBrl).toEqual(position.cashFlowsBrl)
+  })
+})
+
+describe('calculateNetContribution', () => {
+  const flow = (date: string, value: number): CashFlow => ({ date: isoDate(date), value })
+
+  it('sem fluxo nenhum, aporte zero', () => {
+    expect(calculateNetContribution([])).toBe(0)
+  })
+
+  it('só compras: tudo é aporte', () => {
+    const flows = [flow('2024-01-01', -1000), flow('2024-02-01', -500)]
+    expect(calculateNetContribution(flows)).toBeCloseTo(1500, 3)
+  })
+
+  it('provento reinvestido não conta como aporte novo', () => {
+    const flows = [flow('2024-01-01', -1000), flow('2024-02-01', 300), flow('2024-03-01', -300)]
+    expect(calculateNetContribution(flows)).toBeCloseTo(1000, 3)
+  })
+
+  it('compra maior que o caixa: só a diferença é aporte', () => {
+    const flows = [flow('2024-01-01', -1000), flow('2024-02-01', 300), flow('2024-03-01', -500)]
+    expect(calculateNetContribution(flows)).toBeCloseTo(1200, 3)
+  })
+
+  it('lucro de venda reaplicado não infla o aporte', () => {
+    // Compra 1000, vende por 1500, recompra 1500 — do bolso saíram só os 1000 iniciais.
+    const flows = [flow('2024-01-01', -1000), flow('2024-02-01', 1500), flow('2024-03-01', -1500)]
+    expect(calculateNetContribution(flows)).toBeCloseTo(1000, 3)
+  })
+
+  it('caixa sobrando não vira aporte negativo', () => {
+    const flows = [flow('2024-01-01', -1000), flow('2024-02-01', 5000)]
+    expect(calculateNetContribution(flows)).toBeCloseTo(1000, 3)
+  })
+
+  it('no mesmo dia a venda financia a compra', () => {
+    const flows = [flow('2024-01-01', -1000), flow('2024-02-01', -400), flow('2024-02-01', 400)]
+    expect(calculateNetContribution(flows)).toBeCloseTo(1000, 3)
+  })
+
+  it('independe da ordem em que os fluxos chegam', () => {
+    const flows = [flow('2024-03-01', -300), flow('2024-01-01', -1000), flow('2024-02-01', 300)]
+    expect(calculateNetContribution(flows)).toBeCloseTo(1000, 3)
+  })
+
+  it('provento antes da compra financia a compra seguinte', () => {
+    const flows = [flow('2024-01-01', -1000), flow('2024-02-01', 200), flow('2024-03-01', -800)]
+    expect(calculateNetContribution(flows)).toBeCloseTo(1600, 3)
   })
 })
 

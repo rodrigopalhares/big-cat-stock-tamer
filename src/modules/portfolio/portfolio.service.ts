@@ -2,6 +2,7 @@ import type { Db } from '../../config/db.js'
 import {
   buildCashFlows,
   calculateIrr,
+  calculateNetContribution,
   calculateUnrealizedPnl,
   calculateXirr,
 } from '../../domain/calculation.js'
@@ -123,6 +124,9 @@ export class PortfolioService {
 
     return {
       totalInvested: sum(positions.map((p) => p.totalCostBrl)),
+      // A carteira inteira de uma vez, não a soma por ativo: o provento de um papel
+      // pagando a compra de outro só aparece olhando os fluxos juntos, em ordem.
+      netContribution: calculateNetContribution(allCashFlowsBrl),
       currentValue,
       realizedPnl: sum(positions.map((p) => p.realizedPnlBrl)),
       unrealizedPnl: unrealizedBrl.length > 0 ? sum(unrealizedBrl) : null,

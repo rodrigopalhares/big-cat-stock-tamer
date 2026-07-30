@@ -209,9 +209,38 @@ describe('PortfolioService', () => {
       const summary = service.aggregatePositions([], TODAY)
 
       expect(summary.totalInvested).toBe(0)
+      expect(summary.netContribution).toBe(0)
       expect(summary.currentValue).toBeNull()
       expect(summary.unrealizedPnl).toBeNull()
       expect(summary.irrAnnual).toBeNull()
+    })
+
+    it('só compras: o aporte líquido é o próprio total investido', async () => {
+      await seedPosition('PETR4')
+      await seedPosition('VALE3')
+
+      const positions = await service.buildPositions(await db.asset.findMany(), false, TODAY)
+      const summary = service.aggregatePositions(positions, TODAY)
+
+      expect(summary.netContribution).toBeCloseTo(summary.totalInvested, 3)
+      expect(summary.netContribution).toBeCloseTo(200, 3)
+    })
+
+    it('provento de um ativo pagando a compra de outro não é aporte novo', async () => {
+      await createAsset(db, 'PETR4')
+      await createTransaction(db, 'PETR4', { quantity: 10, price: 10, date: '2024-01-01' })
+      await assets.refreshPositionFields('PETR4')
+      await createDividend(db, 'PETR4', { totalAmount: 60, taxWithheld: 0, date: '2024-02-01' })
+
+      await createAsset(db, 'VALE3')
+      await createTransaction(db, 'VALE3', { quantity: 10, price: 10, date: '2024-03-01' })
+      await assets.refreshPositionFields('VALE3')
+
+      const positions = await service.buildPositions(await db.asset.findMany(), false, TODAY)
+      const summary = service.aggregatePositions(positions, TODAY)
+
+      expect(summary.totalInvested).toBeCloseTo(200, 3)
+      expect(summary.netContribution).toBeCloseTo(140, 3)
     })
 
     it('soma o resultado de proventos', async () => {

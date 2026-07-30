@@ -23,6 +23,7 @@ export type DividendChartData = {
 export type DashboardPageProps = {
   positions: AssetPosition[]
   assetTypes: string[]
+  netContribution: number
   totalInvested: number
   realizedPnl: number
   currentValue: number | null
@@ -163,6 +164,7 @@ export function DashboardPage(props: DashboardPageProps) {
 
 function SummaryCards({
   hasUsd,
+  netContribution,
   totalInvested,
   realizedPnl,
   currentValue,
@@ -173,6 +175,18 @@ function SummaryCards({
 
   return (
     <div class="row g-3 mb-4">
+      <Card
+        label={
+          <>
+            Aporte Líquido{brlSuffix}
+            <i
+              class="bi bi-info-circle ms-1"
+              title="Dinheiro novo que saiu do bolso. Proventos e vendas reaplicados na carteira não contam como aporte."
+            />
+          </>
+        }
+        value={money(netContribution)}
+      />
       <Card label={<>Total Investido{brlSuffix}</>} value={money(totalInvested)} />
       <Card
         label={<>Lucro Realizado{brlSuffix}</>}

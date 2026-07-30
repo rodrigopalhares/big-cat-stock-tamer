@@ -152,6 +152,39 @@ export function calculateUnrealizedPnl(
   return (currentPrice - avgPrice) * quantity
 }
 
+/**
+ * Dinheiro novo que saiu do bolso — o aporte líquido.
+ *
+ * Percorre os fluxos em ordem mantendo um caixa da própria carteira: venda, provento e
+ * redução de capital entram nele; compra saca dele primeiro e só o que faltar conta como
+ * aporte. Assim provento reinvestido e lucro de venda reaplicado não inflam o número —
+ * dinheiro que já estava dentro da carteira não é aporte novo.
+ *
+ * O caixa nunca é sacado, porque não existe registro de retirada: quem vendeu e levou o
+ * dinheiro embora aparece com o mesmo aporte de quem deixou parado na corretora. É o
+ * limite do modelo, e ele erra para menos, nunca para mais.
+ *
+ * No mesmo dia a entrada vem antes da saída — a venda da manhã financia a compra da tarde.
+ */
+export function calculateNetContribution(cashFlows: readonly CashFlow[]): number {
+  let cash = 0
+  let contributed = 0
+
+  for (const flow of inflowsFirst(cashFlows)) {
+    if (flow.value >= 0) {
+      cash += flow.value
+      continue
+    }
+
+    const needed = -flow.value
+    const fromCash = Math.min(cash, needed)
+    cash -= fromCash
+    contributed += needed - fromCash
+  }
+
+  return contributed
+}
+
 /** IRR tratando os fluxos como períodos consecutivos. Null quando não há dados suficientes. */
 export function calculateIrr(
   cashFlows: readonly CashFlow[],
@@ -194,4 +227,8 @@ export function calculateXirr(
 
 function sortedByDate(transactions: readonly TransactionData[]): TransactionData[] {
   return [...transactions].sort((a, b) => compareDates(a.date, b.date))
+}
+
+function inflowsFirst(cashFlows: readonly CashFlow[]): CashFlow[] {
+  return [...cashFlows].sort((a, b) => compareDates(a.date, b.date) || b.value - a.value)
 }

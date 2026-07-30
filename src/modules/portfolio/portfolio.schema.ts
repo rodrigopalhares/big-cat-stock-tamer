@@ -31,6 +31,8 @@ export type AssetPosition = {
 
 export type PortfolioSummary = {
   totalInvested: number
+  /** Aporte líquido: só o dinheiro novo, sem provento nem venda reinvestidos. */
+  netContribution: number
   currentValue: number | null
   realizedPnl: number
   unrealizedPnl: number | null

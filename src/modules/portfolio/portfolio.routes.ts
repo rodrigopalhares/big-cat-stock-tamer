@@ -29,6 +29,7 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
         DashboardPage({
           positions,
           assetTypes: [...new Set(positions.map((p) => p.type).filter(isString))].sort(),
+          netContribution: summary.netContribution,
           totalInvested: summary.totalInvested,
           realizedPnl: summary.realizedPnl,
           currentValue: summary.currentValue,
