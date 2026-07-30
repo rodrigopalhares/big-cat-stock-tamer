@@ -51,6 +51,19 @@ describe('categorizeAssets', () => {
     expect(result.tdTickerMap.size).toBe(0)
   })
 
+  it('Tesouro sem símbolo cai no mapa quando o ticker é um código curto', () => {
+    // O cliente do Tesouro traduz `TD:IPCA2026` sozinho, então não precisa do yfTicker.
+    const result = categorizeAssets([asset('TD:IPCA2026', null, 'TESOURO_DIRETO')])
+    expect([...result.tdTickerMap]).toEqual([['TD:IPCA2026', 'TD:IPCA2026']])
+  })
+
+  it('o símbolo gravado tem precedência sobre o código curto', () => {
+    const result = categorizeAssets([
+      asset('TD:PRE2009', 'Tesouro Prefixado;01/07/2009', 'TESOURO_DIRETO'),
+    ])
+    expect([...result.tdTickerMap]).toEqual([['Tesouro Prefixado;01/07/2009', 'TD:PRE2009']])
+  })
+
   it('mistura de ativos vai para os mapas certos', () => {
     const result = categorizeAssets([
       asset('PETR4', null, 'STOCK'),

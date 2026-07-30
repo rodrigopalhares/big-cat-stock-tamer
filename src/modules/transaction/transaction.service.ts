@@ -1,7 +1,7 @@
 import type { Db } from '../../config/db.js'
 import type { Currency } from '../../domain/constants.js'
 import type { Asset, Transaction } from '../../generated/prisma/client.js'
-import type { YahooClient } from '../../integrations/yahoo/yahoo.client.js'
+import type { AssetInfoLookup } from '../../integrations/asset-info.client.js'
 import { HttpError } from '../../shared/http-error.js'
 import type { IsoDate } from '../../shared/iso-date.js'
 import { transactionTypeMeta } from '../../shared/transaction-types.js'
@@ -49,18 +49,18 @@ export type TransactionFilters = {
 export class TransactionService {
   constructor(
     private readonly db: Db,
-    private readonly yahoo: YahooClient,
+    private readonly assetInfo: AssetInfoLookup,
     private readonly exchangeRates: ExchangeRateService,
   ) {}
 
-  /** Busca o ativo; se não existir, cria buscando os dados no Yahoo. */
+  /** Busca o ativo; se não existir, cria buscando os dados na fonte do ticker. */
   async findOrCreateAsset(ticker: string): Promise<Asset> {
     const normalized = ticker.trim().toUpperCase()
     const existing = await this.db.asset.findUnique({ where: { ticker: normalized } })
     if (existing !== null) return existing
 
     // Chamada de rede fora de qualquer transação (regra §3.3 do plano).
-    const info = await this.yahoo.fetchAssetInfo(normalized)
+    const info = await this.assetInfo.fetchAssetInfo(normalized)
     return this.db.asset.create({
       data: {
         ticker: normalized,
@@ -253,7 +253,7 @@ export class TransactionService {
       }
     }
 
-    const info = await this.yahoo.fetchAssetInfo(normalized)
+    const info = await this.assetInfo.fetchAssetInfo(normalized)
     return info.name === normalized
       ? { ticker: normalized, name: null, type: null, status: 'NOT_FOUND' }
       : { ticker: normalized, name: info.name, type: info.type, status: 'FOUND_ONLINE' }

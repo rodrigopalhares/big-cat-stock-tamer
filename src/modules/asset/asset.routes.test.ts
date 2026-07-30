@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createHarness, type Harness } from '../../../tests/app-harness.js'
 import { clearAllData } from '../../../tests/db.js'
 import { createAsset, createTransaction } from '../../../tests/factories.js'
-import { server, yahooChart } from '../../../tests/msw.js'
+import { server, tesouroCsv, yahooChart } from '../../../tests/msw.js'
 
 // Porte de src/test/kotlin/com/stocks/controller/AssetControllerTest.kt
 
@@ -89,6 +89,23 @@ describe('rotas de ativos', () => {
       const asset = await h.db.asset.findUniqueOrThrow({ where: { ticker: 'PETR3' } })
       expect(asset.name).toContain('Petrobras')
     })
+
+    it('código do Tesouro é resolvido pelo CSV, não pelo Yahoo', async () => {
+      server.use(tesouroCsv('tesouro_direto_short_codes.csv'))
+
+      await h.app.inject({
+        method: 'POST',
+        url: '/assets/new',
+        payload: { ticker: 'TD:IPCA2026', name: '', type: '', currency: '' },
+      })
+
+      const asset = await h.db.asset.findUniqueOrThrow({ where: { ticker: 'TD:IPCA2026' } })
+      expect(asset.name).toBe('Tesouro IPCA+ 15/08/2026')
+      expect(asset.type).toBe('TESOURO_DIRETO')
+      expect(asset.currency).toBe('BRL')
+      // O código longo do CSV mora aqui: é ele que vai buscar a cotação.
+      expect(asset.yfTicker).toBe('Tesouro IPCA+;15/08/2026')
+    })
   })
 
   describe('POST /assets/:ticker/edit', () => {
@@ -174,6 +191,30 @@ describe('rotas de ativos', () => {
       expect(res.body).toContain('Petrobras')
       expect(res.body).toContain('hx-swap-oob="true"')
       expect(res.body).toContain('id="assetYfTicker"')
+    })
+
+    it('código do Tesouro preenche o título e o vencimento', async () => {
+      server.use(tesouroCsv('tesouro_direto_short_codes.csv'))
+
+      const res = await h.app.inject({
+        method: 'GET',
+        url: '/assets/ticker-info?ticker=TD:IPCA2026',
+      })
+
+      expect(res.body).toContain('Tesouro IPCA+ 15/08/2026')
+      expect(res.body).toContain('TESOURO_DIRETO')
+    })
+
+    it('avisa quando o ano tem mais de um vencimento', async () => {
+      server.use(tesouroCsv('tesouro_direto_short_codes.csv'))
+
+      const res = await h.app.inject({
+        method: 'GET',
+        url: '/assets/ticker-info?ticker=TD:PRE2009',
+      })
+
+      expect(res.body).toContain('mais de um vencimento')
+      expect(res.body).toContain('01/07/2009')
     })
   })
 

@@ -2,6 +2,7 @@ import type { Db } from './config/db.js'
 import type { Env } from './config/env.js'
 import { BackupService } from './infra/backup.js'
 import { AnthropicClient } from './integrations/anthropic/anthropic.client.js'
+import { AssetInfoClient } from './integrations/asset-info.client.js'
 import { BcbClient } from './integrations/bcb/bcb.client.js'
 import { BROWSER_USER_AGENT, HttpClient, type Logger, silentLogger } from './integrations/http.js'
 import { TesouroClient } from './integrations/tesouro/tesouro.client.js'
@@ -32,17 +33,18 @@ export function buildContainer(db: Db, env: Env, logger: Logger = silentLogger) 
   const yahoo = new YahooClient({ http: yahooHttp, logger })
   const bcb = new BcbClient({ http: plainHttp, logger })
   const tesouro = new TesouroClient({ http: plainHttp, logger })
+  const assetInfo = new AssetInfoClient(yahoo, tesouro)
 
   const exchangeRates = new ExchangeRateService(db, bcb, logger)
   const assets = new AssetService(db)
-  const transactions = new TransactionService(db, yahoo, exchangeRates)
+  const transactions = new TransactionService(db, assetInfo, exchangeRates)
   const dividends = new DividendService(db, transactions, exchangeRates)
   const priceHistory = new PriceHistoryService(db, yahoo, tesouro, logger)
   const portfolio = new PortfolioService(db, yahoo, tesouro, priceHistory, dividends, exchangeRates)
   const evolution = new EvolutionService(db, priceHistory, assets, logger)
   const benchmarks = new BenchmarkService(db, yahoo, bcb, logger)
   const riskMetrics = new RiskMetricsService(db, benchmarks, logger)
-  const csvImport = new CsvImportService(db, yahoo, transactions, dividends)
+  const csvImport = new CsvImportService(db, assetInfo, transactions, dividends)
 
   const anthropic = new AnthropicClient({ apiKey: env.APP_ANTHROPIC_API_KEY, logger })
   const brokerNotes = new BrokerNoteService(db, anthropic, env.notesDir)
@@ -67,6 +69,7 @@ export function buildContainer(db: Db, env: Env, logger: Logger = silentLogger) 
     yahoo,
     bcb,
     tesouro,
+    assetInfo,
     assets,
     transactions,
     dividends,

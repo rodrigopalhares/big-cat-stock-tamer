@@ -48,7 +48,9 @@ the extracted CSV into the same textarea — from there the flow above is unchan
 | `src/modules/transaction/transaction.routes.ts` | Routes: `parse-csv`, `parse-csv-step2`, `batch` |
 | `src/modules/transaction/transaction.service.ts` | `extractDistinctAssets()`, `parseCsvWithAssetLookup()`, `batchImport()` |
 | `src/domain/csv/transaction-csv.ts` | DTOs: `CsvRow`, `CsvAssetRow`, `BatchRowRequest`, `AssetBatchRow`, `parseCsvRows()`, `parseBrazilianNumber()` |
+| `src/integrations/asset-info.client.ts` | `fetchAssetInfo()` — routes the lookup: Tesouro CSV for `TD:` tickers, Yahoo for the rest |
 | `src/integrations/yahoo/yahoo.client.ts` | `fetchAssetInfo()` — Yahoo Finance lookup for unknown tickers |
+| `src/domain/tesouro-ticker.ts` | `resolveTesouroCode()` — `TD:IPCA2026` → `Tesouro IPCA+;15/08/2026` |
 | `src/domain/ticker-classification.ts` | `classifyTicker()` — detects asset type from ticker pattern |
 | `src/views/partials/csv-asset-review.tsx` | Step 1 UI — asset review table (JSX fragment) |
 | `src/views/partials/csv-preview.tsx` | Step 2 UI — transaction preview table (JSX fragment) |

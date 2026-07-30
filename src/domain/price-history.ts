@@ -1,5 +1,6 @@
 import { addDays, compareDates, daysBetween, type IsoDate } from '../shared/iso-date.js'
 import { type AssetType, NO_QUOTE_TYPES } from './constants.js'
+import { isTesouroTicker } from './tesouro-ticker.js'
 import { classifyTicker } from './ticker-classification.js'
 
 /**
@@ -36,10 +37,21 @@ export function resolveYfTicker(ticker: string, yfTicker: string | null): string
 }
 
 /**
+ * Código do Tesouro de um ativo: o `yfTicker` gravado no cadastro ou, na falta dele, o
+ * próprio ticker quando é um código curto (`TD:IPCA2026`) — o cliente sabe traduzir.
+ * Null quando não há como identificar o papel.
+ */
+export function resolveTesouroSymbol(ticker: string, yfTicker: string | null): string | null {
+  if (yfTicker !== null && yfTicker !== '') return yfTicker
+  return isTesouroTicker(ticker) ? ticker : null
+}
+
+/**
  * Separa os ativos entre os que têm cotação no Yahoo e os do Tesouro Direto.
  *
  * Ativos deslistados e tipos sem cotação (RENDA_FIXA, OUTROS) ficam de fora — buscar preço
- * deles é chamada perdida. Tesouro sem `yfTicker` também sai: não há como identificar o papel.
+ * deles é chamada perdida. Tesouro só sai quando nem o `yfTicker` nem o ticker identificam
+ * o papel.
  */
 export function categorizeAssets(assets: readonly AssetTickerInfo[]): TickerMaps {
   const yfTickerMap = new Map<string, string>()
@@ -50,7 +62,8 @@ export function categorizeAssets(assets: readonly AssetTickerInfo[]): TickerMaps
     if (NO_QUOTE_TYPES.has(asset.type as AssetType)) continue
 
     if (asset.type === 'TESOURO_DIRETO') {
-      if (asset.yfTicker !== null) tdTickerMap.set(asset.yfTicker, asset.ticker)
+      const symbol = resolveTesouroSymbol(asset.ticker, asset.yfTicker)
+      if (symbol !== null) tdTickerMap.set(symbol, asset.ticker)
     } else {
       yfTickerMap.set(resolveYfTicker(asset.ticker, asset.yfTicker), asset.ticker)
     }

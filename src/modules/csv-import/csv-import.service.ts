@@ -7,7 +7,7 @@ import {
   extractDistinctTickers,
   parseCsvRows,
 } from '../../domain/csv/transaction-csv.js'
-import type { YahooClient } from '../../integrations/yahoo/yahoo.client.js'
+import type { AssetInfoLookup } from '../../integrations/asset-info.client.js'
 import { isoDate } from '../../shared/iso-date.js'
 import type { DividendService } from '../dividend/dividend.service.js'
 import type { TransactionService } from '../transaction/transaction.service.js'
@@ -61,7 +61,7 @@ export type DividendBatchRowRequest = {
 export class CsvImportService {
   constructor(
     private readonly db: Db,
-    private readonly yahoo: YahooClient,
+    private readonly assetInfo: AssetInfoLookup,
     private readonly transactions: TransactionService,
     private readonly dividends: DividendService,
   ) {}
@@ -75,7 +75,7 @@ export class CsvImportService {
     const unknown = extractDistinctTickers(rawCsv).filter((t) => !existing.has(t))
     const statuses = new Map<string, AssetStatus>()
     for (const ticker of unknown) {
-      const info = await this.yahoo.fetchAssetInfo(ticker)
+      const info = await this.assetInfo.fetchAssetInfo(ticker)
       statuses.set(ticker, info.name === ticker ? 'UNKNOWN' : 'WILL_CREATE')
     }
 
@@ -101,7 +101,7 @@ export class CsvImportService {
         continue
       }
 
-      const info = await this.yahoo.fetchAssetInfo(ticker)
+      const info = await this.assetInfo.fetchAssetInfo(ticker)
       const found = info.name !== ticker
       rows.push({
         ticker,

@@ -1,6 +1,6 @@
 import type { AssetType } from '../../domain/constants.js'
 import { ASSET_TYPES } from '../../domain/constants.js'
-import type { AssetInfo } from '../../integrations/yahoo/yahoo.client.js'
+import type { ResolvedAssetInfo } from '../../integrations/asset-info.client.js'
 import type { TickerLookupResult } from '../../modules/transaction/transaction.service.js'
 import { AssetBadge } from './badge.js'
 
@@ -19,7 +19,7 @@ export function AssetTickerInfo({
   exists,
 }: {
   ticker: string
-  info: AssetInfo | null
+  info: ResolvedAssetInfo | null
   exists: boolean
 }) {
   if (exists) {
@@ -32,9 +32,10 @@ export function AssetTickerInfo({
   }
 
   const found = info !== null && info.name !== ticker
-  const name = found ? (info as AssetInfo).name : ''
+  const name = found ? (info as ResolvedAssetInfo).name : ''
   const type = info?.type ?? 'STOCK'
   const currency = info?.currency ?? 'BRL'
+  const alternatives = info?.alternatives ?? []
 
   return (
     <>
@@ -49,6 +50,14 @@ export function AssetTickerInfo({
           <strong>{ticker}</strong> não encontrado na internet
         </div>
       )}
+
+      {alternatives.length > 0 ? (
+        <div class="alert alert-warning small p-2 mb-0 mt-2">
+          <i class="bi bi-exclamation-triangle me-1" />O ano tem mais de um vencimento. Foi
+          escolhido o primeiro; os outros são {alternatives.join(', ')}. Para usar um deles, ajuste
+          o código do título depois de cadastrar.
+        </div>
+      ) : null}
 
       {/* Swaps out-of-band: preenchem os campos do formulário fora do alvo da requisição. */}
       <input

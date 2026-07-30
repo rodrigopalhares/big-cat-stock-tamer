@@ -40,7 +40,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
       if (normalized.length < 3) return reply.type('text/html; charset=utf-8').send('')
 
       const exists = await c.assets.exists(normalized)
-      const info = exists ? null : await c.yahoo.fetchAssetInfo(normalized)
+      const info = exists ? null : await c.assetInfo.fetchAssetInfo(normalized)
       return reply.partial(AssetTickerInfo({ ticker: normalized, info, exists }))
     })
 
@@ -101,7 +101,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
       let { name, type, currency } = form
       let yfTicker = form.yf_ticker
       if (name.trim() === '') {
-        const info = await c.yahoo.fetchAssetInfo(ticker)
+        const info = await c.assetInfo.fetchAssetInfo(ticker)
         name = info.name === ticker ? '' : info.name
         if (type.trim() === '') type = info.type
         if (yfTicker.trim() === '') yfTicker = info.yfTicker
