@@ -15,6 +15,14 @@ function parse<T>(raw: string | undefined, fallback: T): T {
   return raw === undefined || raw === '' ? fallback : (JSON.parse(raw) as T)
 }
 
+/**
+ * Eixo das linhas de referência, separado do das áreas.
+ *
+ * Existe para elas não entrarem no empilhamento, e é o mesmo critério que tira essas linhas
+ * do total do tooltip: o que empilha é o que soma.
+ */
+const REFERENCE_AXIS = 'yReference'
+
 /** Linha tracejada sobreposta às áreas — referência, não composição do patrimônio. */
 function referenceLine(label: string, data: Array<number | null>, color: string): ChartDataset {
   return {
@@ -28,7 +36,7 @@ function referenceLine(label: string, data: Array<number | null>, color: string)
     pointRadius: 0,
     pointHitRadius: 10,
     order: 1,
-    yAxisID: 'yInvested',
+    yAxisID: REFERENCE_AXIS,
   }
 }
 
@@ -89,7 +97,7 @@ function buildChart(): void {
         },
         // Eixo invisível para as linhas de referência não entrarem no empilhamento,
         // mas ainda compartilharem a escala das áreas.
-        yInvested: {
+        [REFERENCE_AXIS]: {
           display: false,
           stacked: false,
           afterBuildTicks: (axis: {
@@ -108,8 +116,15 @@ function buildChart(): void {
           callbacks: {
             label: (ctx: { dataset: { label: string }; parsed: { y: number } }) =>
               `${ctx.dataset.label}: ${brl(ctx.parsed.y)}`,
-            afterBody: (items: Array<{ parsed: { y: number } }>) => [
-              `\nTotal: ${brl(items.reduce((sum, item) => sum + item.parsed.y, 0))}`,
+            // Só as áreas: o total é o valor de mercado da carteira naquele mês. Somar as
+            // referências junto dava um número que não existe — investido e benchmark são
+            // outra pergunta, não parcela do patrimônio.
+            afterBody: (items: Array<{ dataset: { yAxisID?: string }; parsed: { y: number } }>) => [
+              `\nTotal: ${brl(
+                items
+                  .filter((item) => item.dataset.yAxisID !== REFERENCE_AXIS)
+                  .reduce((sum, item) => sum + item.parsed.y, 0),
+              )}`,
             ],
           },
         },
