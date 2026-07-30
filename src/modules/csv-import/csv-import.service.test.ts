@@ -62,6 +62,20 @@ describe('CsvImportService', () => {
 
       expect(rows[0]?.assetStatus).toBe('UNKNOWN')
     })
+
+    it('linha com erro vem antes das válidas', async () => {
+      await createAsset(db, 'PETR4')
+
+      const rows = await service.parseCsvWithAssetLookup(
+        [
+          'PETR4\t01/06/2024\tC\t100\t25,50\t0\tXP\t0\tBRL\t',
+          'PETR4\t99/99/2024\tC\t100\t25,50\t0\tXP\t0\tBRL\t',
+        ].join('\n'),
+      )
+
+      expect(rows[0]?.error).toContain('Data inválida')
+      expect(rows[1]?.error).toBeNull()
+    })
   })
 
   describe('extractDistinctAssets', () => {
@@ -101,6 +115,21 @@ describe('CsvImportService', () => {
       const csv =
         'PETR4\t01/06/2024\tC\t1\t1\t0\tXP\t0\tBRL\t\nPETR4\t02/06/2024\tC\t1\t1\t0\tXP\t0\tBRL\t'
       expect(await service.extractDistinctAssets(csv)).toHaveLength(1)
+    })
+
+    it('ordena por status: desconhecido, novo e existente', async () => {
+      await createAsset(db, 'VALE3')
+      server.use(yahooChartBySymbol({ 'PETR3.SA': 'yahoo_chart_petr3.json' }))
+
+      const csv = ['VALE3', 'PETR3', 'XXXX9']
+        .map((ticker) => `${ticker}\t01/06/2024\tC\t1\t1\t0\tXP\t0\tBRL\t`)
+        .join('\n')
+
+      expect((await service.extractDistinctAssets(csv)).map((row) => row.ticker)).toEqual([
+        'XXXX9',
+        'PETR3',
+        'VALE3',
+      ])
     })
   })
 
@@ -256,6 +285,19 @@ describe('CsvImportService', () => {
       )
 
       expect(rows[0]?.error).toBeNull()
+    })
+
+    it('parseDividendCsv põe a linha com erro na frente', async () => {
+      await createAsset(db, 'PETR4')
+
+      const rows = await service.parseDividendCsv(
+        [
+          'PETR4\t01/03/2026\tDIVIDENDO\t1,50\t0,00\tBRL\tXP',
+          'XXXX9\t01/03/2026\tDIVIDENDO\t1,00\t0,00\tBRL\tXP',
+        ].join('\n'),
+      )
+
+      expect(rows.map((row) => row.ticker)).toEqual(['XXXX9', 'PETR4'])
     })
 
     it('batchImportDividends grava no banco', async () => {
