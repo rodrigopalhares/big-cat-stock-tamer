@@ -1,9 +1,9 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { Container } from '../../container.js'
 import {
-  buildCdiChartLine,
   buildIbovChartLine,
   buildMonthlyDividendSeries,
+  buildNetContributionChartLine,
 } from '../../domain/chart.js'
 import { monthLabel } from '../../shared/format.js'
 import { HttpError } from '../../shared/http-error.js'
@@ -39,7 +39,7 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
           irrMonthly: summary.irrMonthly,
           hasUsd: positions.some((p) => p.currency === 'USD'),
           usdRate: usdPosition?.exchangeRate ?? null,
-          chart: await buildChart(c),
+          chart: await buildChart(c, positions),
           dividendChart: await buildDividendChart(c),
         }),
       )
@@ -76,7 +76,10 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
  * Dados do gráfico: uma série por tipo de ativo, mais as linhas de referência.
  * Null quando não há snapshot nenhum — aí a página nem desenha o gráfico.
  */
-async function buildChart(c: Container): Promise<ChartData | null> {
+async function buildChart(
+  c: Container,
+  positions: readonly AssetPosition[],
+): Promise<ChartData | null> {
   const evolution = await c.evolution.getEvolution()
   if (evolution.months.length === 0) return null
 
@@ -87,10 +90,7 @@ async function buildChart(c: Container): Promise<ChartData | null> {
   const invested = evolution.months.map((row) => row.totalInvested)
   const months = evolution.months.map((row) => row.month)
 
-  const [ibovPrices, cdiAnnual] = await Promise.all([
-    c.benchmarks.getMonthlyPricesMap(),
-    c.benchmarks.fetchCdiAnnualRate(),
-  ])
+  const ibovPrices = await c.benchmarks.getMonthlyPricesMap()
 
   return {
     labels: months.map((month) => monthLabel(month)),
@@ -103,8 +103,13 @@ async function buildChart(c: Container): Promise<ChartData | null> {
       ),
     })),
     invested,
+    // Os fluxos da carteira inteira em ordem, como no card: provento de um papel pagando a
+    // compra de outro só aparece com eles juntos.
+    netContribution: buildNetContributionChartLine(
+      months as IsoDate[],
+      positions.flatMap((p) => p.allCashFlowsBrl),
+    ),
     ibov: buildIbovChartLine(months as IsoDate[], invested, ibovPrices),
-    cdi: buildCdiChartLine(invested, cdiAnnual),
   }
 }
 

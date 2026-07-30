@@ -9,8 +9,9 @@ export type ChartData = {
   labels: string[]
   datasets: Array<{ label: string; data: number[] }>
   invested: number[]
+  /** Aporte líquido acumulado mês a mês — o mesmo número do card, ao longo do tempo. */
+  netContribution: number[]
   ibov: Array<number | null>
-  cdi: Array<number | null>
 }
 
 /** Proventos por mês, uma série por tipo de ativo — barras empilhadas + média móvel. */
@@ -144,8 +145,8 @@ export function DashboardPage(props: DashboardPageProps) {
           data-labels={JSON.stringify(chart.labels)}
           data-datasets={JSON.stringify(chart.datasets)}
           data-invested={JSON.stringify(chart.invested)}
+          data-net-contribution={JSON.stringify(chart.netContribution)}
           data-ibov={JSON.stringify(chart.ibov)}
-          data-cdi={JSON.stringify(chart.cdi)}
         />
       )}
       {dividendChart !== null && (

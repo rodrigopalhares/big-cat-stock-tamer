@@ -1,37 +1,106 @@
 import { describe, expect, it } from 'vitest'
 import { type IsoDate, isoDate, toYearMonth } from '../shared/iso-date.js'
 import {
-  buildCdiChartLine,
   buildIbovChartLine,
   buildMonthlyDividendSeries,
+  buildNetContributionChartLine,
   type DividendFlow,
 } from './chart.js'
 
-describe('buildCdiChartLine', () => {
-  it('série vazia devolve vazio', () => {
-    expect(buildCdiChartLine([], 0.1)).toEqual([])
+describe('buildNetContributionChartLine', () => {
+  const months = ['2024-01-01', '2024-02-01', '2024-03-01'].map(isoDate)
+  const flows = (entries: Array<[string, number]>) =>
+    entries.map(([date, value]) => ({ date: isoDate(date), value }))
+
+  it('meses vazios devolve vazio', () => {
+    expect(buildNetContributionChartLine([], flows([['2024-01-10', -100]]))).toEqual([])
   })
 
-  it('sem CDI devolve tudo nulo', () => {
-    expect(buildCdiChartLine([100, 200], null)).toEqual([null, null])
+  it('sem fluxo nenhum a linha fica zerada', () => {
+    expect(buildNetContributionChartLine(months, [])).toEqual([0, 0, 0])
   })
 
-  it('sem investimento devolve tudo nulo', () => {
-    expect(buildCdiChartLine([0, 0], 0.1)).toEqual([null, null])
+  it('acumula as compras mês a mês', () => {
+    const line = buildNetContributionChartLine(
+      months,
+      flows([
+        ['2024-01-10', -100],
+        ['2024-02-10', -50],
+        ['2024-03-10', -25],
+      ]),
+    )
+
+    expect(line).toEqual([100, 150, 175])
   })
 
-  it('rende a partir do primeiro mês investido', () => {
-    const line = buildCdiChartLine([0, 100, 100, 100], 0.12)
+  it('mês sem fluxo repete o acumulado, não volta a zero', () => {
+    const line = buildNetContributionChartLine(months, flows([['2024-01-10', -100]]))
 
-    expect(line[0]).toBeNull()
-    expect(line[1]).toBeCloseTo(100, 6)
-    // 12% a.a. ≈ 0,949% a.m.
-    expect(line[2] as number).toBeCloseTo(100 * 1.00949, 3)
-    expect(line[3] as number).toBeGreaterThan(line[2] as number)
+    expect(line).toEqual([100, 100, 100])
   })
 
-  it('CDI zero mantém o valor constante', () => {
-    expect(buildCdiChartLine([100, 100, 100], 0)).toEqual([100, 100, 100])
+  it('compra paga com provento não levanta a linha', () => {
+    const line = buildNetContributionChartLine(
+      months,
+      flows([
+        ['2024-01-10', -100],
+        ['2024-02-05', 30],
+        ['2024-02-20', -30],
+      ]),
+    )
+
+    expect(line).toEqual([100, 100, 100])
+  })
+
+  it('conta só a parte da compra que o caixa não cobriu', () => {
+    const line = buildNetContributionChartLine(
+      months,
+      flows([
+        ['2024-01-10', -100],
+        ['2024-02-05', 30],
+        ['2024-02-20', -50],
+      ]),
+    )
+
+    expect(line).toEqual([100, 120, 120])
+  })
+
+  it('fluxo posterior ao último mês do eixo fica de fora', () => {
+    const line = buildNetContributionChartLine(
+      months,
+      flows([
+        ['2024-01-10', -100],
+        ['2024-04-10', -900],
+      ]),
+    )
+
+    expect(line).toEqual([100, 100, 100])
+  })
+
+  it('fluxo no último dia do mês entra naquele mês', () => {
+    const line = buildNetContributionChartLine(
+      months,
+      flows([
+        ['2024-01-31', -100],
+        // 2024 é bissexto: fevereiro tem 29 dias.
+        ['2024-02-29', -50],
+      ]),
+    )
+
+    expect(line).toEqual([100, 150, 150])
+  })
+
+  it('fluxos fora de ordem não confundem a varredura', () => {
+    const line = buildNetContributionChartLine(
+      months,
+      flows([
+        ['2024-03-10', -25],
+        ['2024-01-10', -100],
+        ['2024-02-10', -50],
+      ]),
+    )
+
+    expect(line).toEqual([100, 150, 175])
   })
 })
 

@@ -52,8 +52,8 @@ function buildChart(): void {
     [],
   )
   const invested = parse<number[]>(dataEl.dataset['invested'], [])
+  const netContribution = parse<number[]>(dataEl.dataset['netContribution'], [])
   const ibov = parse<Array<number | null>>(dataEl.dataset['ibov'], [])
-  const cdi = parse<Array<number | null>>(dataEl.dataset['cdi'], [])
 
   const datasets: ChartDataset[] = rawDatasets.map((ds) => ({
     label: ds.label,
@@ -68,9 +68,11 @@ function buildChart(): void {
   }))
 
   datasets.push(referenceLine('Total Investido', invested, 'rgb(220, 53, 69)'))
+  // Carteira que nunca reaplicou nada tem o aporte colado no total investido; a linha só
+  // agrega quando as duas se separam, mas escondê-la deixaria a legenda inconstante.
+  datasets.push(referenceLine('Aporte Líquido', netContribution, 'rgb(255, 193, 7)'))
   if (ibov.some((v) => v !== null))
     datasets.push(referenceLine('IBOVESPA', ibov, 'rgb(40, 167, 69)'))
-  if (cdi.some((v) => v !== null)) datasets.push(referenceLine('CDI', cdi, 'rgb(255, 193, 7)'))
 
   new Chart(canvas, {
     type: 'line',

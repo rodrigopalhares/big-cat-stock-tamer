@@ -152,8 +152,14 @@ export function calculateUnrealizedPnl(
   return (currentPrice - avgPrice) * quantity
 }
 
+/** Um passo da caminhada do aporte: o total já aportado logo depois daquele fluxo. */
+export type NetContributionPoint = {
+  readonly date: IsoDate
+  readonly contributed: number
+}
+
 /**
- * Dinheiro novo que saiu do bolso — o aporte líquido.
+ * Dinheiro novo que saiu do bolso — o aporte líquido, passo a passo.
  *
  * Percorre os fluxos em ordem mantendo um caixa da própria carteira: venda, provento e
  * redução de capital entram nele; compra saca dele primeiro e só o que faltar conta como
@@ -165,24 +171,36 @@ export function calculateUnrealizedPnl(
  * limite do modelo, e ele erra para menos, nunca para mais.
  *
  * No mesmo dia a entrada vem antes da saída — a venda da manhã financia a compra da tarde.
+ *
+ * Devolve a caminhada inteira, e não só o total, porque a linha do gráfico de evolução
+ * precisa do acumulado em cada mês. Uma passada só: refazer a conta por mês daria o mesmo
+ * número com custo quadrático.
  */
-export function calculateNetContribution(cashFlows: readonly CashFlow[]): number {
+export function walkNetContribution(
+  cashFlows: readonly CashFlow[],
+): readonly NetContributionPoint[] {
   let cash = 0
   let contributed = 0
+  const points: NetContributionPoint[] = []
 
   for (const flow of inflowsFirst(cashFlows)) {
     if (flow.value >= 0) {
       cash += flow.value
-      continue
+    } else {
+      const needed = -flow.value
+      const fromCash = Math.min(cash, needed)
+      cash -= fromCash
+      contributed += needed - fromCash
     }
-
-    const needed = -flow.value
-    const fromCash = Math.min(cash, needed)
-    cash -= fromCash
-    contributed += needed - fromCash
+    points.push({ date: flow.date, contributed })
   }
 
-  return contributed
+  return points
+}
+
+/** O aporte líquido do fim da caminhada: o total que saiu do bolso. */
+export function calculateNetContribution(cashFlows: readonly CashFlow[]): number {
+  return walkNetContribution(cashFlows).at(-1)?.contributed ?? 0
 }
 
 /** IRR tratando os fluxos como períodos consecutivos. Null quando não há dados suficientes. */

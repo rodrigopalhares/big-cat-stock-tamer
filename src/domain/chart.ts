@@ -1,40 +1,54 @@
 import {
   type IsoDate,
+  lastDayOf,
   maxDate,
   minDate,
   monthsBetweenInclusive,
   type YearMonth,
   yearMonth,
 } from '../shared/iso-date.js'
-import { annualToMonthlyRate } from './regression.js'
+import { type NetContributionPoint, walkNetContribution } from './calculation.js'
+import type { CashFlow } from './xirr.js'
 
 /**
  * Séries dos gráficos do dashboard — funções puras.
- * Porte de `buildCdiChartLine` e `buildIbovChartLine`, privadas no PortfolioController.kt.
+ * Porte de `buildIbovChartLine`, privada no PortfolioController.kt.
  *
- * As duas linhas de referência respondem à mesma pergunta: "e se esse dinheiro tivesse ido
- * para o benchmark?". Por isso ambas partem do primeiro mês com investimento e normalizam
- * por ele — antes disso não há capital aplicado e a comparação não significa nada, daí o
- * `null`.
+ * A linha do Ibovespa responde "e se esse dinheiro tivesse ido para o benchmark?". Por isso
+ * parte do primeiro mês com investimento e normaliza por ele — antes disso não há capital
+ * aplicado e a comparação não significa nada, daí o `null`.
  */
 
-/** Rende o valor inicial ao CDI, mês a mês, a partir do primeiro mês investido. */
-export function buildCdiChartLine(
-  investedLine: readonly number[],
-  cdiAnnual: number | null,
-): Array<number | null> {
-  if (investedLine.length === 0) return []
-  if (cdiAnnual === null) return investedLine.map(() => null)
+/**
+ * O aporte líquido acumulado ao fim de cada mês do eixo.
+ *
+ * Sobe em degrau a cada dinheiro novo e fica plana quando a compra saiu de provento ou de
+ * venda reaplicada — é justamente a distância dela para as áreas que mostra o quanto a
+ * carteira andou sozinha. Diferente das outras referências, não normaliza nada: é valor
+ * absoluto, na mesma escala do patrimônio.
+ *
+ * Não usa `null` antes do primeiro aporte porque nunca há um "antes": o eixo começa no
+ * primeiro mês com posição, que já tem compra. Mês sem fluxo nenhum repete o acumulado
+ * anterior, e não zero — o dinheiro aportado continua lá.
+ */
+export function buildNetContributionChartLine(
+  months: readonly IsoDate[],
+  cashFlows: readonly CashFlow[],
+): number[] {
+  const walk = walkNetContribution(cashFlows)
 
-  const firstIndex = investedLine.findIndex((value) => value > 0)
-  if (firstIndex < 0) return investedLine.map(() => null)
+  // Uma varredura só: os meses sobem e a caminhada também, então o ponteiro nunca volta.
+  let index = 0
+  let contributed = 0
 
-  const cdiMonthly = annualToMonthlyRate(cdiAnnual)
-  const firstInvested = investedLine[firstIndex] as number
-
-  return investedLine.map((_, index) =>
-    index < firstIndex ? null : firstInvested * (1 + cdiMonthly) ** (index - firstIndex),
-  )
+  return months.map((month) => {
+    const monthEnd = lastDayOf(yearMonth(month))
+    while (index < walk.length && (walk[index] as NetContributionPoint).date <= monthEnd) {
+      contributed = (walk[index] as NetContributionPoint).contributed
+      index += 1
+    }
+    return contributed
+  })
 }
 
 /** Aplica a variação do Ibovespa sobre o valor inicial investido. */

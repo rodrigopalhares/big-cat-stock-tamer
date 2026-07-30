@@ -5,7 +5,7 @@ import { today } from '../../src/shared/iso-date.js'
 import { createHarness, type Harness } from '../app-harness.js'
 import { clearAllData } from '../db.js'
 import { createAsset, createDividend, createPriceHistory, createTransaction } from '../factories.js'
-import { bcbSeries, server, yahooChart } from '../msw.js'
+import { server, yahooChart } from '../msw.js'
 
 // Porte de PortfolioControllerTest, TransactionControllerTest, DividendControllerTest
 // e MonthlyEvolutionControllerTest.
@@ -123,12 +123,13 @@ describe('rotas da aplicação', () => {
     })
 
     it('com snapshots monta os dados do gráfico', async () => {
-      server.use(
-        yahooChart('yahoo_chart_empty.json'),
-        bcbSeries([{ data: '01/06/2024', valor: '10,50' }]),
-      )
+      server.use(yahooChart('yahoo_chart_empty.json'))
       await createAsset(h.db, 'PETR4', { type: 'STOCK' })
       await createAsset(h.db, 'HGLG11', { type: 'REIT' })
+      await createTransaction(h.db, 'PETR4', { quantity: 10, price: 10, date: '2024-01-05' })
+      await createTransaction(h.db, 'HGLG11', { quantity: 1, price: 150, date: '2024-01-05' })
+      await h.container.assets.refreshPositionFields('PETR4')
+      await h.container.assets.refreshPositionFields('HGLG11')
       await h.db.monthlySnapshot.createMany({
         data: [
           {
@@ -165,9 +166,10 @@ describe('rotas da aplicação', () => {
         { label: 'STOCK', data: [120] },
       ])
       expect(chartAttr(res.body, 'data-invested')).toEqual([250])
+      // Sem provento nem venda, o aporte é o próprio custo das compras do mês.
+      expect(chartAttr(res.body, 'data-net-contribution')).toEqual([250])
       // As linhas de referência entram com um ponto por mês; o cálculo é testado em domain/chart.
       expect(chartAttr(res.body, 'data-ibov')).toHaveLength(1)
-      expect(chartAttr(res.body, 'data-cdi')).toHaveLength(1)
     })
 
     it('com proventos monta o gráfico mensal por tipo de ativo', async () => {
