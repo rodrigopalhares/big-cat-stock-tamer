@@ -159,6 +159,24 @@ gunzip -c data/backups/daily/stocks-2026-06-09.db.gz > data/stocks.db
 # 2. suba de novo
 ```
 
+## Serviço (systemd)
+
+Em produção a aplicação roda como serviço, com auto-start amarrado ao volume criptografado:
+um *path unit* vigia a sentinela `/storage/media/big-cat/.mounted` e sobe o serviço quando o
+volume é montado; `BindsTo` derruba junto no `umount`. As units estão versionadas em
+[`deploy/`](deploy/), com sandbox do systemd — um único caminho gravável, resto do sistema
+read-only.
+
+Instalação, isolamento e operação no dia a dia: [`deploy/README.md`](deploy/README.md).
+
+Como `dist/` e `public/js/` não são versionados, atualizar código é sempre:
+
+```bash
+npm ci && npm run build
+npm run db:deploy                        # se houver migration nova
+sudo systemctl restart big-cat.service
+```
+
 ## Migração do Kotlin
 
 O projeto nasceu em Kotlin com Spring Boot e foi migrado para TypeScript. O plano completo,

@@ -1,0 +1,68 @@
+[Unit]
+Description=Big Cat — carteira de investimentos (Fastify/Node)
+# So roda com o volume criptografado montado; cai junto ao desmontar (BindsTo).
+After=network.target storage-media.mount
+BindsTo=storage-media.mount
+RequiresMountsFor=/storage/media
+
+[Service]
+Type=exec
+User=super
+Group=super
+# CWD e obrigatorio: o .env, o public/ (static) e o Prisma resolvem por process.cwd().
+WorkingDirectory=/srv/big-cat-stock-tamer
+# O ReadWritePaths abaixo nao aceita variavel de ambiente (systemd.exec(5): o sandbox e
+# montado antes de o processo existir), entao o caminho esta duplicado aqui e no .env.
+# Sem esta assertiva a divergencia seria SILENCIOSA: o backup falharia com EROFS e o
+# `guard` do scheduler.ts:33 engoliria o erro, deixando a app rodando sem backup.
+ExecStartPre=/usr/bin/grep -qxF APP_DATA_DIR=/storage/media/big-cat/data .env
+# Caminho direto do binario, nao `mise exec`: o node nao precisa de HOME e o mise sim,
+# e aqui /home vira tmpfs. O alias `22` resolve dentro do namespace (ver o bind abaixo).
+ExecStart=/home/super/.local/share/mise/installs/node/22/bin/node dist/main.js
+# process.loadEnvFile nao sobrescreve o ambiente, entao isto ganha do .env — que fica
+# em development para o `npm run dev` continuar com log bonito (pino-pretty).
+Environment=NODE_ENV=production
+Restart=on-failure
+RestartSec=5
+
+# --- Isolamento ---
+# Sao as mesmas primitivas do bubblewrap (mount namespaces + seccomp), declaradas na
+# unit em vez de numa linha de comando. Conferir com: systemd-analyze security big-cat
+NoNewPrivileges=yes
+# Porta 8001 > 1024: nenhuma capability e necessaria.
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+# Unico caminho gravavel. As 3 escritas da app (backup.ts:82, broker-note.service.ts:192,
+# auth.service.ts:111) caem todas aqui — o repositorio fica read-only para o servico.
+ReadWritePaths=/storage/media/big-cat/data
+# /home vira tmpfs vazio; o furo read-only abaixo e so o runtime do node.
+# Liga o diretorio pai, nao o `.../node/22`: aquele e um symlink, e o systemd resolveria
+# o alvo ao montar, congelando a versao no start. Com o pai, o symlink entra no namespace
+# e resolve no exec — upgrade de patch pelo mise nao pede mexer na unit.
+ProtectHome=tmpfs
+BindReadOnlyPaths=/home/super/.local/share/mise/installs/node
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+# AF_NETLINK e exigido pelo getaddrinfo da glibc — sem ele, DNS falha.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
+# MemoryDenyWriteExecute NAO entra: o JIT do V8 precisa de paginas W+X.
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Aguarda /storage/media montar para subir o Big Cat
+
+[Path]
+# A sentinela mora DENTRO do btrfs criptografado: so existe quando montado.
+# (O diretorio /storage/media existe mesmo desmontado, por isso nao serve de gatilho.)
+PathExists=/storage/media/big-cat/.mounted
+Unit=big-cat.service
+
+[Install]
+WantedBy=multi-user.target
