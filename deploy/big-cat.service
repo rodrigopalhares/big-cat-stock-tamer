@@ -36,6 +36,7 @@ ProtectSystem=strict
 # Unico caminho gravavel. As 3 escritas da app (backup.ts:82, broker-note.service.ts:192,
 # auth.service.ts:111) caem todas aqui — o repositorio fica read-only para o servico.
 ReadWritePaths=/storage/media/big-cat/data
+ReadWritePaths=/storage/media/backups/big-cat
 # /home vira tmpfs vazio; o furo read-only abaixo e so o runtime do node.
 # Liga o diretorio pai, nao o `.../node/22`: aquele e um symlink, e o systemd resolveria
 # o alvo ao montar, congelando a versao no start. Com o pai, o symlink entra no namespace
