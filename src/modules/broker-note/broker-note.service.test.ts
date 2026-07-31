@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { clearAllData, createTestDb, type TestDb } from '../../../tests/db.js'
 import { createAsset } from '../../../tests/factories.js'
+import { encryptedPdf, needsPassword, plainPdf } from '../../../tests/pdf.js'
 import type { BrokerNoteData } from '../../domain/broker-note.js'
 import type {
   AnthropicClient,
@@ -234,6 +235,87 @@ describe('BrokerNoteService', () => {
       const result = await serviceIn(tempDir()).importNote(upload)
 
       expect(result.groups[0]?.tickerSource).toBe('NOTE')
+    })
+  })
+
+  describe('nota protegida por senha', () => {
+    const SENHA = '01234567890'
+    const protectedUpload = () => ({ ...upload, file: encryptedPdf(SENHA), password: SENHA })
+
+    /** Um cliente que guarda o que recebeu — é assim que se vê o que subiu para o modelo. */
+    function recording(): { client: AnthropicClient; sent: Buffer[] } {
+      const sent: Buffer[] = []
+      const client = {
+        enabled: true,
+        extractBrokerNote: (file: Buffer) => {
+          sent.push(file)
+          return Promise.resolve({
+            note: NOTE,
+            rawResponse: RAW_RESPONSE,
+            fees: [],
+            checkedTotal: 30160.98,
+            checkNotes: 'Confere.',
+          })
+        },
+      }
+      return { client: client as unknown as AnthropicClient, sent }
+    }
+
+    it('guarda o arquivo aberto no nome oficial e o original ao lado, com _orig', async () => {
+      const dir = tempDir()
+      const sent = protectedUpload()
+      const result = await serviceIn(dir).importNote(sent)
+
+      const servido = join(dir, '2026', `20260715_${result.id}.pdf`)
+      const original = join(dir, '2026', `20260715_${result.id}_orig.pdf`)
+
+      expect(needsPassword(readFileSync(servido))).toBe(false)
+      // Byte a byte como o usuário mandou, senha e tudo.
+      expect(readFileSync(original)).toEqual(sent.file)
+      expect(needsPassword(readFileSync(original))).toBe(true)
+    })
+
+    it('só o arquivo sem senha vai para o banco e para o download', async () => {
+      const service = serviceIn(tempDir())
+      const { id } = await service.importNote(protectedUpload())
+      const saved = await db.brokerNote.findUniqueOrThrow({ where: { id } })
+
+      expect(saved.fileName).toBe(`20260715_${id}.pdf`)
+      expect(needsPassword((await service.readFile(id)).content)).toBe(false)
+    })
+
+    it('sobe para a Anthropic o PDF já aberto, não o criptografado', async () => {
+      const { client, sent } = recording()
+      await new BrokerNoteService(db, client, tempDir()).importNote(protectedUpload())
+
+      expect(sent).toHaveLength(1)
+      expect(needsPassword(sent[0] as Buffer)).toBe(false)
+    })
+
+    it('para na senha errada sem gastar chamada ao modelo nem criar linha', async () => {
+      const { client, sent } = recording()
+      const service = new BrokerNoteService(db, client, tempDir())
+
+      await expect(
+        service.importNote({ ...protectedUpload(), password: 'errada' }),
+      ).rejects.toMatchObject({ statusCode: 400 })
+
+      expect(sent).toHaveLength(0)
+      expect(await db.brokerNote.count()).toBe(0)
+    })
+
+    it('cobra a senha quando a nota é protegida e nada foi informado', async () => {
+      await expect(
+        serviceIn(tempDir()).importNote({ ...upload, file: encryptedPdf(SENHA) }),
+      ).rejects.toThrow(/protegida por senha/i)
+    })
+
+    it('não cria o _orig quando a nota não tem senha', async () => {
+      const dir = tempDir()
+      const result = await serviceIn(dir).importNote({ ...upload, file: plainPdf() })
+
+      expect(existsSync(join(dir, '2026', `20260715_${result.id}.pdf`))).toBe(true)
+      expect(existsSync(join(dir, '2026', `20260715_${result.id}_orig.pdf`))).toBe(false)
     })
   })
 

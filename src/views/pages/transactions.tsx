@@ -222,6 +222,16 @@ function NoteImportPane({ enabled }: { enabled: boolean }) {
         </div>
       </div>
       <div class="mb-3">
+        <label class="form-label" for="notePassword">
+          Senha do PDF <span class="fw-normal text-body-secondary">(só se a nota pedir)</span>
+        </label>
+        <input type="password" class="form-control" id="notePassword" autocomplete="off" />
+        <div class="form-text">
+          Serve só para abrir o arquivo nesta importação e não fica guardada. A nota é arquivada sem
+          senha.
+        </div>
+      </div>
+      <div class="mb-3">
         <button type="button" class="btn btn-secondary" data-note-parse>
           <i class="bi bi-stars" /> Ler nota
         </button>

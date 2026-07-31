@@ -65,6 +65,7 @@ the extracted CSV into the same textarea — from there the flow above is unchan
 | `src/domain/broker-note.ts` | Broker note: `groupTrades()`, `allocateFees()`, `checkTotal()`, `toCsv()` — pure |
 | `src/integrations/anthropic/anthropic.client.ts` | Reads the note PDF with `claude-haiku-4-5` + structured output |
 | `src/integrations/anthropic/anthropic.schema.ts` | Zod schema of the extraction; also the JSON Schema sent to the API |
+| `src/shared/pdf-password.ts` | `decryptPdf()` — removes the PDF password before the upload (mupdf) |
 | `src/modules/broker-note/broker-note.service.ts` | Saves the file, persists `BrokerNote`, serves the downloads |
 | `src/views/partials/broker-note-preview.tsx` | Note preview fragment (grouped table + total check) |
 
@@ -148,8 +149,8 @@ type AssetBatchRow(ticker, name, type, yfTicker, currency)
 | POST | `/transactions/parse-csv` | Fragment `csv-asset-review :: csvAssetReview` |
 | POST | `/transactions/parse-csv-step2` | Fragment `csv-preview :: csvPreview` |
 | POST | `/transactions/batch` | JSON `{ inserted: N }` — optional `brokerNoteId` links the rows to a note |
-| POST | `/transactions/parse-note` | multipart `file` → fragment `broker-note-preview` |
-| GET | `/transactions/notes/:id` | The original PDF/image, as a download |
+| POST | `/transactions/parse-note` | multipart `password` + `file`, in that order → fragment `broker-note-preview` |
+| GET | `/transactions/notes/:id` | The archived PDF/image, as a download — always the password-free one |
 | GET | `/transactions/notes/:id/response` | The model's raw JSON response, as a download |
 | GET | `/transactions/asset-info?ticker=X` | JSON `{ name, type, yfTicker, currency }` |
 | GET | `/transactions/ticker-info?ticker=X` | HTML snippet with ticker status |
@@ -160,9 +161,9 @@ A nota de negociação lists every execution separately — a single 329-share p
 19 lines across 2 pages. The import turns that into one transaction per ticker.
 
 ```
-upload -> AnthropicClient.extractBrokerNote() -> resolveTickers() -> groupTrades()
-       -> allocateFees() -> checkTotal() -> toCsv() -> persist BrokerNote + file
-       -> preview fragment
+upload -> decryptPdf() -> AnthropicClient.extractBrokerNote() -> resolveTickers()
+       -> groupTrades() -> allocateFees() -> checkTotal() -> toCsv()
+       -> persist BrokerNote + file -> preview fragment
 ```
 
 `broker_notes.ai_response` stores the model's answer **verbatim**, not the derived CSV. The
@@ -198,6 +199,18 @@ Rules that matter when changing this:
 - **The file name needs the row id**, so the row is inserted first and the file written
   after, at `${APP_NOTES_DIR}/<year>/<yyyyMMdd>_<id>.<ext>` (default `./data/notas`). If the
   write fails the row is deleted — a note without a file is a permanently broken download.
+- **A password-protected note is opened before the upload.** The Messages API only takes
+  "Standard PDF (no passwords/encryption)", so `decryptPdf()` (mupdf) strips the password
+  first; sending it encrypted just returns a vague complaint about the document. The
+  password is a multipart field that must come **before** `file` — `req.file()` streams the
+  body and only sees fields it has already passed, so reordering the client's `FormData`
+  would silently blank it. Wrong or missing password is a 400 raised before the model call.
+- **When there was a password, two files are kept**: `<yyyyMMdd>_<id>.<ext>` without it, and
+  `<yyyyMMdd>_<id>_orig.<ext>` exactly as uploaded. Only the first goes into
+  `broker_notes.file_name` and only it is ever served — the original is a byte-for-byte
+  safety copy whose name is derived from the same id, so no extra column. **The password itself is never
+  persisted or logged.** A note with only an *owner* password opens on its own and is left
+  untouched: rewriting it would lose the original for nothing.
 
 The extraction prompt lives in `SYSTEM_PROMPT` (`anthropic.client.ts`) and the field
 descriptions in `anthropic.schema.ts` — those descriptions go into the JSON Schema and are

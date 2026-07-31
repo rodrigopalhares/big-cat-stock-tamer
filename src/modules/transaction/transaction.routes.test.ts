@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { FastifyInstance } from 'fastify'
@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createHarness, type Harness } from '../../../tests/app-harness.js'
 import { clearAllData, createTestDb, type TestDb } from '../../../tests/db.js'
 import { createAsset } from '../../../tests/factories.js'
+import { encryptedPdf, needsPassword } from '../../../tests/pdf.js'
 import { buildApp } from '../../app.js'
 import { loadEnv } from '../../config/env.js'
 import { buildContainer } from '../../container.js'
@@ -51,14 +52,25 @@ const fakeAnthropic = {
 } as unknown as AnthropicClient
 
 /** Corpo multipart montado à mão — evita mais uma dependência só para o teste. */
-function upload(content: Buffer, fileName = 'nota.pdf', contentType = 'application/pdf') {
+function upload(
+  content: Buffer,
+  { fileName = 'nota.pdf', contentType = 'application/pdf', password = '' } = {},
+) {
   const boundary = '----NotaDeNegociacao'
+  // A senha vai antes do arquivo, como o cliente monta o FormData: o `req.file()` lê o
+  // corpo em streaming e só enxerga os campos que já passaram quando chega no arquivo.
+  const field =
+    password === ''
+      ? Buffer.alloc(0)
+      : Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="password"\r\n\r\n${password}\r\n`,
+        )
   const head = Buffer.from(
     `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\n` +
       `Content-Type: ${contentType}\r\n\r\n`,
   )
   return {
-    payload: Buffer.concat([head, content, Buffer.from(`\r\n--${boundary}--\r\n`)]),
+    payload: Buffer.concat([field, head, content, Buffer.from(`\r\n--${boundary}--\r\n`)]),
     headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
   }
 }
@@ -136,6 +148,44 @@ describe('rotas de nota de negociação', () => {
       const saved = await db.brokerNote.findFirstOrThrow()
       expect(saved).toMatchObject({ date: '2026-07-15', broker: 'XP', warning: null })
       expect(saved.fileName).toBe(`20260715_${saved.id}.pdf`)
+    })
+
+    it('leva a senha do formulário até o arquivo e arquiva as duas versões', async () => {
+      const protegido = encryptedPdf('01234567890')
+      const res = await app.inject({
+        method: 'POST',
+        url: '/transactions/parse-note',
+        ...upload(protegido, { password: '01234567890' }),
+      })
+
+      expect(res.statusCode).toBe(200)
+      const { id, fileName } = await db.brokerNote.findFirstOrThrow()
+      expect(fileName).toBe(`20260715_${id}.pdf`)
+      expect(needsPassword(readFileSync(join(notesDir, '2026', fileName)))).toBe(false)
+      expect(readFileSync(join(notesDir, '2026', `20260715_${id}_orig.pdf`))).toEqual(protegido)
+    })
+
+    it('devolve 400 com a senha errada, sem registrar a nota', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/transactions/parse-note',
+        ...upload(encryptedPdf('01234567890'), { password: 'errada' }),
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(res.body).toContain('Senha da nota incorreta')
+      expect(await db.brokerNote.count()).toBe(0)
+    })
+
+    it('pede a senha quando a nota é protegida e o campo veio vazio', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/transactions/parse-note',
+        ...upload(encryptedPdf('01234567890')),
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(res.body).toContain('protegida por senha')
     })
 
     it('recusa requisição sem arquivo', async () => {

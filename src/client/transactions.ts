@@ -210,6 +210,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (notePreview !== null) notePreview.innerHTML = ''
     const noteFile = byId<HTMLInputElement>('noteFile')
     if (noteFile !== null) noteFile.value = ''
+    const notePassword = byId<HTMLInputElement>('notePassword')
+    if (notePassword !== null) notePassword.value = ''
     pendingNewAssets = []
     ignoredTickers = new Set()
     pendingBrokerNoteId = null
@@ -256,6 +258,9 @@ async function parseNote(): Promise<void> {
   area.innerHTML = ''
 
   const body = new FormData()
+  // Senha antes do arquivo: o `req.file()` do servidor lê o multipart em streaming e só
+  // enxerga os campos que vieram antes. Inverter estas duas linhas some com a senha.
+  body.append('password', byId<HTMLInputElement>('notePassword')?.value ?? '')
   body.append('file', file)
 
   try {
