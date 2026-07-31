@@ -28,7 +28,7 @@ describe('EvolutionService', () => {
     service = new EvolutionService(
       db,
       priceHistory,
-      new AssetService(db, new AssetClassService(db)),
+      new AssetService(db, new AssetClassService(db), priceHistory),
     )
   })
 

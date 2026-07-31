@@ -14,6 +14,23 @@ import { AssetFilters, AssetRequest } from './asset.schema.js'
 
 const TickerQuery = z.object({ ticker: z.string().default('') })
 
+const PriceWarningQuery = z.object({ prices: z.string().optional(), ticker: z.string().optional() })
+
+/**
+ * Aviso do refetch que voltou vazio, propagado pelo redirect da edição.
+ * Fica na rota, e não em campo do banco, porque é sobre a última ação — não sobre o ativo.
+ */
+function priceWarning(query: unknown): string | null {
+  const parsed = PriceWarningQuery.safeParse(query)
+  if (!parsed.success || parsed.data.prices !== 'none') return null
+
+  const ticker = parsed.data.ticker ?? 'o ativo'
+  return (
+    `Nenhuma cotação encontrada para o novo código de ${ticker}. ` +
+    'O histórico foi mantido como estava — confira se o código está certo.'
+  )
+}
+
 const CreateForm = z.object({
   ticker: z.string(),
   name: z.string().default(''),
@@ -55,6 +72,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
         AssetsPage({
           assets: await c.assets.findFiltered(filters),
           classes: await c.assetClasses.listViews(),
+          warning: priceWarning(req.query),
           selectedType: filters.type ?? '',
           selectedPosition: filters.position ?? '',
           selectedDelisted: filters.delisted ?? '',
@@ -79,6 +97,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
         AssetDetailPage({
           asset,
           classes,
+          warning: priceWarning(req.query),
           position: positions[0] ?? null,
           transactions: transactions.map(toTransactionView),
           dividends: dividends.map(toDividendView),
@@ -130,7 +149,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
 
     app.post<{ Params: { ticker: string } }>('/assets/:ticker/edit', async (req, reply) => {
       const form = EditForm.parse(req.body)
-      await c.assets.update(req.params.ticker, {
+      const result = await c.assets.update(req.params.ticker, {
         name: form.name,
         type: form.type,
         yfTicker: form.yf_ticker,
@@ -138,7 +157,12 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
         delisted: form.delisted === 'on' || form.delisted === 'true',
         assetClassId: form.asset_class_id === '' ? null : Number(form.asset_class_id),
       })
-      return reply.redirect(form.returnTo ?? '/assets/', 302)
+
+      // Símbolo trocado e busca vazia: o histórico ficou como estava, e quase sempre é
+      // porque o símbolo novo não existe. Sem este aviso o usuário sai achando que corrigiu.
+      const destination = form.returnTo ?? '/assets/'
+      const query = result.refetchedPrices === 0 ? `?prices=none&ticker=${req.params.ticker}` : ''
+      return reply.redirect(`${destination}${query}`, 302)
     })
 
     app.post<{ Params: { ticker: string } }>('/assets/:ticker/delete', async (req, reply) => {

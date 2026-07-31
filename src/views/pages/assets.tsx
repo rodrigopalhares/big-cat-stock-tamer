@@ -14,6 +14,8 @@ export type AssetsPageProps = {
   selectedPosition: string
   selectedDelisted: string
   error?: string | null
+  /** Aviso da última ação — hoje, o refetch de cotação que voltou vazio. */
+  warning?: string | null
 }
 
 export function AssetsPage({
@@ -23,6 +25,7 @@ export function AssetsPage({
   selectedPosition,
   selectedDelisted,
   error = null,
+  warning = null,
 }: AssetsPageProps) {
   const hasFilters = selectedType !== '' || selectedPosition !== '' || selectedDelisted !== ''
 
@@ -41,6 +44,8 @@ export function AssetsPage({
             <button type="button" class="btn-close" data-bs-dismiss="alert" />
           </div>
         )}
+
+        <PriceWarning warning={warning} />
 
         <div class="row g-4">
           <div class="col-lg-4">
@@ -259,6 +264,17 @@ function AssetTable({ assets }: { assets: AssetView[] }) {
           ))}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+/** Aviso do refetch de cotação que não encontrou nada. Nulo não desenha nada. */
+export function PriceWarning({ warning }: { warning: string | null }) {
+  if (warning === null) return null
+  return (
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+      <i class="bi bi-exclamation-triangle" /> <span>{warning}</span>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" />
     </div>
   )
 }

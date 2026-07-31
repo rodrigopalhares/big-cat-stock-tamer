@@ -5,7 +5,10 @@ import {
   createTransaction,
   seedDefaultAssetClasses,
 } from '../../../tests/factories.js'
+import { TesouroClient } from '../../integrations/tesouro/tesouro.client.js'
+import { YahooClient } from '../../integrations/yahoo/yahoo.client.js'
 import { AssetClassService } from '../allocation/asset-class.service.js'
+import { PriceHistoryService } from '../price-history/price-history.service.js'
 import { AssetRequest } from './asset.schema.js'
 import { AssetService } from './asset.service.js'
 
@@ -18,7 +21,11 @@ describe('AssetService', () => {
 
   beforeAll(async () => {
     db = await createTestDb()
-    service = new AssetService(db, new AssetClassService(db))
+    service = new AssetService(
+      db,
+      new AssetClassService(db),
+      new PriceHistoryService(db, new YahooClient(), new TesouroClient()),
+    )
   })
 
   afterAll(async () => {
@@ -148,7 +155,11 @@ describe('AssetService', () => {
         delisted: true,
       })
 
-      expect(updated).toMatchObject({ name: 'Petrobras PN', yfTicker: 'PETR4.SA', delisted: true })
+      expect(updated.asset).toMatchObject({
+        name: 'Petrobras PN',
+        yfTicker: 'PETR4.SA',
+        delisted: true,
+      })
     })
 
     it('campo em branco vira null', async () => {
@@ -156,8 +167,8 @@ describe('AssetService', () => {
 
       const updated = await service.update('PETR4', { name: '', yfTicker: '', delisted: false })
 
-      expect(updated.name).toBeNull()
-      expect(updated.yfTicker).toBeNull()
+      expect(updated.asset.name).toBeNull()
+      expect(updated.asset.yfTicker).toBeNull()
     })
 
     it('moeda em branco preserva a atual', async () => {
@@ -165,7 +176,7 @@ describe('AssetService', () => {
 
       const updated = await service.update('AAPL', { currency: '', delisted: false })
 
-      expect(updated.currency).toBe('USD')
+      expect(updated.asset.currency).toBe('USD')
     })
 
     it('ativo inexistente dá 404', async () => {

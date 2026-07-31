@@ -9,6 +9,7 @@ import {
 import { type AssetType, NO_QUOTE_TYPES } from '../../domain/constants.js'
 import {
   type PriceRecord,
+  resolveQuoteSymbol,
   resolveTesouroSymbol,
   resolveYfTicker,
 } from '../../domain/price-history.js'
@@ -61,7 +62,7 @@ export class PortfolioService {
       if (!asset.hasPosition && asset.realizedPnl === 0) continue
 
       const currentPrice = fetchQuotes
-        ? (liveQuotes.get(quoteKey(asset) ?? '') ??
+        ? (liveQuotes.get(resolveQuoteSymbol(asset.ticker, asset.yfTicker, asset.type) ?? '') ??
           (await this.priceHistory.getLatestPrice(asset.ticker)))
         : await this.priceHistory.getLatestPrice(asset.ticker)
 
@@ -231,13 +232,6 @@ export class PortfolioService {
     }
     return byAsset
   }
-}
-
-/** Chave usada para achar a cotação viva do ativo; null quando ele não tem cotação. */
-function quoteKey(asset: Asset): string | null {
-  if (asset.type === 'TESOURO_DIRETO') return resolveTesouroSymbol(asset.ticker, asset.yfTicker)
-  if (asset.type !== null && NO_QUOTE_TYPES.has(asset.type as AssetType)) return null
-  return resolveYfTicker(asset.ticker, asset.yfTicker)
 }
 
 function scale(value: number | null, rate: number | null): number | null {

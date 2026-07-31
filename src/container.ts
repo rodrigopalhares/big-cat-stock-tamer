@@ -40,10 +40,11 @@ export function buildContainer(db: Db, env: Env, logger: Logger = silentLogger) 
   const exchangeRates = new ExchangeRateService(db, bcb, logger)
   // Vem antes dos três serviços que criam ativo — é quem diz a classe padrão do tipo.
   const assetClasses = new AssetClassService(db)
-  const assets = new AssetService(db, assetClasses)
+  const priceHistory = new PriceHistoryService(db, yahoo, tesouro, logger)
+  // Depois do priceHistory: trocar o símbolo de cotação de um ativo refaz a série dele.
+  const assets = new AssetService(db, assetClasses, priceHistory)
   const transactions = new TransactionService(db, assetInfo, exchangeRates, assetClasses)
   const dividends = new DividendService(db, transactions, exchangeRates)
-  const priceHistory = new PriceHistoryService(db, yahoo, tesouro, logger)
   const portfolio = new PortfolioService(db, yahoo, tesouro, priceHistory, dividends, exchangeRates)
   const allocation = new AllocationService(db, portfolio, assetClasses)
   const evolution = new EvolutionService(db, priceHistory, assets, logger)

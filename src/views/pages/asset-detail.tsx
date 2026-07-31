@@ -8,6 +8,7 @@ import type { IsoDate } from '../../shared/iso-date.js'
 import { AssetBadge, DividendBadge, TransactionBadge } from '../components/badge.js'
 import { Layout } from '../layout.js'
 import { EditAssetModal, editAssetAttrs } from '../partials/edit-asset-modal.js'
+import { PriceWarning } from './assets.js'
 import { DividendModal } from './dividends.js'
 import { TransactionModal } from './transactions.js'
 
@@ -22,6 +23,8 @@ export type AssetDetailPageProps = {
   dividends: DividendView[]
   /** Data que o formulário de lançamento já vem preenchida — do servidor, não do navegador. */
   today: IsoDate
+  /** Aviso da última ação — hoje, o refetch de cotação que voltou vazio. */
+  warning?: string | null
 }
 
 export function AssetDetailPage({
@@ -31,6 +34,7 @@ export function AssetDetailPage({
   transactions,
   dividends,
   today,
+  warning = null,
 }: AssetDetailPageProps) {
   const returnTo = `/assets/${asset.ticker}`
 
@@ -64,6 +68,8 @@ export function AssetDetailPage({
             </a>
           </div>
         </div>
+
+        <PriceWarning warning={warning} />
 
         {position !== null && <PositionCards position={position} />}
 

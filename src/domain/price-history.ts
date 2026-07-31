@@ -47,6 +47,24 @@ export function resolveTesouroSymbol(ticker: string, yfTicker: string | null): s
 }
 
 /**
+ * Símbolo que as fontes externas consultam para este ativo — Yahoo ou Tesouro, conforme o
+ * tipo. Null quando o papel não tem cotação em lugar nenhum (RENDA_FIXA, OUTROS, ou Tesouro
+ * sem código identificável).
+ *
+ * É a identidade externa do ativo, e o que muda quando alguém corrige o `yfTicker`: dois
+ * símbolos diferentes são dois papéis diferentes, ainda que sob o mesmo ticker no cadastro.
+ */
+export function resolveQuoteSymbol(
+  ticker: string,
+  yfTicker: string | null,
+  type: string | null,
+): string | null {
+  if (type === 'TESOURO_DIRETO') return resolveTesouroSymbol(ticker, yfTicker)
+  if (type !== null && NO_QUOTE_TYPES.has(type as AssetType)) return null
+  return resolveYfTicker(ticker, yfTicker)
+}
+
+/**
  * Separa os ativos entre os que têm cotação no Yahoo e os do Tesouro Direto.
  *
  * Ativos deslistados e tipos sem cotação (RENDA_FIXA, OUTROS) ficam de fora — buscar preço

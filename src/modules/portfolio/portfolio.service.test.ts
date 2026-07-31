@@ -36,7 +36,7 @@ describe('PortfolioService', () => {
     const transactions = new TransactionService(db, yahoo, exchangeRates, assetClasses)
     const dividends = new DividendService(db, transactions, exchangeRates)
     const priceHistory = new PriceHistoryService(db, yahoo, tesouro)
-    assets = new AssetService(db, assetClasses)
+    assets = new AssetService(db, assetClasses, priceHistory)
     service = new PortfolioService(db, yahoo, tesouro, priceHistory, dividends, exchangeRates)
   })
 

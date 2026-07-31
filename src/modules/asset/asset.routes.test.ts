@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createHarness, type Harness } from '../../../tests/app-harness.js'
 import { clearAllData } from '../../../tests/db.js'
 import { createAsset, createAssetClass, createTransaction } from '../../../tests/factories.js'
-import { server, tesouroCsv, yahooChart } from '../../../tests/msw.js'
+import { server, tesouroCsv, yahooChart, yahooError } from '../../../tests/msw.js'
 
 // Porte de src/test/kotlin/com/stocks/controller/AssetControllerTest.kt
 
@@ -199,6 +199,59 @@ describe('rotas de ativos', () => {
       })
 
       expect(res.statusCode).toBe(404)
+    })
+
+    it('trocar o yfTicker refaz a série de preços do ativo', async () => {
+      server.use(yahooChart('yahoo_chart_historical.json'))
+      await createAsset(h.db, 'PETR3', { yfTicker: 'ERRADO.SA' })
+      await createTransaction(h.db, 'PETR3', { date: '2024-01-01' })
+      // Preço vindo do símbolo errado, numa data que o fixture novo não cobre.
+      await h.db.priceHistory.create({ data: { assetId: 'PETR3', date: '2020-01-02', close: 999 } })
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/assets/PETR3/edit',
+        payload: { name: '', type: 'STOCK', yf_ticker: 'PETR3.SA', currency: 'BRL' },
+      })
+
+      expect(res.statusCode).toBe(302)
+      expect(await h.db.priceHistory.count({ where: { assetId: 'PETR3', close: 999 } })).toBe(0)
+      expect(await h.db.priceHistory.count({ where: { assetId: 'PETR3' } })).toBeGreaterThan(0)
+    })
+
+    it('editar sem mexer no símbolo não toca no histórico', async () => {
+      // Sem handler do Yahoo: buscar cotação aqui quebraria o teste.
+      await createAsset(h.db, 'PETR3', { yfTicker: 'PETR3.SA' })
+      await createTransaction(h.db, 'PETR3', { date: '2024-01-01' })
+      await h.db.priceHistory.create({ data: { assetId: 'PETR3', date: '2024-06-25', close: 42 } })
+
+      await h.app.inject({
+        method: 'POST',
+        url: '/assets/PETR3/edit',
+        payload: { name: 'Petrobras ON', type: 'STOCK', yf_ticker: 'PETR3.SA', currency: 'BRL' },
+      })
+
+      expect(await h.db.priceHistory.count({ where: { assetId: 'PETR3', close: 42 } })).toBe(1)
+    })
+
+    it('símbolo novo sem cotação preserva a série e avisa na volta', async () => {
+      server.use(yahooError(404))
+      await createAsset(h.db, 'PETR3', { yfTicker: 'PETR3.SA' })
+      await createTransaction(h.db, 'PETR3', { date: '2024-01-01' })
+      await h.db.priceHistory.create({ data: { assetId: 'PETR3', date: '2024-06-25', close: 42 } })
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/assets/PETR3/edit',
+        payload: { name: '', type: 'STOCK', yf_ticker: 'NAO_EXISTE.SA', currency: 'BRL' },
+      })
+
+      expect(res.headers.location).toContain('prices=none')
+      expect(await h.db.priceHistory.count({ where: { assetId: 'PETR3', close: 42 } })).toBe(1)
+
+      // O aviso aparece na tela para onde o redirect aponta.
+      const page = await h.app.inject({ method: 'GET', url: '/assets/?prices=none&ticker=PETR3' })
+      expect(page.body).toContain('Nenhuma cotação encontrada')
     })
 
     it('respeita returnTo', async () => {
