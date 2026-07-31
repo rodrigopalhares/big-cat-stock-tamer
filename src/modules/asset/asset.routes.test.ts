@@ -246,12 +246,27 @@ describe('rotas de ativos', () => {
         payload: { name: '', type: 'STOCK', yf_ticker: 'NAO_EXISTE.SA', currency: 'BRL' },
       })
 
-      expect(res.headers.location).toContain('prices=none')
+      expect(res.headers.location).toBe('/assets/?prices=none&ticker=PETR3')
       expect(await h.db.priceHistory.count({ where: { assetId: 'PETR3', close: 42 } })).toBe(1)
 
       // O aviso aparece na tela para onde o redirect aponta.
       const page = await h.app.inject({ method: 'GET', url: '/assets/?prices=none&ticker=PETR3' })
       expect(page.body).toContain('Nenhuma cotação encontrada')
+    })
+
+    it('returnTo em branco volta para a lista, não para a própria URL do POST', async () => {
+      // O campo escondido do modal é sempre enviado; na lista ele vem vazio. Sem tratar,
+      // o redirect relativo parava em /assets/PETR4/edit, que só aceita POST.
+      await createAsset(h.db, 'PETR4')
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/assets/PETR4/edit',
+        payload: { name: 'x', type: 'STOCK', yf_ticker: '', currency: 'BRL', returnTo: '' },
+      })
+
+      expect(res.statusCode).toBe(302)
+      expect(res.headers.location).toBe('/assets/')
     })
 
     it('respeita returnTo', async () => {

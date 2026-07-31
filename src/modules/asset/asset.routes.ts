@@ -17,6 +17,26 @@ const TickerQuery = z.object({ ticker: z.string().default('') })
 const PriceWarningQuery = z.object({ prices: z.string().optional(), ticker: z.string().optional() })
 
 /**
+ * Para onde a edição volta.
+ *
+ * O campo `returnTo` do modal é sempre enviado, e vem **vazio** quando a edição partiu da
+ * lista. String vazia não é `null`, então `?? '/assets/'` não a pegava e o `redirect('')`
+ * era resolvido pelo navegador relativo à URL do POST — parando em `/assets/PETR4/edit`,
+ * que só aceita POST. Em branco é ausente, não destino.
+ */
+function destinationOf(returnTo: string | undefined): string {
+  const trimmed = returnTo?.trim() ?? ''
+  return trimmed === '' ? '/assets/' : trimmed
+}
+
+/** Anexa o aviso preservando a query que o destino já tenha. */
+function withPriceWarning(destination: string, ticker: string | null): string {
+  if (ticker === null) return destination
+  const separator = destination.includes('?') ? '&' : '?'
+  return `${destination}${separator}prices=none&ticker=${encodeURIComponent(ticker)}`
+}
+
+/**
  * Aviso do refetch que voltou vazio, propagado pelo redirect da edição.
  * Fica na rota, e não em campo do banco, porque é sobre a última ação — não sobre o ativo.
  */
@@ -160,9 +180,8 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
 
       // Símbolo trocado e busca vazia: o histórico ficou como estava, e quase sempre é
       // porque o símbolo novo não existe. Sem este aviso o usuário sai achando que corrigiu.
-      const destination = form.returnTo ?? '/assets/'
-      const query = result.refetchedPrices === 0 ? `?prices=none&ticker=${req.params.ticker}` : ''
-      return reply.redirect(`${destination}${query}`, 302)
+      const warn = result.refetchedPrices === 0 ? req.params.ticker : null
+      return reply.redirect(withPriceWarning(destinationOf(form.returnTo), warn), 302)
     })
 
     app.post<{ Params: { ticker: string } }>('/assets/:ticker/delete', async (req, reply) => {
