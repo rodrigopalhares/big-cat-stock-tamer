@@ -550,8 +550,12 @@ function TransactionRow({ transaction: t }: { transaction: TransactionView }) {
 /**
  * Serve para editar e para criar: na tela do ativo o ticker já está decidido, então o mesmo
  * formulário vira o de "Nova Transação" com um `ticker` escondido — o cliente troca a ação,
- * o título e o ícone. Só o campo "Valor Total" fica de fora; ele é conveniência da tela de
- * transações, e o preço aqui é obrigatório.
+ * o título e o ícone.
+ *
+ * Os campos são os mesmos da tela de transações, incluindo "Valor Total": quantidade, preço,
+ * total e taxas se completam pela mesma regra em `client/transactions.ts`, e o servidor
+ * resolve pelo mesmo `resolvePrice()`. Preço não é `required` no HTML justamente porque
+ * informar só o total é uma entrada válida.
  */
 export function TransactionModal() {
   return (
@@ -609,8 +613,21 @@ export function TransactionModal() {
                     class="form-control"
                     step="0.0001"
                     min="0"
-                    required
-                    data-required-when-visible="true"
+                    placeholder="ou informe o total"
+                  />
+                </div>
+              </div>
+              <div class="row g-2 mb-3" id="editTxMarketExtrasRow">
+                <div class="col-6">
+                  <label class="form-label">Valor Total</label>
+                  <input
+                    type="number"
+                    id="editTxTotal"
+                    name="total_price"
+                    class="form-control"
+                    step="0.01"
+                    min="0"
+                    placeholder="opcional"
                   />
                 </div>
                 <div class="col-6" id="editTxFeesCol">

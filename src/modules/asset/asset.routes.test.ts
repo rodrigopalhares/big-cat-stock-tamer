@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createHarness, type Harness } from '../../../tests/app-harness.js'
 import { clearAllData } from '../../../tests/db.js'
-import { createAsset, createTransaction } from '../../../tests/factories.js'
-import { server, tesouroCsv, yahooChart } from '../../../tests/msw.js'
+import { createAsset, createAssetClass, createTransaction } from '../../../tests/factories.js'
+import { server, tesouroCsv, yahooChart, yahooError } from '../../../tests/msw.js'
 
 // Porte de src/test/kotlin/com/stocks/controller/AssetControllerTest.kt
 
@@ -108,6 +108,24 @@ describe('rotas de ativos', () => {
     })
   })
 
+  describe('GET /assets/:ticker', () => {
+    it('traz o modal de edição preenchido, sem passar pela lista', async () => {
+      const fii = await createAssetClass(h.db, 'Fii')
+      await createAsset(h.db, 'HGLG11', { name: 'CSHG Logística', assetClassId: fii.id })
+
+      const res = await h.app.inject({ method: 'GET', url: '/assets/HGLG11' })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('editAssetModal')
+      expect(res.body).toContain('data-edit-asset')
+      expect(res.body).toContain(`data-asset-class-id="${fii.id}"`)
+      // Volta para o detalhe, não para /assets/.
+      expect(res.body).toContain('data-return-to="/assets/HGLG11"')
+      // O select traz as classes cadastradas.
+      expect(res.body).toContain('asset_class_id')
+    })
+  })
+
   describe('POST /assets/:ticker/edit', () => {
     it('atualiza e redireciona', async () => {
       await createAsset(h.db, 'PETR4')
@@ -135,6 +153,120 @@ describe('rotas de ativos', () => {
 
       const asset = await h.db.asset.findUniqueOrThrow({ where: { ticker: 'PETR4' } })
       expect(asset.delisted).toBe(true)
+    })
+
+    it('troca a classe de alocação', async () => {
+      const fii = await createAssetClass(h.db, 'Fii')
+      await createAsset(h.db, 'HGLG11')
+
+      await h.app.inject({
+        method: 'POST',
+        url: '/assets/HGLG11/edit',
+        payload: {
+          name: '',
+          type: 'REIT',
+          yf_ticker: '',
+          currency: 'BRL',
+          asset_class_id: String(fii.id),
+        },
+      })
+
+      const asset = await h.db.asset.findUniqueOrThrow({ where: { ticker: 'HGLG11' } })
+      expect(asset.assetClassId).toBe(fii.id)
+    })
+
+    it('classe em branco tira a classe do ativo', async () => {
+      const fii = await createAssetClass(h.db, 'Fii')
+      await createAsset(h.db, 'HGLG11', { assetClassId: fii.id })
+
+      await h.app.inject({
+        method: 'POST',
+        url: '/assets/HGLG11/edit',
+        payload: { name: '', type: 'REIT', yf_ticker: '', currency: 'BRL', asset_class_id: '' },
+      })
+
+      const asset = await h.db.asset.findUniqueOrThrow({ where: { ticker: 'HGLG11' } })
+      expect(asset.assetClassId).toBeNull()
+    })
+
+    it('classe inexistente responde 404 em vez de erro de FK', async () => {
+      await createAsset(h.db, 'PETR4')
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/assets/PETR4/edit',
+        payload: { name: '', type: 'STOCK', yf_ticker: '', currency: 'BRL', asset_class_id: '999' },
+      })
+
+      expect(res.statusCode).toBe(404)
+    })
+
+    it('trocar o yfTicker refaz a série de preços do ativo', async () => {
+      server.use(yahooChart('yahoo_chart_historical.json'))
+      await createAsset(h.db, 'PETR3', { yfTicker: 'ERRADO.SA' })
+      await createTransaction(h.db, 'PETR3', { date: '2024-01-01' })
+      // Preço vindo do símbolo errado, numa data que o fixture novo não cobre.
+      await h.db.priceHistory.create({ data: { assetId: 'PETR3', date: '2020-01-02', close: 999 } })
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/assets/PETR3/edit',
+        payload: { name: '', type: 'STOCK', yf_ticker: 'PETR3.SA', currency: 'BRL' },
+      })
+
+      expect(res.statusCode).toBe(302)
+      expect(await h.db.priceHistory.count({ where: { assetId: 'PETR3', close: 999 } })).toBe(0)
+      expect(await h.db.priceHistory.count({ where: { assetId: 'PETR3' } })).toBeGreaterThan(0)
+    })
+
+    it('editar sem mexer no símbolo não toca no histórico', async () => {
+      // Sem handler do Yahoo: buscar cotação aqui quebraria o teste.
+      await createAsset(h.db, 'PETR3', { yfTicker: 'PETR3.SA' })
+      await createTransaction(h.db, 'PETR3', { date: '2024-01-01' })
+      await h.db.priceHistory.create({ data: { assetId: 'PETR3', date: '2024-06-25', close: 42 } })
+
+      await h.app.inject({
+        method: 'POST',
+        url: '/assets/PETR3/edit',
+        payload: { name: 'Petrobras ON', type: 'STOCK', yf_ticker: 'PETR3.SA', currency: 'BRL' },
+      })
+
+      expect(await h.db.priceHistory.count({ where: { assetId: 'PETR3', close: 42 } })).toBe(1)
+    })
+
+    it('símbolo novo sem cotação preserva a série e avisa na volta', async () => {
+      server.use(yahooError(404))
+      await createAsset(h.db, 'PETR3', { yfTicker: 'PETR3.SA' })
+      await createTransaction(h.db, 'PETR3', { date: '2024-01-01' })
+      await h.db.priceHistory.create({ data: { assetId: 'PETR3', date: '2024-06-25', close: 42 } })
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/assets/PETR3/edit',
+        payload: { name: '', type: 'STOCK', yf_ticker: 'NAO_EXISTE.SA', currency: 'BRL' },
+      })
+
+      expect(res.headers.location).toBe('/assets/?prices=none&ticker=PETR3')
+      expect(await h.db.priceHistory.count({ where: { assetId: 'PETR3', close: 42 } })).toBe(1)
+
+      // O aviso aparece na tela para onde o redirect aponta.
+      const page = await h.app.inject({ method: 'GET', url: '/assets/?prices=none&ticker=PETR3' })
+      expect(page.body).toContain('Nenhuma cotação encontrada')
+    })
+
+    it('returnTo em branco volta para a lista, não para a própria URL do POST', async () => {
+      // O campo escondido do modal é sempre enviado; na lista ele vem vazio. Sem tratar,
+      // o redirect relativo parava em /assets/PETR4/edit, que só aceita POST.
+      await createAsset(h.db, 'PETR4')
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/assets/PETR4/edit',
+        payload: { name: 'x', type: 'STOCK', yf_ticker: '', currency: 'BRL', returnTo: '' },
+      })
+
+      expect(res.statusCode).toBe(302)
+      expect(res.headers.location).toBe('/assets/')
     })
 
     it('respeita returnTo', async () => {

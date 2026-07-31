@@ -5,7 +5,7 @@ import type { FastifyInstance } from 'fastify'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createHarness, type Harness } from '../../../tests/app-harness.js'
 import { clearAllData, createTestDb, type TestDb } from '../../../tests/db.js'
-import { createAsset } from '../../../tests/factories.js'
+import { createAsset, createTransaction } from '../../../tests/factories.js'
 import { encryptedPdf, needsPassword } from '../../../tests/pdf.js'
 import { buildApp } from '../../app.js'
 import { loadEnv } from '../../config/env.js'
@@ -333,5 +333,89 @@ describe('sem APP_ANTHROPIC_API_KEY', () => {
     expect(res.body).toContain('configure APP_ANTHROPIC_API_KEY para habilitar')
     // Sem chave o formulário de envio não vai junto.
     expect(res.body).not.toContain('data-note-parse')
+  })
+})
+
+/**
+ * A edição passa pelo mesmo `resolvePrice()` da criação. Antes o formulário de edição não
+ * mandava o total e exigia preço, então corrigir uma linha pelo valor total da nota só
+ * funcionava na tela de transações.
+ */
+describe('POST /transactions/:id/edit', () => {
+  let h: Harness
+
+  beforeAll(async () => {
+    h = await createHarness()
+  })
+
+  afterAll(async () => {
+    await h.close()
+  })
+
+  afterEach(async () => {
+    await clearAllData(h.db)
+  })
+
+  async function existing(): Promise<number> {
+    await createAsset(h.db, 'PETR4')
+    const tx = await createTransaction(h.db, 'PETR4', { quantity: 100, price: 30, fees: 0 })
+    return tx.id
+  }
+
+  const edit = (id: number, payload: Record<string, string>) =>
+    h.app.inject({
+      method: 'POST',
+      url: `/transactions/${id}/edit`,
+      payload: { type: 'BUY', quantity: '100', date: '2024-01-15', currency: 'BRL', ...payload },
+    })
+
+  it('só o valor total deduz o preço unitário', async () => {
+    const id = await existing()
+
+    const res = await edit(id, { price: '', total_price: '2510', fees: '10' })
+
+    expect(res.statusCode).toBe(302)
+    const tx = await h.db.transaction.findUniqueOrThrow({ where: { id } })
+    expect(tx.price).toBeCloseTo(25, 4)
+    expect(tx.fees).toBeCloseTo(10, 4)
+  })
+
+  it('preço e valor total juntos deduzem as taxas', async () => {
+    const id = await existing()
+
+    await edit(id, { price: '25', total_price: '2510', fees: '0' })
+
+    const tx = await h.db.transaction.findUniqueOrThrow({ where: { id } })
+    expect(tx.price).toBeCloseTo(25, 4)
+    expect(tx.fees).toBeCloseTo(10, 4)
+  })
+
+  it('sem preço e sem total recusa com 400', async () => {
+    const id = await existing()
+
+    const res = await edit(id, { price: '', total_price: '', fees: '0' })
+
+    expect(res.statusCode).toBe(400)
+    expect(res.body).toContain('Informe o preço unitário ou o valor total')
+  })
+
+  it('preço sozinho continua valendo', async () => {
+    const id = await existing()
+
+    await edit(id, { price: '42.5', fees: '3' })
+
+    const tx = await h.db.transaction.findUniqueOrThrow({ where: { id } })
+    expect(tx.price).toBeCloseTo(42.5, 4)
+    expect(tx.fees).toBeCloseTo(3, 4)
+  })
+
+  it('evento sem caixa ignora total e taxas', async () => {
+    const id = await existing()
+
+    await edit(id, { type: 'DESDOBRAMENTO', price: '10', total_price: '999', fees: '7' })
+
+    const tx = await h.db.transaction.findUniqueOrThrow({ where: { id } })
+    expect(tx.price).toBe(0)
+    expect(tx.fees).toBe(0)
   })
 })

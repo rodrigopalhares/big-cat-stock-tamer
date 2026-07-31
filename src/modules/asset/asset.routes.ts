@@ -14,6 +14,43 @@ import { AssetFilters, AssetRequest } from './asset.schema.js'
 
 const TickerQuery = z.object({ ticker: z.string().default('') })
 
+const PriceWarningQuery = z.object({ prices: z.string().optional(), ticker: z.string().optional() })
+
+/**
+ * Para onde a edição volta.
+ *
+ * O campo `returnTo` do modal é sempre enviado, e vem **vazio** quando a edição partiu da
+ * lista. String vazia não é `null`, então `?? '/assets/'` não a pegava e o `redirect('')`
+ * era resolvido pelo navegador relativo à URL do POST — parando em `/assets/PETR4/edit`,
+ * que só aceita POST. Em branco é ausente, não destino.
+ */
+function destinationOf(returnTo: string | undefined): string {
+  const trimmed = returnTo?.trim() ?? ''
+  return trimmed === '' ? '/assets/' : trimmed
+}
+
+/** Anexa o aviso preservando a query que o destino já tenha. */
+function withPriceWarning(destination: string, ticker: string | null): string {
+  if (ticker === null) return destination
+  const separator = destination.includes('?') ? '&' : '?'
+  return `${destination}${separator}prices=none&ticker=${encodeURIComponent(ticker)}`
+}
+
+/**
+ * Aviso do refetch que voltou vazio, propagado pelo redirect da edição.
+ * Fica na rota, e não em campo do banco, porque é sobre a última ação — não sobre o ativo.
+ */
+function priceWarning(query: unknown): string | null {
+  const parsed = PriceWarningQuery.safeParse(query)
+  if (!parsed.success || parsed.data.prices !== 'none') return null
+
+  const ticker = parsed.data.ticker ?? 'o ativo'
+  return (
+    `Nenhuma cotação encontrada para o novo código de ${ticker}. ` +
+    'O histórico foi mantido como estava — confira se o código está certo.'
+  )
+}
+
 const CreateForm = z.object({
   ticker: z.string(),
   name: z.string().default(''),
@@ -28,6 +65,8 @@ const EditForm = z.object({
   yf_ticker: z.string().default(''),
   currency: z.string().default('BRL'),
   delisted: z.string().default('false'),
+  // Vazio é "sem classe", que é diferente de "não mexer": o select sempre manda um valor.
+  asset_class_id: z.string().default(''),
   returnTo: z.string().optional(),
 })
 
@@ -52,6 +91,8 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
       return reply.html(
         AssetsPage({
           assets: await c.assets.findFiltered(filters),
+          classes: await c.assetClasses.listViews(),
+          warning: priceWarning(req.query),
           selectedType: filters.type ?? '',
           selectedPosition: filters.position ?? '',
           selectedDelisted: filters.delisted ?? '',
@@ -64,16 +105,19 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
       const asset = await c.assets.findById(ticker)
       if (asset === null) throw HttpError.notFound('Asset not found')
 
-      const [entity, transactions, dividends] = await Promise.all([
+      const [entity, transactions, dividends, classes] = await Promise.all([
         c.db.asset.findUniqueOrThrow({ where: { ticker } }),
         c.transactions.listTransactions({ ticker }),
         c.dividends.listDividends(ticker),
+        c.assetClasses.listViews(),
       ])
       const positions = await c.portfolio.buildPositions([entity], false)
 
       return reply.html(
         AssetDetailPage({
           asset,
+          classes,
+          warning: priceWarning(req.query),
           position: positions[0] ?? null,
           transactions: transactions.map(toTransactionView),
           dividends: dividends.map(toDividendView),
@@ -91,6 +135,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
         return reply.html(
           AssetsPage({
             assets: await c.assets.findAll(),
+            classes: await c.assetClasses.listViews(),
             selectedType: '',
             selectedPosition: '',
             selectedDelisted: '',
@@ -124,14 +169,19 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
 
     app.post<{ Params: { ticker: string } }>('/assets/:ticker/edit', async (req, reply) => {
       const form = EditForm.parse(req.body)
-      await c.assets.update(req.params.ticker, {
+      const result = await c.assets.update(req.params.ticker, {
         name: form.name,
         type: form.type,
         yfTicker: form.yf_ticker,
         currency: form.currency,
         delisted: form.delisted === 'on' || form.delisted === 'true',
+        assetClassId: form.asset_class_id === '' ? null : Number(form.asset_class_id),
       })
-      return reply.redirect(form.returnTo ?? '/assets/', 302)
+
+      // Símbolo trocado e busca vazia: o histórico ficou como estava, e quase sempre é
+      // porque o símbolo novo não existe. Sem este aviso o usuário sai achando que corrigiu.
+      const warn = result.refetchedPrices === 0 ? req.params.ticker : null
+      return reply.redirect(withPriceWarning(destinationOf(form.returnTo), warn), 302)
     })
 
     app.post<{ Params: { ticker: string } }>('/assets/:ticker/delete', async (req, reply) => {

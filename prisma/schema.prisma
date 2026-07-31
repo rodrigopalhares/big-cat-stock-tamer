@@ -14,6 +14,25 @@ datasource db {
   provider = "sqlite"
 }
 
+/**
+ * Classe de alocação — a divisão que a carteira persegue. Não é o tipo do ativo:
+ * ETF, BDR e ação americana têm tipos diferentes e a mesma classe "Internacional".
+ *
+ * `targetPercent` é ponto percentual do patrimônio (20 = 20%), não fração.
+ */
+model AssetClass {
+  id            Int      @id @default(autoincrement())
+  name          String   @unique
+  targetPercent Float    @default(0) @map("target_percent")
+  /// Hex usado no badge e na barra da tela de alocação.
+  color         String   @default("#6c757d")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  assets Asset[]
+
+  @@map("asset_classes")
+}
+
 model Asset {
   ticker         String   @id
   yfTicker       String?  @map("yf_ticker")
@@ -22,6 +41,7 @@ model Asset {
   currency       String   @default("BRL")
   delisted       Boolean  @default(false)
   hasPosition    Boolean  @default(false) @map("has_position")
+  assetClassId   Int?     @map("asset_class_id")
   quantity       Float    @default(0)
   avgPrice       Float    @default(0) @map("avg_price")
   avgPriceBrl    Float    @default(0) @map("avg_price_brl")
@@ -31,11 +51,15 @@ model Asset {
   realizedPnlBrl Float    @default(0) @map("realized_pnl_brl")
   createdAt      DateTime @default(now()) @map("created_at")
 
+  // SetNull de propósito: apagar a classe não pode levar os ativos junto — sem classe
+  // eles caem no balde "Sem classe" da tela de alocação, visível e corrigível.
+  assetClass       AssetClass?       @relation(fields: [assetClassId], references: [id], onDelete: SetNull)
   transactions     Transaction[]
   dividends        Dividend[]
   priceHistory     PriceHistory[]
   monthlySnapshots MonthlySnapshot[]
 
+  @@index([assetClassId])
   @@map("assets")
 }
 

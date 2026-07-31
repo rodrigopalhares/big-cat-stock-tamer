@@ -12,6 +12,7 @@ import { BcbClient } from '../../integrations/bcb/bcb.client.js'
 import { TesouroClient } from '../../integrations/tesouro/tesouro.client.js'
 import { YahooClient } from '../../integrations/yahoo/yahoo.client.js'
 import { isoDate } from '../../shared/iso-date.js'
+import { AssetClassService } from '../allocation/asset-class.service.js'
 import { AssetService } from '../asset/asset.service.js'
 import { DividendService } from '../dividend/dividend.service.js'
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service.js'
@@ -31,10 +32,11 @@ describe('PortfolioService', () => {
     const yahoo = new YahooClient()
     const tesouro = new TesouroClient()
     const exchangeRates = new ExchangeRateService(db, new BcbClient())
-    const transactions = new TransactionService(db, yahoo, exchangeRates)
+    const assetClasses = new AssetClassService(db)
+    const transactions = new TransactionService(db, yahoo, exchangeRates, assetClasses)
     const dividends = new DividendService(db, transactions, exchangeRates)
     const priceHistory = new PriceHistoryService(db, yahoo, tesouro)
-    assets = new AssetService(db)
+    assets = new AssetService(db, assetClasses, priceHistory)
     service = new PortfolioService(db, yahoo, tesouro, priceHistory, dividends, exchangeRates)
   })
 
@@ -177,6 +179,24 @@ describe('PortfolioService', () => {
 
       expect(position?.currentPrice).toBe(1)
       expect(position?.delisted).toBe(true)
+    })
+
+    it('posição encerrada não é consultada na API', async () => {
+      // Vendido: continua na lista pelo resultado realizado, mas sem valor de mercado a
+      // atualizar. Sem handler do Yahoo — se chamasse a API, o teste falharia.
+      await createAsset(db, 'MGLU3', {
+        yfTicker: 'MGLU3.SA',
+        hasPosition: false,
+        realizedPnl: 500,
+        realizedPnlBrl: 500,
+      })
+      await createPriceHistory(db, 'MGLU3', '2024-06-01', 3)
+
+      const [position] = await service.buildPositions(await db.asset.findMany(), true, TODAY)
+
+      // O último preço gravado, não o de hoje.
+      expect(position?.currentPrice).toBe(3)
+      expect(position?.currentValue).toBeNull()
     })
 
     it('tipo sem cotação usa apenas o histórico', async () => {

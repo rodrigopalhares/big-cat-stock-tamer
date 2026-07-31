@@ -22,11 +22,14 @@ export const TransactionForm = z.object({
   returnTo: z.string().optional(),
 })
 
-export const TransactionEditForm = TransactionForm.omit({ ticker: true, total_price: true }).extend(
-  {
-    price: number,
-  },
-)
+/**
+ * Editar é o mesmo formulário de criar, sem o ticker — inclusive o `total_price`.
+ *
+ * Antes o total ficava de fora e o preço era obrigatório, então corrigir uma linha pelo
+ * valor total da nota só dava certo na tela de transações. As duas telas passam pelo mesmo
+ * `resolvePrice()`, que é quem exige preço ou total.
+ */
+export const TransactionEditForm = TransactionForm.omit({ ticker: true })
 
 export const TransactionApiRequest = z.object({
   assetId: z.string().min(1),

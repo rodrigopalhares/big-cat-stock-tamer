@@ -93,6 +93,82 @@ export class PriceHistoryService {
     this.logger.info(`Gerados ${records.length} preços de ${assetTicker} (deslistado)`)
   }
 
+  /**
+   * Refaz do zero a série de um ativo, com o símbolo que está no cadastro **agora**.
+   *
+   * É o que fecha o buraco de trocar o `yfTicker`: a série é chaveada pelo ticker do
+   * cadastro, então os preços do símbolo antigo continuariam ali, misturados aos novos e
+   * indistinguíveis. E o `runBackfill` não os reescreve — ele retoma do último preço
+   * gravado sempre que a série já cobre a primeira transação.
+   *
+   * Busca antes de apagar, e só apaga se veio dado. Um `yfTicker` digitado errado devolve
+   * série vazia; destruir o histórico nesse caso deixaria a evolução com um buraco de anos,
+   * que é pior que o preço errado que se queria corrigir.
+   *
+   * Devolve quantos preços gravou. Zero significa que nada foi tocado.
+   */
+  async refetchAssetHistory(assetTicker: string, today: IsoDate = todayIso()): Promise<number> {
+    const asset = await this.db.asset.findUnique({
+      where: { ticker: assetTicker },
+      select: { ticker: true, yfTicker: true, type: true, delisted: true },
+    })
+    if (asset === null) return 0
+
+    const firstTransaction = await this.db.transaction.aggregate({
+      where: { assetId: assetTicker },
+      _min: { date: true },
+    })
+    const first = firstTransaction._min.date as IsoDate | null
+    // Sem transação não há série a refazer — o backfill nem olharia para este ativo.
+    if (first === null) return 0
+
+    // Deslistado não tem cotação em fonte nenhuma: a série sai das próprias transações,
+    // e trocar o símbolo não muda o resultado. Regenera assim mesmo, para a troca não
+    // deixar metade da série vinda de um caminho e metade do outro.
+    if (asset.delisted) {
+      await this.db.priceHistory.deleteMany({ where: { assetId: assetTicker } })
+      await this.generateDelistedPrices(assetTicker, today)
+      return this.db.priceHistory.count({ where: { assetId: assetTicker } })
+    }
+
+    const start = (minDate([first, addDays(today, -365 * LOOKBACK_YEARS)]) ?? first) as IsoDate
+    const records = await this.fetchFullSeries(asset, start)
+
+    if (records.length === 0) {
+      this.logger.warn(
+        `Refetch de ${assetTicker}: nenhuma cotação encontrada — histórico mantido como estava.`,
+      )
+      return 0
+    }
+
+    // Troca atômica, e sem rede no meio: a busca já terminou antes de abrir a transação.
+    await this.db.$transaction([
+      this.db.priceHistory.deleteMany({ where: { assetId: assetTicker } }),
+      this.db.priceHistory.createMany({ data: [...records] }),
+    ])
+    this.logger.info(`Refetch de ${assetTicker}: ${records.length} preços regravados`)
+    return records.length
+  }
+
+  /** Série completa de um único ativo, a partir de [start], na fonte que o tipo indica. */
+  private async fetchFullSeries(asset: AssetTickerInfo, start: IsoDate): Promise<PriceRecord[]> {
+    const maps = categorizeAssets([asset])
+
+    if (maps.yfTickerMap.size > 0) {
+      const batch = await this.yahoo.fetchHistoricalQuotesBatch(maps.yfTickerMap, start)
+      return filterBatchToRecords(batch, (_ticker, date) => date >= start)
+    }
+    if (maps.tdTickerMap.size > 0) {
+      const batch = await this.tesouro.fetchHistoricalQuotesBatch([...maps.tdTickerMap.keys()])
+      return filterBatchToRecords(
+        batch,
+        (_ticker, date) => date >= start,
+        (key) => maps.tdTickerMap.get(key) ?? null,
+      )
+    }
+    return []
+  }
+
   /** Busca o histórico completo de cada ativo, a partir da última data já gravada. */
   async runBackfill(today: IsoDate = todayIso()): Promise<void> {
     const assets = await this.loadAssetsWithTransactions()
@@ -161,28 +237,35 @@ export class PriceHistoryService {
     }
   }
 
-  /** Busca só o preço de hoje — roda no scheduler das 18:30. */
+  /**
+   * Busca só o preço de hoje — roda no scheduler das 18:30.
+   *
+   * Só de quem ainda está em carteira. Papel já vendido não muda mais o patrimônio nem a
+   * evolução: a cotação de hoje dele não entra em conta nenhuma, e buscá-la só gastava
+   * chamada de API — dezenas delas, num acervo em que a maioria dos ativos já saiu.
+   * O histórico do período em que a posição existiu continua gravado, e é o `runBackfill`
+   * quem preenche buraco antigo, inclusive de posição encerrada.
+   */
   async runDailyUpdate(today: IsoDate = todayIso()): Promise<void> {
     const assets = await this.loadAssetsWithTransactions()
+    const active = assets.filter((a) => a.transactionCount > 0 && a.hasPosition)
 
-    for (const asset of assets) {
-      if (asset.delisted && asset.transactionCount > 0) {
+    for (const asset of active) {
+      if (asset.delisted) {
         await this.generateDelistedPrices(asset.ticker, today)
       }
     }
 
-    const withTransactions = assets
-      .filter((a) => a.transactionCount > 0)
-      .map(
-        (a): AssetTickerInfo => ({
-          ticker: a.ticker,
-          yfTicker: a.yfTicker,
-          type: a.type,
-          delisted: a.delisted,
-        }),
-      )
+    const activeTickers = active.map(
+      (a): AssetTickerInfo => ({
+        ticker: a.ticker,
+        yfTicker: a.yfTicker,
+        type: a.type,
+        delisted: a.delisted,
+      }),
+    )
 
-    const maps = categorizeAssets(withTransactions)
+    const maps = categorizeAssets(activeTickers)
 
     if (maps.yfTickerMap.size > 0) {
       const batch = await this.yahoo.fetchHistoricalQuotesBatch(maps.yfTickerMap, today)
@@ -215,13 +298,14 @@ export class PriceHistoryService {
       yfTicker: string | null
       type: string
       delisted: boolean
+      hasPosition: boolean
       transactionCount: number
       firstTransactionDate: IsoDate | null
     }>
   > {
     const [assets, grouped] = await Promise.all([
       this.db.asset.findMany({
-        select: { ticker: true, yfTicker: true, type: true, delisted: true },
+        select: { ticker: true, yfTicker: true, type: true, delisted: true, hasPosition: true },
         orderBy: { ticker: 'asc' },
       }),
       this.db.transaction.groupBy({

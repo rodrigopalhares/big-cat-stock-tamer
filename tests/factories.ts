@@ -1,4 +1,5 @@
-import type { Asset, Dividend, Transaction } from '../src/generated/prisma/client.js'
+import { DEFAULT_ASSET_CLASSES } from '../src/domain/asset-class.js'
+import type { Asset, AssetClass, Dividend, Transaction } from '../src/generated/prisma/client.js'
 import type { TestDb } from './db.js'
 
 /**
@@ -20,6 +21,26 @@ export function createAsset(
       ...overrides,
     },
   })
+}
+
+export function createAssetClass(
+  db: TestDb,
+  name: string,
+  overrides: Partial<Omit<AssetClass, 'id' | 'name'>> = {},
+): Promise<AssetClass> {
+  return db.assetClass.create({
+    data: { name, targetPercent: 20, color: '#6c757d', ...overrides },
+  })
+}
+
+/**
+ * As 5 classes que a migration cria. O `clearAllData` de cada teste apaga o que veio da
+ * migration, então quem depende da classificação padrão as recria aqui.
+ */
+export async function seedDefaultAssetClasses(db: TestDb): Promise<void> {
+  for (const assetClass of DEFAULT_ASSET_CLASSES) {
+    await db.assetClass.create({ data: { ...assetClass } })
+  }
 }
 
 export function createTransaction(

@@ -20,8 +20,11 @@ let pendingNewAssets: AssetDraft[] = []
 let ignoredTickers = new Set<string>()
 /** Nota que originou o CSV em revisão; vai junto no lote para ligar as transações a ela. */
 let pendingBrokerNoteId: number | null = null
-/** Distingue preço digitado de preço derivado do total — muda o que o total recalcula. */
-let priceIsUserSet = false
+/**
+ * Distingue preço digitado de preço derivado do total — muda o que o total recalcula.
+ * Por formulário: a página e o modal têm cada um o seu estado.
+ */
+const priceIsUserSet: Record<string, boolean> = {}
 
 const byId = <T extends HTMLElement>(id: string): T | null =>
   document.getElementById(id) as T | null
@@ -94,42 +97,64 @@ document.addEventListener('DOMContentLoaded', () => applyTypeVisibility('tx'))
 
 // --- formulário: quantidade, preço, total e taxas se completam ---
 
-function currentValues() {
+/**
+ * Os dois formulários que têm o quarteto quantidade/preço/total/taxas: o da página de
+ * transações (`tx*`) e o modal, que edita e também cria pela tela do ativo (`editTx*`).
+ * A regra é a mesma nos dois — por isso ela é escrita uma vez e parametrizada pelo prefixo.
+ */
+const PRICE_FORM_PREFIXES = ['editTx', 'tx'] as const
+const PRICE_FIELDS = ['Qty', 'Price', 'Total', 'Fees'] as const
+
+/** `editTxTotal` → `{ prefix: 'editTx', field: 'Total' }`. Null para qualquer outro input. */
+function priceFieldOf(id: string): { prefix: string; field: string } | null {
+  for (const prefix of PRICE_FORM_PREFIXES) {
+    for (const field of PRICE_FIELDS) {
+      if (id === `${prefix}${field}`) return { prefix, field }
+    }
+  }
+  return null
+}
+
+function currentValues(prefix: string) {
   return {
-    qty: numberValue('txQty'),
-    price: numberValue('txPrice'),
-    total: numberValue('txTotal'),
-    fees: numberValue('txFees'),
+    qty: numberValue(`${prefix}Qty`),
+    price: numberValue(`${prefix}Price`),
+    total: numberValue(`${prefix}Total`),
+    fees: numberValue(`${prefix}Fees`),
   }
 }
 
-function recalculateTotal(): void {
-  const v = currentValues()
-  if (v.qty > 0 && v.price > 0) setValue('txTotal', (v.qty * v.price + v.fees).toFixed(2))
+function recalculateTotal(prefix: string): void {
+  const v = currentValues(prefix)
+  if (v.qty > 0 && v.price > 0) setValue(`${prefix}Total`, (v.qty * v.price + v.fees).toFixed(2))
 }
 
 document.addEventListener('input', (event) => {
   const target = event.target
   if (!(target instanceof HTMLInputElement)) return
 
-  switch (target.id) {
-    case 'txQty':
-    case 'txFees':
-      recalculateTotal()
+  const found = priceFieldOf(target.id)
+  if (found === null) return
+  const { prefix, field } = found
+
+  switch (field) {
+    case 'Qty':
+    case 'Fees':
+      recalculateTotal(prefix)
       break
-    case 'txPrice':
-      priceIsUserSet = target.value !== ''
-      recalculateTotal()
+    case 'Price':
+      priceIsUserSet[prefix] = target.value !== ''
+      recalculateTotal(prefix)
       break
-    case 'txTotal': {
-      const v = currentValues()
+    case 'Total': {
+      const v = currentValues(prefix)
       if (v.total > 0 && v.qty > 0) {
-        if (priceIsUserSet && v.price > 0) {
+        if (priceIsUserSet[prefix] === true && v.price > 0) {
           // Preço veio do usuário: o total define as taxas.
-          setValue('txFees', (v.total - v.qty * v.price).toFixed(2))
+          setValue(`${prefix}Fees`, (v.total - v.qty * v.price).toFixed(2))
         } else {
           // Preço vazio ou derivado: o total define o preço.
-          setValue('txPrice', ((v.total - v.fees) / v.qty).toFixed(4))
+          setValue(`${prefix}Price`, ((v.total - v.fees) / v.qty).toFixed(4))
         }
       }
       break
@@ -169,6 +194,14 @@ function openTxModal(trigger: HTMLElement, isNew: boolean): void {
   setValue('editTxDate', d['txDate'] ?? '')
   setValue('editTxBroker', d['txBroker'] ?? '')
   setValue('editTxNotes', d['txNotes'] ?? '')
+
+  // O preço gravado conta como digitado: mexer no total passa a ajustar as taxas, que é o
+  // que se quer ao acertar uma linha pelo total da nota. Para o total definir o preço,
+  // basta apagar o campo de preço antes — a mesma regra da tela de transações.
+  setValue('editTxTotal', '')
+  priceIsUserSet['editTx'] = (d['txPrice'] ?? '') !== ''
+  recalculateTotal('editTx')
+
   applyTypeVisibility('editTx')
 
   setHiddenField(form, 'editTxTicker', 'ticker', isNew ? (d['ticker'] ?? '') : '')

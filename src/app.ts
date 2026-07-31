@@ -6,6 +6,7 @@ import Fastify, { type FastifyInstance } from 'fastify'
 import type { Db } from './config/db.js'
 import type { Env } from './config/env.js'
 import { buildContainer, type Container } from './container.js'
+import { allocationRoutes } from './modules/allocation/allocation.routes.js'
 import { assetRoutes } from './modules/asset/asset.routes.js'
 import { authRoutes } from './modules/auth/auth.routes.js'
 import { dividendRoutes } from './modules/dividend/dividend.routes.js'
@@ -64,6 +65,7 @@ export async function buildApp({ env, db, container }: AppDeps): Promise<Fastify
   await app.register(authRoutes(c, env.APP_AUTH_SESSION_DAYS))
   await app.register(assetRoutes(c))
   await app.register(portfolioRoutes(c))
+  await app.register(allocationRoutes(c))
   await app.register(evolutionRoutes(c))
   await app.register(riskRoutes(c))
   await app.register(transactionRoutes(c))

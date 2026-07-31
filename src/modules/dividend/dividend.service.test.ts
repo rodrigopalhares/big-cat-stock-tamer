@@ -4,6 +4,7 @@ import { createAsset, createDividend, createExchangeRate } from '../../../tests/
 import { BcbClient } from '../../integrations/bcb/bcb.client.js'
 import { YahooClient } from '../../integrations/yahoo/yahoo.client.js'
 import { isoDate } from '../../shared/iso-date.js'
+import { AssetClassService } from '../allocation/asset-class.service.js'
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service.js'
 import { TransactionService } from '../transaction/transaction.service.js'
 import { DividendService } from './dividend.service.js'
@@ -19,7 +20,7 @@ describe('DividendService', () => {
     const exchangeRates = new ExchangeRateService(db, new BcbClient())
     service = new DividendService(
       db,
-      new TransactionService(db, new YahooClient(), exchangeRates),
+      new TransactionService(db, new YahooClient(), exchangeRates, new AssetClassService(db)),
       exchangeRates,
     )
   })

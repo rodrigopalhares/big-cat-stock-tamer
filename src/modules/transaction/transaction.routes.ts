@@ -136,11 +136,19 @@ export function transactionRoutes(c: Container): FastifyPluginAsync {
 
     app.post<{ Params: { id: string } }>('/transactions/:id/edit', async (req, reply) => {
       const form = TransactionEditForm.parse(req.body)
+      const resolved = c.transactions.resolvePrice(
+        form.type,
+        form.price,
+        form.total_price,
+        form.fees,
+        form.quantity,
+      )
+
       const assetId = await c.transactions.updateTransaction(Number(req.params.id), {
         type: form.type,
         quantity: form.quantity,
-        price: form.price,
-        fees: form.fees,
+        price: resolved.price,
+        fees: resolved.fees,
         date: isoDate(form.date),
         broker: form.broker,
         notes: form.notes,

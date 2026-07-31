@@ -5,6 +5,7 @@ import type { AssetInfoLookup } from '../../integrations/asset-info.client.js'
 import { HttpError } from '../../shared/http-error.js'
 import type { IsoDate } from '../../shared/iso-date.js'
 import { transactionTypeMeta } from '../../shared/transaction-types.js'
+import type { AssetClassService } from '../allocation/asset-class.service.js'
 import type { ExchangeRateService } from '../exchange-rate/exchange-rate.service.js'
 
 /** Porte de src/main/kotlin/com/stocks/service/TransactionService.kt. */
@@ -51,6 +52,7 @@ export class TransactionService {
     private readonly db: Db,
     private readonly assetInfo: AssetInfoLookup,
     private readonly exchangeRates: ExchangeRateService,
+    private readonly assetClasses: AssetClassService,
   ) {}
 
   /** Busca o ativo; se não existir, cria buscando os dados na fonte do ticker. */
@@ -68,6 +70,7 @@ export class TransactionService {
         name: info.name === normalized ? null : info.name,
         type: info.type,
         currency: info.currency,
+        assetClassId: await this.assetClasses.defaultClassIdForType(info.type),
       },
     })
   }

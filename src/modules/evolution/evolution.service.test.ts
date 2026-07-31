@@ -9,6 +9,7 @@ import {
 import { TesouroClient } from '../../integrations/tesouro/tesouro.client.js'
 import { YahooClient } from '../../integrations/yahoo/yahoo.client.js'
 import { isoDate } from '../../shared/iso-date.js'
+import { AssetClassService } from '../allocation/asset-class.service.js'
 import { AssetService } from '../asset/asset.service.js'
 import { PriceHistoryService } from '../price-history/price-history.service.js'
 import { EvolutionService } from './evolution.service.js'
@@ -24,7 +25,11 @@ describe('EvolutionService', () => {
   beforeAll(async () => {
     db = await createTestDb()
     const priceHistory = new PriceHistoryService(db, new YahooClient(), new TesouroClient())
-    service = new EvolutionService(db, priceHistory, new AssetService(db))
+    service = new EvolutionService(
+      db,
+      priceHistory,
+      new AssetService(db, new AssetClassService(db), priceHistory),
+    )
   })
 
   afterAll(async () => {

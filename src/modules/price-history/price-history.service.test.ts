@@ -126,6 +126,69 @@ describe('PriceHistoryService', () => {
     })
   })
 
+  describe('refetchAssetHistory', () => {
+    it('troca a série inteira pela do símbolo novo', async () => {
+      server.use(yahooChart('yahoo_chart_historical.json'))
+      await createAsset(db, 'PETR3', { yfTicker: 'PETR3.SA' })
+      await createTransaction(db, 'PETR3', { date: '2024-01-01' })
+      // Preço do símbolo antigo, numa data que o fixture novo não cobre.
+      await createPriceHistory(db, 'PETR3', '2020-01-02', 999)
+
+      const written = await service.refetchAssetHistory('PETR3', TODAY)
+
+      expect(written).toBeGreaterThan(0)
+      // O preço velho sumiu junto com a série: não sobra rastro do símbolo anterior.
+      expect(await db.priceHistory.count({ where: { assetId: 'PETR3', close: 999 } })).toBe(0)
+      expect(await db.priceHistory.count({ where: { assetId: 'PETR3' } })).toBe(written)
+    })
+
+    it('busca vazia preserva o histórico em vez de destruí-lo', async () => {
+      // Símbolo errado devolve 404 — é o caso de quem digitou o código torto.
+      server.use(yahooError(404))
+      await createAsset(db, 'PETR3', { yfTicker: 'NAO_EXISTE.SA' })
+      await createTransaction(db, 'PETR3', { date: '2024-01-01' })
+      await createPriceHistory(db, 'PETR3', '2024-06-25', 42)
+
+      const written = await service.refetchAssetHistory('PETR3', TODAY)
+
+      expect(written).toBe(0)
+      expect(await db.priceHistory.count({ where: { assetId: 'PETR3' } })).toBe(1)
+    })
+
+    it('não mexe na série de outro ativo', async () => {
+      server.use(yahooChart('yahoo_chart_historical.json'))
+      await createAsset(db, 'PETR3', { yfTicker: 'PETR3.SA' })
+      await createTransaction(db, 'PETR3', { date: '2024-01-01' })
+      await createAsset(db, 'VALE3', { yfTicker: 'VALE3.SA' })
+      await createPriceHistory(db, 'VALE3', '2020-01-02', 55)
+
+      await service.refetchAssetHistory('PETR3', TODAY)
+
+      expect(await db.priceHistory.count({ where: { assetId: 'VALE3' } })).toBe(1)
+    })
+
+    it('ativo sem transação não tem série a refazer', async () => {
+      await createAsset(db, 'PETR3', { yfTicker: 'PETR3.SA' })
+
+      expect(await service.refetchAssetHistory('PETR3', TODAY)).toBe(0)
+    })
+
+    it('deslistado regenera a série interpolada, sem consultar a API', async () => {
+      await createAsset(db, 'OIBR3', { delisted: true })
+      await createTransaction(db, 'OIBR3', { date: '2024-06-25', price: 10 })
+      await createPriceHistory(db, 'OIBR3', '2019-01-02', 999)
+
+      const written = await service.refetchAssetHistory('OIBR3', TODAY)
+
+      expect(written).toBeGreaterThan(0)
+      expect(await db.priceHistory.count({ where: { assetId: 'OIBR3', close: 999 } })).toBe(0)
+    })
+
+    it('ativo inexistente não faz nada', async () => {
+      expect(await service.refetchAssetHistory('XXXX9', TODAY)).toBe(0)
+    })
+  })
+
   describe('runBackfill', () => {
     it('ativo deslistado não consulta o Yahoo', async () => {
       await createAsset(db, 'OIBR3', { delisted: true })
@@ -208,7 +271,7 @@ describe('PriceHistoryService', () => {
   describe('runDailyUpdate', () => {
     it('grava só o preço de hoje', async () => {
       server.use(yahooChart('yahoo_chart_historical.json'))
-      await createAsset(db, 'PETR3', { yfTicker: 'PETR3.SA' })
+      await createAsset(db, 'PETR3', { yfTicker: 'PETR3.SA', hasPosition: true })
       await createTransaction(db, 'PETR3', { date: '2024-01-01' })
 
       // O fixture não tem preço de 30/06, então nada é gravado.
@@ -223,9 +286,37 @@ describe('PriceHistoryService', () => {
       await expect(service.runDailyUpdate(TODAY)).resolves.toBeUndefined()
     })
 
+    it('posição encerrada não busca cotação', async () => {
+      // Sem handler do Yahoo: se o serviço tentasse buscar, o teste estouraria na rede.
+      await createAsset(db, 'MGLU3', { yfTicker: 'MGLU3.SA', hasPosition: false })
+      await createTransaction(db, 'MGLU3', { date: '2024-01-01' })
+
+      await service.runDailyUpdate(TODAY)
+
+      expect(await db.priceHistory.count({ where: { assetId: 'MGLU3' } })).toBe(0)
+    })
+
+    it('deslistado sem posição não gera preço interpolado', async () => {
+      await createAsset(db, 'HGTX3', { yfTicker: 'HGTX3.SA', delisted: true, hasPosition: false })
+      await createTransaction(db, 'HGTX3', { date: '2024-01-01', price: 10 })
+
+      await service.runDailyUpdate(TODAY)
+
+      expect(await db.priceHistory.count({ where: { assetId: 'HGTX3' } })).toBe(0)
+    })
+
+    it('deslistado com posição continua gerando preço interpolado', async () => {
+      await createAsset(db, 'HGTX3', { yfTicker: 'HGTX3.SA', delisted: true, hasPosition: true })
+      await createTransaction(db, 'HGTX3', { date: '2024-01-01', price: 10 })
+
+      await service.runDailyUpdate(TODAY)
+
+      expect(await db.priceHistory.count({ where: { assetId: 'HGTX3' } })).toBeGreaterThan(0)
+    })
+
     it('erro da API não derruba a atualização', async () => {
       server.use(yahooError(503))
-      await createAsset(db, 'PETR3', { yfTicker: 'PETR3.SA' })
+      await createAsset(db, 'PETR3', { yfTicker: 'PETR3.SA', hasPosition: true })
       await createTransaction(db, 'PETR3', { date: '2024-01-01' })
 
       await expect(service.runDailyUpdate(TODAY)).resolves.toBeUndefined()

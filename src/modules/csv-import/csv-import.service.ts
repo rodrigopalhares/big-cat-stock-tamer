@@ -10,6 +10,7 @@ import {
 } from '../../domain/csv/transaction-csv.js'
 import type { AssetInfoLookup } from '../../integrations/asset-info.client.js'
 import { isoDate } from '../../shared/iso-date.js'
+import type { AssetClassService } from '../allocation/asset-class.service.js'
 import type { DividendService } from '../dividend/dividend.service.js'
 import type { TransactionService } from '../transaction/transaction.service.js'
 
@@ -65,6 +66,7 @@ export class CsvImportService {
     private readonly assetInfo: AssetInfoLookup,
     private readonly transactions: TransactionService,
     private readonly dividends: DividendService,
+    private readonly assetClasses: AssetClassService,
   ) {}
 
   /** Analisa o CSV colado, resolvendo no Yahoo os tickers ainda não cadastrados. */
@@ -141,13 +143,15 @@ export class CsvImportService {
       const ticker = asset.ticker.trim().toUpperCase()
       const exists = await this.db.asset.count({ where: { ticker } })
       if (exists === 0) {
+        const type = asset.type || 'STOCK'
         await this.db.asset.create({
           data: {
             ticker,
             yfTicker: asset.yfTicker || null,
             name: asset.name || null,
-            type: asset.type || 'STOCK',
+            type,
             currency: asset.currency || 'BRL',
+            assetClassId: await this.assetClasses.defaultClassIdForType(type),
           },
         })
       }

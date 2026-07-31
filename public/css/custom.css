@@ -27,6 +27,40 @@ body {
     font-size: 0.75rem;
 }
 
+/*
+ * Números em fonte monoespaçada, com dígitos de largura fixa.
+ *
+ * Em fonte proporcional o "1" é bem mais estreito que o "8", então uma coluna de valores
+ * sai desalinhada e comparar duas linhas vira contar dígito. `tabular-nums` iguala a
+ * largura de todos os algarismos e a monoespaçada separa visualmente o número do rótulo.
+ *
+ * Dentro de tabela a regra pega o `text-end`: em todas as telas deste projeto, célula
+ * alinhada à direita é número — vale a convenção que já existe em vez de exigir uma classe
+ * a mais em cada `<td>`. O cabeçalho fica de fora de propósito: `<th>` é rótulo, não valor.
+ * Fora de tabela, o `.num` marca o número explicitamente.
+ */
+.num,
+.table td.text-end {
+    font-family: var(--bs-font-monospace);
+    font-variant-numeric: tabular-nums;
+    /*
+     * A monoespaçada tem altura de x maior que a fonte do corpo no mesmo `font-size`, e o
+     * número acabava dominando o rótulo ao lado ("1.429.338,32 da carteira"). Em `em` para
+     * acompanhar quem herda um tamanho próprio, como os valores em `fs-4` dos cards.
+     */
+    font-size: 0.92em;
+}
+
+/*
+ * O dígito monoespaçado é mais largo, e colunas que antes cabiam passaram a quebrar no
+ * meio do valor ("≈ R$" numa linha, "480.012,53" na seguinte) — pior de ler que a rolagem
+ * horizontal que a `.table-responsive` já oferece. Não afeta o `<br>` explícito que separa
+ * a moeda original da convertida.
+ */
+.table td.text-end {
+    white-space: nowrap;
+}
+
 .text-success { color: #198754 !important; }
 .text-danger  { color: #dc3545 !important; }
 

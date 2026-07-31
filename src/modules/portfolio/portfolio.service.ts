@@ -9,6 +9,7 @@ import {
 import { type AssetType, NO_QUOTE_TYPES } from '../../domain/constants.js'
 import {
   type PriceRecord,
+  resolveQuoteSymbol,
   resolveTesouroSymbol,
   resolveYfTicker,
 } from '../../domain/price-history.js'
@@ -61,7 +62,7 @@ export class PortfolioService {
       if (!asset.hasPosition && asset.realizedPnl === 0) continue
 
       const currentPrice = fetchQuotes
-        ? (liveQuotes.get(quoteKey(asset) ?? '') ??
+        ? (liveQuotes.get(resolveQuoteSymbol(asset.ticker, asset.yfTicker, asset.type) ?? '') ??
           (await this.priceHistory.getLatestPrice(asset.ticker)))
         : await this.priceHistory.getLatestPrice(asset.ticker)
 
@@ -152,9 +153,11 @@ export class PortfolioService {
     const yfToAsset = new Map<string, string>()
     const tdToAsset = new Map<string, string>()
 
-    const withTransactions = await this.tickersWithTransactions()
     for (const asset of assets) {
-      if (!withTransactions.has(asset.ticker)) continue
+      // Só quem ainda está em carteira: posição encerrada não tem valor de mercado para
+      // atualizar, e a cotação do dia dela não entra em soma nenhuma. A linha do papel
+      // vendido continua na tabela, mostrando o último preço já gravado.
+      if (!asset.hasPosition) continue
       if (asset.delisted) continue
       if (asset.type !== null && NO_QUOTE_TYPES.has(asset.type as AssetType)) continue
 
@@ -215,11 +218,6 @@ export class PortfolioService {
     await this.priceHistory.upsertPrices(records)
   }
 
-  private async tickersWithTransactions(): Promise<Set<string>> {
-    const grouped = await this.db.transaction.groupBy({ by: ['assetId'] })
-    return new Set(grouped.map((g) => g.assetId))
-  }
-
   private async loadTransactionsByAsset(
     tickers: readonly string[],
   ): Promise<Map<string, Transaction[]>> {
@@ -234,13 +232,6 @@ export class PortfolioService {
     }
     return byAsset
   }
-}
-
-/** Chave usada para achar a cotação viva do ativo; null quando ele não tem cotação. */
-function quoteKey(asset: Asset): string | null {
-  if (asset.type === 'TESOURO_DIRETO') return resolveTesouroSymbol(asset.ticker, asset.yfTicker)
-  if (asset.type !== null && NO_QUOTE_TYPES.has(asset.type as AssetType)) return null
-  return resolveYfTicker(asset.ticker, asset.yfTicker)
 }
 
 function scale(value: number | null, rate: number | null): number | null {
