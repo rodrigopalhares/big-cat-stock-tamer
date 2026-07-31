@@ -43,6 +43,19 @@ function noteId(params: unknown): number {
   return parsed.data.id
 }
 
+/**
+ * Valor de um campo de texto do multipart.
+ *
+ * `req.file()` consome o corpo em streaming e só expõe em `fields` o que veio **antes** do
+ * arquivo — por isso o cliente anexa a senha primeiro. Trocar essa ordem no `FormData`
+ * faria a senha chegar vazia sem erro nenhum.
+ */
+function textField(field: unknown): string {
+  if (typeof field !== 'object' || field === null) return ''
+  const { value } = field as { value?: unknown }
+  return typeof value === 'string' ? value : ''
+}
+
 /** O nome do arquivo vem do banco, nunca da URL — não há caminho para o usuário forjar. */
 function download(reply: FastifyReply, file: BrokerNoteFile): FastifyReply {
   return reply
@@ -168,6 +181,7 @@ export function transactionRoutes(c: Container): FastifyPluginAsync {
         file: await upload.toBuffer(),
         fileName: upload.filename,
         contentType: upload.mimetype,
+        password: textField(upload.fields['password']),
       })
       return reply.partial(BrokerNotePreview({ result }))
     })

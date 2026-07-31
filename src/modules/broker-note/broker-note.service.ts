@@ -16,6 +16,7 @@ import {
 import type { BrokerNote } from '../../generated/prisma/client.js'
 import type { AnthropicClient } from '../../integrations/anthropic/anthropic.client.js'
 import { HttpError } from '../../shared/http-error.js'
+import { decryptPdf } from '../../shared/pdf-password.js'
 
 /**
  * Importação de nota de negociação em PDF.
@@ -27,6 +28,11 @@ import { HttpError } from '../../shared/http-error.js'
  * O nome do arquivo depende do id, que só existe depois do insert: por isso grava-se a
  * linha primeiro e o arquivo em seguida. Se a gravação falhar, a linha é desfeita — nota
  * sem arquivo seria um link de download quebrado para sempre.
+ *
+ * Nota protegida por senha é aberta antes de subir para a Anthropic, que só aceita PDF sem
+ * criptografia. Nesse caso ficam dois arquivos lado a lado: `<...>.<ext>` sem senha, que é
+ * o que a aplicação serve, e `<...>_orig.<ext>` exatamente como o usuário mandou. O par
+ * sai do mesmo id, então não há coluna nova no banco — nem a senha, que não é persistida.
  */
 
 const EXTENSIONS: Readonly<Record<string, string>> = {
@@ -49,6 +55,8 @@ export type BrokerNoteUpload = {
   readonly file: Buffer
   readonly fileName: string
   readonly contentType: string
+  /** Em branco quando a nota não tem senha, que é o caso normal. */
+  readonly password?: string
 }
 
 /** O que a rota devolve para a prévia. */
@@ -84,9 +92,13 @@ export class BrokerNoteService {
   }
 
   async importNote(upload: BrokerNoteUpload): Promise<BrokerNoteImport> {
+    // Abrir antes de subir: a Anthropic recusa PDF criptografado. Senha errada para aqui,
+    // antes de gastar uma chamada ao modelo.
+    const { file, decrypted } = decryptPdf(upload.file, upload.password ?? '')
+
     // Rede antes de qualquer escrita: o SQLite tem escritor único e segurar o lock
     // durante uma chamada HTTP travaria a aplicação inteira.
-    const extracted = await this.anthropic.extractBrokerNote(upload.file, upload.contentType)
+    const extracted = await this.anthropic.extractBrokerNote(file, upload.contentType)
 
     const note = { ...extracted.note, trades: await this.resolveTickers(extracted.note.trades) }
     const groups = summarizeNote(note)
@@ -107,7 +119,12 @@ export class BrokerNoteService {
       },
     })
 
-    const fileName = await this.storeFile(saved, upload)
+    const fileName = await this.storeFile(
+      saved,
+      upload.contentType,
+      file,
+      decrypted ? upload.file : null,
+    )
 
     return {
       id: saved.id,
@@ -183,16 +200,40 @@ export class BrokerNoteService {
     }
   }
 
-  private async storeFile(note: BrokerNote, upload: BrokerNoteUpload): Promise<string> {
-    const extension = EXTENSIONS[upload.contentType] ?? 'bin'
-    const fileName = `${note.date.replaceAll('-', '')}_${note.id}.${extension}`
+  /**
+   * Grava o arquivo que a aplicação serve e, quando a nota veio com senha, o original ao
+   * lado. Só o primeiro nome vai para o banco: o do original é o mesmo com `_orig`.
+   */
+  private async storeFile(
+    note: BrokerNote,
+    contentType: string,
+    file: Buffer,
+    original: Buffer | null,
+  ): Promise<string> {
+    const extension = EXTENSIONS[contentType] ?? 'bin'
+    const stem = `${note.date.replaceAll('-', '')}_${note.id}`
+    const fileName = `${stem}.${extension}`
+    const originalName = `${stem}_orig.${extension}`
     const folder = join(this.notesDir, yearOf(note.date))
+    // Faxina best-effort: se a própria pasta estiver ruim o `rmSync` também falha, e aí o
+    // erro que interessa — o que impediu a gravação — sumiria atrás do erro da limpeza.
+    const discard = () => {
+      for (const name of [fileName, originalName]) {
+        try {
+          rmSync(join(folder, name), { force: true })
+        } catch {
+          /* nada a fazer: o arquivo não existe ou o caminho nem é pasta */
+        }
+      }
+    }
 
     try {
       mkdirSync(folder, { recursive: true })
-      writeFileSync(join(folder, fileName), upload.file)
+      writeFileSync(join(folder, fileName), file)
+      if (original !== null) writeFileSync(join(folder, originalName), original)
     } catch (error) {
       await this.db.brokerNote.delete({ where: { id: note.id } })
+      discard()
       const message = error instanceof Error ? error.message : String(error)
       throw HttpError.badGateway(`Não foi possível salvar o arquivo da nota: ${message}`)
     }
@@ -200,7 +241,7 @@ export class BrokerNoteService {
     try {
       await this.db.brokerNote.update({ where: { id: note.id }, data: { fileName } })
     } catch (error) {
-      rmSync(join(folder, fileName), { force: true })
+      discard()
       throw error
     }
     return fileName
