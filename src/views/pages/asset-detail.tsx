@@ -3,9 +3,11 @@ import type { DividendView } from '../../modules/dividend/dividend.schema.js'
 import type { AssetPosition } from '../../modules/portfolio/portfolio.schema.js'
 import type { TransactionView } from '../../modules/transaction/transaction.schema.js'
 import { date as fmtDate, money, percent, quantity, signClass } from '../../shared/format.js'
+import type { IsoDate } from '../../shared/iso-date.js'
 import { AssetBadge, DividendBadge, TransactionBadge } from '../components/badge.js'
 import { Layout } from '../layout.js'
-import { EditTransactionModal } from './transactions.js'
+import { DividendModal } from './dividends.js'
+import { TransactionModal } from './transactions.js'
 
 /** Porte de src/main/resources/templates/asset-detail.html. */
 
@@ -14,6 +16,8 @@ export type AssetDetailPageProps = {
   position: AssetPosition | null
   transactions: TransactionView[]
   dividends: DividendView[]
+  /** Data que o formulário de lançamento já vem preenchida — do servidor, não do navegador. */
+  today: IsoDate
 }
 
 export function AssetDetailPage({
@@ -21,6 +25,7 @@ export function AssetDetailPage({
   position,
   transactions,
   dividends,
+  today,
 }: AssetDetailPageProps) {
   const returnTo = `/assets/${asset.ticker}`
 
@@ -47,9 +52,23 @@ export function AssetDetailPage({
         {position !== null && <PositionCards position={position} />}
 
         <div class="card border-0 shadow-sm mb-4">
-          <div class="card-header bg-white fw-semibold">
-            <i class="bi bi-arrow-left-right" /> Transações{' '}
-            <span class="badge bg-secondary ms-1">{transactions.length}</span>
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">
+              <i class="bi bi-arrow-left-right" /> Transações{' '}
+              <span class="badge bg-secondary ms-1">{transactions.length}</span>
+            </span>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-primary"
+              data-new-tx
+              data-ticker={asset.ticker}
+              data-return-to={returnTo}
+              data-tx-date={today}
+              data-tx-currency={asset.currency}
+              data-tx-fees="0"
+            >
+              <i class="bi bi-plus-lg" /> Nova Transação
+            </button>
           </div>
           <div class="card-body p-0">
             {transactions.length > 0 ? (
@@ -61,13 +80,27 @@ export function AssetDetailPage({
         </div>
 
         <div class="card border-0 shadow-sm">
-          <div class="card-header bg-white fw-semibold">
-            <i class="bi bi-cash-coin" /> Proventos{' '}
-            <span class="badge bg-secondary ms-1">{dividends.length}</span>
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">
+              <i class="bi bi-cash-coin" /> Proventos{' '}
+              <span class="badge bg-secondary ms-1">{dividends.length}</span>
+            </span>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-primary"
+              data-new-div
+              data-ticker={asset.ticker}
+              data-return-to={returnTo}
+              data-div-date={today}
+              data-div-currency={asset.currency}
+              data-div-tax-withheld="0"
+            >
+              <i class="bi bi-plus-lg" /> Novo Provento
+            </button>
           </div>
           <div class="card-body p-0">
             {dividends.length > 0 ? (
-              <DividendsTable dividends={dividends} />
+              <DividendsTable dividends={dividends} returnTo={returnTo} />
             ) : (
               <EmptyState message="Nenhum provento registrado para este ativo." />
             )}
@@ -75,8 +108,10 @@ export function AssetDetailPage({
         </div>
       </div>
 
-      <EditTransactionModal />
+      <TransactionModal />
+      <DividendModal />
       <script src="/js/transactions.js" defer />
+      <script src="/js/dividends.js" defer />
     </Layout>
   )
 }
@@ -214,7 +249,7 @@ function TransactionsTable({
   )
 }
 
-function DividendsTable({ dividends }: { dividends: DividendView[] }) {
+function DividendsTable({ dividends, returnTo }: { dividends: DividendView[]; returnTo: string }) {
   return (
     <div class="table-responsive">
       <table class="table table-hover mb-0 align-middle small">
@@ -225,6 +260,7 @@ function DividendsTable({ dividends }: { dividends: DividendView[] }) {
             <th class="text-end">Valor Bruto</th>
             <th class="text-end">IR Retido</th>
             <th class="text-end">Valor Líquido</th>
+            <th class="text-center">Ações</th>
           </tr>
         </thead>
         <tbody>
@@ -237,6 +273,35 @@ function DividendsTable({ dividends }: { dividends: DividendView[] }) {
               <td class="text-end">{money(d.totalAmount, d.currency)}</td>
               <td class="text-end text-muted">{money(d.taxWithheld, d.currency)}</td>
               <td class="text-end fw-semibold text-success">{money(d.netAmount, d.currency)}</td>
+              <td class="text-center text-nowrap">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-primary border-0"
+                  title="Editar"
+                  data-edit-div
+                  data-return-to={returnTo}
+                  data-div-id={String(d.id)}
+                  data-div-type={d.type}
+                  data-div-total-amount={String(d.totalAmount)}
+                  data-div-tax-withheld={String(d.taxWithheld)}
+                  data-div-date={d.date}
+                  data-div-currency={d.currency}
+                  data-div-notes={d.notes ?? ''}
+                >
+                  <i class="bi bi-pencil" />
+                </button>
+                <form
+                  method="post"
+                  action={`/dividends/${d.id}/delete`}
+                  class="d-inline"
+                  data-confirm="Excluir este provento?"
+                >
+                  <input type="hidden" name="returnTo" value={returnTo} />
+                  <button type="submit" class="btn btn-sm btn-outline-danger border-0">
+                    <i class="bi bi-trash" />
+                  </button>
+                </form>
+              </td>
             </tr>
           ))}
         </tbody>

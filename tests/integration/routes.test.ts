@@ -240,6 +240,31 @@ describe('rotas da aplicação', () => {
       expect(res.statusCode).toBe(404)
     })
 
+    it('oferece lançar transação e provento sem sair da tela', async () => {
+      await createAsset(h.db, 'PETR4', { name: 'Petrobras' })
+
+      const res = await h.app.inject({ method: 'GET', url: '/assets/PETR4' })
+
+      expect(res.body).toContain('Nova Transação')
+      expect(res.body).toContain('Novo Provento')
+      // Os dois botões abrem o mesmo modal do formulário completo, e o ticker vai junto.
+      expect(res.body).toContain('data-new-tx')
+      expect(res.body).toContain('data-new-div')
+      expect(res.body).toContain('id="editTxModal"')
+      expect(res.body).toContain('id="editDivModal"')
+    })
+
+    it('o provento listado pode ser editado e excluído de volta para o ativo', async () => {
+      await createAsset(h.db, 'PETR4')
+      const dividend = await createDividend(h.db, 'PETR4', { totalAmount: 100 })
+
+      const res = await h.app.inject({ method: 'GET', url: '/assets/PETR4' })
+
+      expect(res.body).toContain('data-edit-div')
+      expect(res.body).toContain(`/dividends/${dividend.id}/delete`)
+      expect(res.body).toContain('value="/assets/PETR4"')
+    })
+
     it('com posição aberta mostra os cartões de posição', async () => {
       await createAsset(h.db, 'PETR4', { name: 'Petrobras' })
       await createTransaction(h.db, 'PETR4', { quantity: 100, price: 20, date: '2024-01-02' })
@@ -304,6 +329,27 @@ describe('rotas da aplicação', () => {
       // A posição do ativo é recalculada junto.
       const asset = await h.db.asset.findUniqueOrThrow({ where: { ticker: 'PETR4' } })
       expect(asset.hasPosition).toBe(true)
+    })
+
+    it('criada pela tela do ativo, volta para ela', async () => {
+      await createAsset(h.db, 'PETR4')
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/transactions/new',
+        payload: {
+          ticker: 'PETR4',
+          type: 'BUY',
+          quantity: '100',
+          price: '25.50',
+          fees: '0',
+          date: '2024-06-01',
+          currency: 'BRL',
+          returnTo: '/assets/PETR4',
+        },
+      })
+
+      expect(res.headers.location).toBe('/assets/PETR4')
     })
 
     it('valor total sem preço deduz o preço unitário', async () => {
@@ -650,7 +696,28 @@ describe('rotas da aplicação', () => {
       })
 
       expect(res.statusCode).toBe(302)
+      expect(res.headers.location).toBe('/dividends/')
       expect(await h.db.dividend.count()).toBe(1)
+    })
+
+    it('criado pela tela do ativo, volta para ela', async () => {
+      await createAsset(h.db, 'PETR4')
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/dividends/new',
+        payload: {
+          ticker: 'PETR4',
+          type: 'DIVIDENDO',
+          total_amount: '150',
+          tax_withheld: '0',
+          date: '2024-06-01',
+          currency: 'BRL',
+          returnTo: '/assets/PETR4',
+        },
+      })
+
+      expect(res.headers.location).toBe('/assets/PETR4')
     })
 
     it('lista mostra o valor líquido', async () => {

@@ -58,11 +58,11 @@ so you can make targeted changes without exploring the codebase.
 
 | File | Role |
 |------|------|
-| `src/views/pages/dividends.tsx` | Main page — form, filters, table, CSV modal, edit modal |
+| `src/views/pages/dividends.tsx` | Main page — form, filters, table, CSV modal, and the exported `DividendModal` (creates and edits; the asset page reuses it) |
 | `src/views/partials/dividend-csv-preview.tsx` | HTMX fragment with the parsed CSV rows |
 | `src/views/components/badge.tsx` | `DividendBadge` component + `DIVIDEND_BADGE_CLASSES` map |
 | `src/views/layout.tsx` | Navbar entry "Proventos" (`bi-cash-coin`) |
-| `src/client/dividends.ts` | Browser TS — edit modal + CSV batch submit (bundled to `public/js/`) |
+| `src/client/dividends.ts` | Browser TS — `DividendModal` (create/edit) + CSV batch submit (bundled to `public/js/`) |
 
 ### Integration Points
 
@@ -75,7 +75,7 @@ so you can make targeted changes without exploring the codebase.
 | `src/domain/chart.ts` | Pure `buildMonthlyDividendSeries()` + the `DividendFlow` type |
 | `src/client/dashboard.ts` | Draws the chart; `TYPE_COLORS` is shared with the evolution chart |
 | `src/modules/asset/asset.routes.ts` | Asset detail page lists the asset's dividends |
-| `src/views/pages/asset-detail.tsx` | `DividendsTable` on the asset page |
+| `src/views/pages/asset-detail.tsx` | `DividendsTable` on the asset page — lists, creates, edits and deletes, reusing `DividendModal` with the ticker fixed |
 | `src/modules/evolution/evolution.service.ts` | Queries `dividend` directly for accumulated net income |
 | `src/domain/csv/dividend-csv.ts` | Pure parser — `parseDividendCsvRows()`, `DividendCsvRow` |
 | `src/modules/csv-import/csv-import.service.ts` | `parseDividendCsv()` + `batchImportDividends()` |
@@ -158,7 +158,7 @@ All registered by `dividendRoutes(container)` in `dividend.routes.ts`.
 | Method | Path | Type | Behaviour |
 |--------|------|------|-----------|
 | GET | `/dividends/` | HTML | Page with form, filters (`ticker`, `type`) and table |
-| POST | `/dividends/new` | HTML | Creates, redirects 302 to `/dividends/` |
+| POST | `/dividends/new` | HTML | Creates, redirects to `returnTo` or `/dividends/` |
 | POST | `/dividends/:id/edit` | HTML | Updates, redirects to `returnTo` or `/dividends/` |
 | POST | `/dividends/:id/delete` | HTML | Deletes, redirects to `returnTo` or `/dividends/` |
 | GET | `/dividends/ticker-info?ticker=X` | HTMX | Ticker status fragment (empty if under 3 chars) |
@@ -168,10 +168,10 @@ All registered by `dividendRoutes(container)` in `dividend.routes.ts`.
 | POST | `/dividends/api` | JSON | Creates, returns 201 + response body |
 | DELETE | `/dividends/api/:id` | JSON | Returns 204 |
 
-`returnTo` is accepted by the edit and delete routes but no view sends it today — the
-dividends page posts without it, and `DividendsTable` on the asset detail page is read-only.
-It is the hook to use if dividends ever get edit/delete buttons outside `/dividends/`, the way
-transactions already do on the asset page.
+`returnTo` is what keeps the asset detail page working: the create, edit and delete routes all
+redirect back to it when it comes in the body. `/dividends/` posts without it and lands on
+itself; `DividendsTable` on the asset page sends `/assets/<TICKER>` in a hidden input (delete)
+or in `data-return-to` (edit and create), which `src/client/dividends.ts` copies into the form.
 
 ## Schemas
 
@@ -216,9 +216,11 @@ In `PortfolioService.buildPositions()`:
 3. Add it to `DividendForm`, `DividendApiRequest`, `DividendView`, `toDividendView` and
    `toDividendResponse` in `dividend.schema.ts`.
 4. Pass it through in `dividend.routes.ts` (create, edit, and the API create).
-5. Add the input to the form and the edit modal plus a `<td>` in `src/views/pages/dividends.tsx`;
-   if the edit modal needs it, add a `data-div-*` attribute and a `setValue()` call in
-   `src/client/dividends.ts`.
+5. Add the input to the form and to `DividendModal` plus a `<td>` in
+   `src/views/pages/dividends.tsx`; if the modal needs it, add a `data-div-*` attribute and a
+   `setValue()` call in `src/client/dividends.ts`. The same attribute has to go on the "Novo
+   Provento" button in `asset-detail.tsx`, which is what supplies the modal's initial values
+   there.
 6. Update `createDividend` in `tests/factories.ts` if the field is required.
 7. Cover it in `dividend.service.test.ts` and, if it shows up in a route, `routes.test.ts`.
 

@@ -60,7 +60,7 @@ export function dividendRoutes(c: Container): FastifyPluginAsync {
         broker: form.broker,
         currency: form.currency,
       })
-      return reply.redirect('/dividends/', 302)
+      return reply.redirect(form.returnTo ?? '/dividends/', 302)
     })
 
     app.post<{ Params: { id: string } }>('/dividends/:id/edit', async (req, reply) => {

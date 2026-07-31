@@ -118,7 +118,7 @@ export function transactionRoutes(c: Container): FastifyPluginAsync {
       })
       await c.assets.refreshPositionFields(form.ticker)
 
-      return reply.redirect('/transactions/', 302)
+      return reply.redirect(form.returnTo ?? '/transactions/', 302)
     })
 
     app.post<{ Params: { id: string } }>('/transactions/:id/edit', async (req, reply) => {

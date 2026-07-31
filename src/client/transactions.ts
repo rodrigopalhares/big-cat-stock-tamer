@@ -137,19 +137,30 @@ document.addEventListener('input', (event) => {
   }
 })
 
-// --- modal de edição de transação ---
+// --- modal de transação: cria e edita ---
 
 declare const bootstrap: { Modal: new (el: Element) => { show: () => void } }
 
 document.addEventListener('click', (event) => {
-  const trigger = (event.target as Element | null)?.closest<HTMLElement>('[data-edit-tx]')
+  const target = event.target as Element | null
+  const trigger = target?.closest<HTMLElement>('[data-edit-tx], [data-new-tx]')
   if (trigger === null || trigger === undefined) return
 
+  openTxModal(trigger, trigger.dataset['newTx'] !== undefined)
+})
+
+/**
+ * O mesmo modal serve para criar e para editar. Quem cria é a tela do ativo, onde o ticker
+ * já está decidido — ele vai num campo escondido, junto com o `returnTo` que traz de volta
+ * para a mesma tela. Os valores iniciais saem dos `data-tx-*` do próprio botão, então o
+ * caminho de preenchimento é um só.
+ */
+function openTxModal(trigger: HTMLElement, isNew: boolean): void {
   const d = trigger.dataset
   const form = byId<HTMLFormElement>('editTxForm')
   if (form === null) return
 
-  form.action = `/transactions/${d['txId']}/edit`
+  form.action = isNew ? '/transactions/new' : `/transactions/${d['txId']}/edit`
   setValue('editTxType', d['txType'] || 'BUY')
   setValue('editTxCurrency', d['txCurrency'] || 'BRL')
   setValue('editTxQty', d['txQuantity'] ?? '')
@@ -160,20 +171,32 @@ document.addEventListener('click', (event) => {
   setValue('editTxNotes', d['txNotes'] ?? '')
   applyTypeVisibility('editTx')
 
-  const returnTo = trigger.dataset['returnTo']
-  byId('editTxReturnTo')?.remove()
-  if (returnTo !== undefined && returnTo !== '') {
-    const input = document.createElement('input')
-    input.type = 'hidden'
-    input.name = 'returnTo'
-    input.id = 'editTxReturnTo'
-    input.value = returnTo
-    form.appendChild(input)
-  }
+  setHiddenField(form, 'editTxTicker', 'ticker', isNew ? (d['ticker'] ?? '') : '')
+  setHiddenField(form, 'editTxReturnTo', 'returnTo', d['returnTo'] ?? '')
+
+  const title = byId('editTxModalTitle')
+  if (title !== null) title.textContent = isNew ? 'Nova Transação' : 'Editar Transação'
+  byId('editTxModalIcon')?.setAttribute('class', `bi ${isNew ? 'bi-plus-circle' : 'bi-pencil'}`)
 
   const modal = byId('editTxModal')
   if (modal !== null) new bootstrap.Modal(modal).show()
-})
+}
+
+/**
+ * Campo escondido que só existe quando tem valor — enviar `returnTo` vazio redirecionaria
+ * para lugar nenhum.
+ */
+function setHiddenField(form: HTMLFormElement, id: string, name: string, value: string): void {
+  byId(id)?.remove()
+  if (value === '') return
+
+  const input = document.createElement('input')
+  input.type = 'hidden'
+  input.name = name
+  input.id = id
+  input.value = value
+  form.appendChild(input)
+}
 
 // --- importação de CSV ---
 

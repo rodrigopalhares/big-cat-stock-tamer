@@ -63,7 +63,7 @@ export function DividendsPage(props: DividendsPageProps) {
       </div>
 
       <CsvImportModal />
-      <EditDividendModal />
+      <DividendModal />
       <script src="/js/dividends.js" defer />
     </Layout>
   )
@@ -318,14 +318,20 @@ function CsvImportModal() {
   )
 }
 
-function EditDividendModal() {
+/**
+ * Serve para editar e para criar: na tela do ativo o ticker já está decidido, então o mesmo
+ * formulário vira o de "Novo Provento" com um `ticker` escondido — o cliente troca a ação,
+ * o título e o ícone.
+ */
+export function DividendModal() {
   return (
     <div class="modal fade" id="editDivModal" tabindex={-1}>
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
-              <i class="bi bi-pencil" /> Editar Provento
+              <i class="bi bi-pencil" id="editDivModalIcon" />{' '}
+              <span id="editDivModalTitle">Editar Provento</span>
             </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" />
           </div>

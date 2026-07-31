@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
 import type { Container } from '../../container.js'
 import { HttpError } from '../../shared/http-error.js'
+import { today as todayIso } from '../../shared/iso-date.js'
 import { AssetTickerInfo } from '../../views/components/ticker-info.js'
 import { AssetDetailPage } from '../../views/pages/asset-detail.js'
 import { AssetsPage } from '../../views/pages/assets.js'
@@ -76,6 +77,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
           position: positions[0] ?? null,
           transactions: transactions.map(toTransactionView),
           dividends: dividends.map(toDividendView),
+          today: todayIso(),
         }),
       )
     })

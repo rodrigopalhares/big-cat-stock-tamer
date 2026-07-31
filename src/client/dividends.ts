@@ -15,21 +15,26 @@ const setValue = (id: string, value: string): void => {
 document.addEventListener('click', (event) => {
   const target = event.target as Element | null
 
-  const edit = target?.closest<HTMLElement>('[data-edit-div]')
-  if (edit !== null && edit !== undefined) {
-    openEditModal(edit)
+  const trigger = target?.closest<HTMLElement>('[data-edit-div], [data-new-div]')
+  if (trigger !== null && trigger !== undefined) {
+    openDivModal(trigger, trigger.dataset['newDiv'] !== undefined)
     return
   }
 
   if (target?.closest('[data-div-csv-batch-submit]') !== null) void submitBatch()
 })
 
-function openEditModal(trigger: HTMLElement): void {
+/**
+ * O mesmo modal serve para criar e para editar. Quem cria é a tela do ativo, onde o ticker
+ * já está decidido — ele vai num campo escondido, junto com o `returnTo` que traz de volta
+ * para a mesma tela. Os valores iniciais saem dos `data-div-*` do próprio botão.
+ */
+function openDivModal(trigger: HTMLElement, isNew: boolean): void {
   const d = trigger.dataset
   const form = byId<HTMLFormElement>('editDivForm')
   if (form === null) return
 
-  form.action = `/dividends/${d['divId']}/edit`
+  form.action = isNew ? '/dividends/new' : `/dividends/${d['divId']}/edit`
   setValue('editDivType', d['divType'] ?? '')
   setValue('editDivCurrency', d['divCurrency'] || 'BRL')
   setValue('editDivTotalAmount', d['divTotalAmount'] ?? '')
@@ -37,8 +42,31 @@ function openEditModal(trigger: HTMLElement): void {
   setValue('editDivDate', d['divDate'] ?? '')
   setValue('editDivNotes', d['divNotes'] ?? '')
 
+  setHiddenField(form, 'editDivTicker', 'ticker', isNew ? (d['ticker'] ?? '') : '')
+  setHiddenField(form, 'editDivReturnTo', 'returnTo', d['returnTo'] ?? '')
+
+  const title = byId('editDivModalTitle')
+  if (title !== null) title.textContent = isNew ? 'Novo Provento' : 'Editar Provento'
+  byId('editDivModalIcon')?.setAttribute('class', `bi ${isNew ? 'bi-plus-circle' : 'bi-pencil'}`)
+
   const modal = byId('editDivModal')
   if (modal !== null) new bootstrap.Modal(modal).show()
+}
+
+/**
+ * Campo escondido que só existe quando tem valor — enviar `returnTo` vazio redirecionaria
+ * para lugar nenhum.
+ */
+function setHiddenField(form: HTMLFormElement, id: string, name: string, value: string): void {
+  byId(id)?.remove()
+  if (value === '') return
+
+  const input = document.createElement('input')
+  input.type = 'hidden'
+  input.name = name
+  input.id = id
+  input.value = value
+  form.appendChild(input)
 }
 
 async function submitBatch(): Promise<void> {

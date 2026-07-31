@@ -71,7 +71,7 @@ export function TransactionsPage(props: TransactionsPageProps) {
         </div>
       </div>
 
-      <EditTransactionModal />
+      <TransactionModal />
       <script src="/js/transactions.js" defer />
     </Layout>
   )
@@ -537,14 +537,21 @@ function TransactionRow({ transaction: t }: { transaction: TransactionView }) {
   )
 }
 
-export function EditTransactionModal() {
+/**
+ * Serve para editar e para criar: na tela do ativo o ticker já está decidido, então o mesmo
+ * formulário vira o de "Nova Transação" com um `ticker` escondido — o cliente troca a ação,
+ * o título e o ícone. Só o campo "Valor Total" fica de fora; ele é conveniência da tela de
+ * transações, e o preço aqui é obrigatório.
+ */
+export function TransactionModal() {
   return (
     <div class="modal fade" id="editTxModal" tabindex={-1}>
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
-              <i class="bi bi-pencil" /> Editar Transação
+              <i class="bi bi-pencil" id="editTxModalIcon" />{' '}
+              <span id="editTxModalTitle">Editar Transação</span>
             </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" />
           </div>
