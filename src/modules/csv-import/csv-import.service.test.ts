@@ -4,6 +4,7 @@ import { createAsset } from '../../../tests/factories.js'
 import { server, yahooChart, yahooChartBySymbol } from '../../../tests/msw.js'
 import { BcbClient } from '../../integrations/bcb/bcb.client.js'
 import { YahooClient } from '../../integrations/yahoo/yahoo.client.js'
+import { AssetClassService } from '../allocation/asset-class.service.js'
 import { DividendService } from '../dividend/dividend.service.js'
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service.js'
 import { TransactionService } from '../transaction/transaction.service.js'
@@ -19,9 +20,10 @@ describe('CsvImportService', () => {
     db = await createTestDb()
     const yahoo = new YahooClient()
     const exchangeRates = new ExchangeRateService(db, new BcbClient())
-    const transactions = new TransactionService(db, yahoo, exchangeRates)
+    const assetClasses = new AssetClassService(db)
+    const transactions = new TransactionService(db, yahoo, exchangeRates, assetClasses)
     const dividends = new DividendService(db, transactions, exchangeRates)
-    service = new CsvImportService(db, yahoo, transactions, dividends)
+    service = new CsvImportService(db, yahoo, transactions, dividends, assetClasses)
   })
 
   afterAll(async () => {

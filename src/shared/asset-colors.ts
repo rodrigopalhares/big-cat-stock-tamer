@@ -45,6 +45,28 @@ export function assetTypeFill(type: string, alpha = 0.6): string {
  * Luminância percebida (ITU-R BT.601) — é o que impede texto branco no amarelo do Tesouro.
  */
 export function assetTypeTextColor(type: string): string {
-  const [r, g, b] = rgbOf(type)
+  return textColorFor(rgbOf(type))
+}
+
+/**
+ * A mesma regra de contraste para uma cor hex qualquer.
+ * A cor da classe de alocação é escolhida pelo usuário, então não sai do mapa de tipos —
+ * mas o rótulo dela some no fundo claro pelo mesmo motivo, e a conta é uma só.
+ */
+export function hexTextColor(hex: string): string {
+  return textColorFor(parseHex(hex) ?? FALLBACK)
+}
+
+function textColorFor([r, g, b]: Rgb): string {
   return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? '#212529' : '#fff'
+}
+
+/** `#36a2eb` → `[54, 162, 235]`. Null no que não for hex de 6 dígitos. */
+function parseHex(hex: string): Rgb | null {
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return null
+  return [
+    Number.parseInt(hex.slice(1, 3), 16),
+    Number.parseInt(hex.slice(3, 5), 16),
+    Number.parseInt(hex.slice(5, 7), 16),
+  ]
 }

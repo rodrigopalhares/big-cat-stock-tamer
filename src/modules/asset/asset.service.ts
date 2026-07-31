@@ -4,6 +4,7 @@ import type { TransactionType } from '../../domain/constants.js'
 import type { Transaction } from '../../generated/prisma/client.js'
 import { HttpError } from '../../shared/http-error.js'
 import type { IsoDate } from '../../shared/iso-date.js'
+import type { AssetClassService } from '../allocation/asset-class.service.js'
 import {
   type AssetFilters,
   type AssetView,
@@ -13,7 +14,10 @@ import {
 
 /** Porte de src/main/kotlin/com/stocks/service/AssetService.kt. */
 export class AssetService {
-  constructor(private readonly db: Db) {}
+  constructor(
+    private readonly db: Db,
+    private readonly assetClasses: AssetClassService,
+  ) {}
 
   async findAll(): Promise<AssetView[]> {
     const assets = await this.db.asset.findMany({ orderBy: { ticker: 'asc' } })
@@ -58,13 +62,16 @@ export class AssetService {
     if (await this.exists(request.ticker)) {
       throw HttpError.conflict('Ticker already registered')
     }
+    const type = request.type ?? 'STOCK'
     const asset = await this.db.asset.create({
       data: {
         ticker: request.ticker,
         yfTicker: request.yfTicker ?? null,
         name: request.name ?? null,
-        type: request.type ?? 'STOCK',
+        type,
         currency: request.currency,
+        // Nasce classificado pelo tipo; a tela de alocação corrige o que ficar torto.
+        assetClassId: await this.assetClasses.defaultClassIdForType(type),
       },
     })
     return toAssetView(asset)

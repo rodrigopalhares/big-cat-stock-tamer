@@ -109,6 +109,9 @@ Two traps worth knowing:
 - **The parser signs the quantity for preview only.** `AGRUPAMENTO` comes out negative there, but
   `batchImport()` passes `Math.abs()` and `insert()` re-derives the sign from the final type — so
   changing the type in the step-2 dropdown always yields the right sign.
+- **An asset created by the import is born classified.** `batchImport()` resolves the allocation
+  class from the type via `AssetClassService.defaultClassIdForType()` (`src/domain/asset-class.ts`).
+  A new creation path that skips it leaves the asset in the "Sem classe" bucket of `/allocation/`.
 - **Price and taxes are normalized server-side**, in `normalizePriceFees()` inside
   `transaction.service.ts`, not in the parser. A stray price on a `D`/`A` row is discarded, and
   taxes are zeroed for every type except BUY, SELL and R.CAP. This is the one enforcement point

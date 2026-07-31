@@ -93,6 +93,15 @@ O sufixo `J` marca "com Juros Semestrais": `TD:IPCA2035` é o principal e `TD:IP
 de cupom — mesmo vencimento, PU quase o dobro, então trocar um pelo outro erra a carteira
 em silêncio.
 
+**Classe de alocação não é tipo de ativo.** `assets.type` diz o que o papel é (ETF, BDR,
+INTERNATIONAL); `assets.asset_class_id` diz em que fatia da carteira ele conta — e os três
+exemplos acima caem na mesma classe "Internacional". O tipo só define a classe *inicial*,
+por `src/domain/asset-class.ts`; depois disso quem manda é o que o usuário escolheu na tela.
+O mesmo mapa está escrito em SQL na migration `add_asset_classes`, que classificou o acervo
+existente: mexer num sem mexer no outro deixa histórico e ativo novo em classes diferentes.
+A FK é `ON DELETE SET NULL` e ativo sem classe aparece no balde "Sem classe" de `/allocation/`,
+em vez de sumir da conta.
+
 **Nada de rede dentro de transação.** O SQLite tem escritor único; segurar o lock durante uma
 chamada HTTP trava a aplicação inteira. Busque primeiro, escreva depois.
 

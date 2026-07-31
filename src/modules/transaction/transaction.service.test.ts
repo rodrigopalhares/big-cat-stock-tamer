@@ -5,6 +5,7 @@ import { server, yahooChart } from '../../../tests/msw.js'
 import { BcbClient } from '../../integrations/bcb/bcb.client.js'
 import { YahooClient } from '../../integrations/yahoo/yahoo.client.js'
 import { isoDate } from '../../shared/iso-date.js'
+import { AssetClassService } from '../allocation/asset-class.service.js'
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service.js'
 import { TransactionService } from './transaction.service.js'
 
@@ -20,6 +21,7 @@ describe('TransactionService', () => {
       db,
       new YahooClient(),
       new ExchangeRateService(db, new BcbClient()),
+      new AssetClassService(db),
     )
   })
 

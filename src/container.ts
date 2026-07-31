@@ -7,6 +7,8 @@ import { BcbClient } from './integrations/bcb/bcb.client.js'
 import { BROWSER_USER_AGENT, HttpClient, type Logger, silentLogger } from './integrations/http.js'
 import { TesouroClient } from './integrations/tesouro/tesouro.client.js'
 import { YahooClient } from './integrations/yahoo/yahoo.client.js'
+import { AllocationService } from './modules/allocation/allocation.service.js'
+import { AssetClassService } from './modules/allocation/asset-class.service.js'
 import { AssetService } from './modules/asset/asset.service.js'
 import { AuthService } from './modules/auth/auth.service.js'
 import { BrokerNoteService } from './modules/broker-note/broker-note.service.js'
@@ -36,15 +38,18 @@ export function buildContainer(db: Db, env: Env, logger: Logger = silentLogger) 
   const assetInfo = new AssetInfoClient(yahoo, tesouro)
 
   const exchangeRates = new ExchangeRateService(db, bcb, logger)
-  const assets = new AssetService(db)
-  const transactions = new TransactionService(db, assetInfo, exchangeRates)
+  // Vem antes dos três serviços que criam ativo — é quem diz a classe padrão do tipo.
+  const assetClasses = new AssetClassService(db)
+  const assets = new AssetService(db, assetClasses)
+  const transactions = new TransactionService(db, assetInfo, exchangeRates, assetClasses)
   const dividends = new DividendService(db, transactions, exchangeRates)
   const priceHistory = new PriceHistoryService(db, yahoo, tesouro, logger)
   const portfolio = new PortfolioService(db, yahoo, tesouro, priceHistory, dividends, exchangeRates)
+  const allocation = new AllocationService(db, portfolio, assetClasses)
   const evolution = new EvolutionService(db, priceHistory, assets, logger)
   const benchmarks = new BenchmarkService(db, yahoo, bcb, logger)
   const riskMetrics = new RiskMetricsService(db, benchmarks, logger)
-  const csvImport = new CsvImportService(db, assetInfo, transactions, dividends)
+  const csvImport = new CsvImportService(db, assetInfo, transactions, dividends, assetClasses)
 
   const anthropic = new AnthropicClient({ apiKey: env.APP_ANTHROPIC_API_KEY, logger })
   const brokerNotes = new BrokerNoteService(db, anthropic, env.notesDir)
@@ -71,6 +76,8 @@ export function buildContainer(db: Db, env: Env, logger: Logger = silentLogger) 
     tesouro,
     assetInfo,
     assets,
+    assetClasses,
+    allocation,
     transactions,
     dividends,
     exchangeRates,

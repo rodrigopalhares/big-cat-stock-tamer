@@ -1,6 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { clearAllData, createTestDb, type TestDb } from '../../../tests/db.js'
-import { createAsset, createTransaction } from '../../../tests/factories.js'
+import {
+  createAsset,
+  createTransaction,
+  seedDefaultAssetClasses,
+} from '../../../tests/factories.js'
+import { AssetClassService } from '../allocation/asset-class.service.js'
 import { AssetRequest } from './asset.schema.js'
 import { AssetService } from './asset.service.js'
 
@@ -13,7 +18,7 @@ describe('AssetService', () => {
 
   beforeAll(async () => {
     db = await createTestDb()
-    service = new AssetService(db)
+    service = new AssetService(db, new AssetClassService(db))
   })
 
   afterAll(async () => {
@@ -29,6 +34,27 @@ describe('AssetService', () => {
       const asset = await service.create(AssetRequest.parse({ ticker: 'petr4' }))
 
       expect(asset).toMatchObject({ ticker: 'PETR4', type: 'STOCK', currency: 'BRL' })
+    })
+
+    it('nasce na classe de alocação padrão do tipo', async () => {
+      await seedDefaultAssetClasses(db)
+
+      await service.create(AssetRequest.parse({ ticker: 'HGLG11', type: 'REIT' }))
+
+      const asset = await db.asset.findUniqueOrThrow({
+        where: { ticker: 'HGLG11' },
+        include: { assetClass: true },
+      })
+      expect(asset.assetClass?.name).toBe('Fii')
+    })
+
+    it('tipo sem classe padrão fica sem classe, não em uma qualquer', async () => {
+      await seedDefaultAssetClasses(db)
+
+      await service.create(AssetRequest.parse({ ticker: 'XPTO3', type: 'OUTROS' }))
+
+      const asset = await db.asset.findUniqueOrThrow({ where: { ticker: 'XPTO3' } })
+      expect(asset.assetClassId).toBeNull()
     })
 
     it('normaliza o ticker no schema, antes de chegar ao service', async () => {

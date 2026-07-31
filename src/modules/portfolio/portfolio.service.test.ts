@@ -12,6 +12,7 @@ import { BcbClient } from '../../integrations/bcb/bcb.client.js'
 import { TesouroClient } from '../../integrations/tesouro/tesouro.client.js'
 import { YahooClient } from '../../integrations/yahoo/yahoo.client.js'
 import { isoDate } from '../../shared/iso-date.js'
+import { AssetClassService } from '../allocation/asset-class.service.js'
 import { AssetService } from '../asset/asset.service.js'
 import { DividendService } from '../dividend/dividend.service.js'
 import { ExchangeRateService } from '../exchange-rate/exchange-rate.service.js'
@@ -31,10 +32,11 @@ describe('PortfolioService', () => {
     const yahoo = new YahooClient()
     const tesouro = new TesouroClient()
     const exchangeRates = new ExchangeRateService(db, new BcbClient())
-    const transactions = new TransactionService(db, yahoo, exchangeRates)
+    const assetClasses = new AssetClassService(db)
+    const transactions = new TransactionService(db, yahoo, exchangeRates, assetClasses)
     const dividends = new DividendService(db, transactions, exchangeRates)
     const priceHistory = new PriceHistoryService(db, yahoo, tesouro)
-    assets = new AssetService(db)
+    assets = new AssetService(db, assetClasses)
     service = new PortfolioService(db, yahoo, tesouro, priceHistory, dividends, exchangeRates)
   })
 

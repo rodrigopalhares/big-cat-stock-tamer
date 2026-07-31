@@ -39,6 +39,18 @@ document.addEventListener('click', (event) => {
     return
   }
 
+  const newClassTrigger = target?.closest<HTMLElement>('[data-new-class]')
+  if (newClassTrigger !== null && newClassTrigger !== undefined) {
+    openAssetClassModal(null)
+    return
+  }
+
+  const editClassTrigger = target?.closest<HTMLElement>('[data-edit-class]')
+  if (editClassTrigger !== null && editClassTrigger !== undefined) {
+    openAssetClassModal(editClassTrigger)
+    return
+  }
+
   if (target?.closest('[data-theme-toggle]') !== null) toggleTheme()
 })
 
@@ -75,6 +87,28 @@ function openEditAssetModal(trigger: HTMLElement): void {
   setChecked('editDelisted', d['assetDelisted'] === 'true')
 
   const modal = document.getElementById('editAssetModal')
+  if (modal !== null) new bootstrap.Modal(modal).show()
+}
+
+/**
+ * Um modal só para criar e editar classe de alocação — sem trigger é "nova".
+ * Dois modais quase iguais na mesma página é o que gera id duplicado e campo que não
+ * limpa entre uma abertura e outra.
+ */
+function openAssetClassModal(trigger: HTMLElement | null): void {
+  const d = trigger?.dataset
+  const id = d?.['classId'] ?? ''
+
+  setText('assetClassModalTitle', id === '' ? 'Nova classe' : 'Editar classe')
+  setAction(
+    'assetClassForm',
+    id === '' ? '/allocation/classes/new' : `/allocation/classes/${id}/edit`,
+  )
+  setValue('className', d?.['className'] ?? '')
+  setValue('classTarget', d?.['classTarget'] ?? '0')
+  setValue('classColor', d?.['classColor'] ?? '#6c757d')
+
+  const modal = document.getElementById('assetClassModal')
   if (modal !== null) new bootstrap.Modal(modal).show()
 }
 

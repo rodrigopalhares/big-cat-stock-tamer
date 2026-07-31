@@ -9,6 +9,7 @@ import type { ComponentChildren } from 'preact'
 const NAV_ITEMS = [
   { href: '/portfolio/', icon: 'bi-speedometer2', label: 'Dashboard' },
   { href: '/assets/', icon: 'bi-building', label: 'Ativos' },
+  { href: '/allocation/', icon: 'bi-pie-chart', label: 'Alocação' },
   { href: '/transactions/', icon: 'bi-arrow-left-right', label: 'Transações' },
   { href: '/dividends/', icon: 'bi-cash-coin', label: 'Proventos' },
   { href: '/evolution/', icon: 'bi-graph-up', label: 'Evolução' },

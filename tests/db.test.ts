@@ -12,11 +12,12 @@ describe('banco de teste', () => {
     await db.$disconnect()
   })
 
-  it('cria as 9 tabelas', async () => {
+  it('cria as 10 tabelas', async () => {
     const tables = await db.$queryRawUnsafe<Array<{ name: string }>>(
       "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
     )
     expect(tables.map((t) => t.name)).toEqual([
+      'asset_classes',
       'assets',
       'benchmark_prices',
       'broker_notes',
@@ -27,6 +28,18 @@ describe('banco de teste', () => {
       'risk_metrics',
       'transactions',
     ])
+  })
+
+  it('a migration já traz as 5 classes de alocação', async () => {
+    const classes = await db.assetClass.findMany({ orderBy: { name: 'asc' } })
+    expect(classes.map((c) => c.name)).toEqual([
+      'Ações',
+      'Crypto',
+      'Fii',
+      'Internacional',
+      'Renda Fixa',
+    ])
+    expect(classes.every((c) => c.targetPercent === 20)).toBe(true)
   })
 
   it('grava e lê um ativo', async () => {
