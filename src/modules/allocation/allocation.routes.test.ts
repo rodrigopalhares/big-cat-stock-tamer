@@ -64,16 +64,16 @@ describe('rotas de alocação', () => {
       expect(res.body).toContain('R$ 1.000,00')
     })
 
-    it('lista as classes da mais distante da meta para a menos', async () => {
+    it('lista quem está abaixo da meta antes de quem passou dela', async () => {
       const acoes = await createAssetClass(h.db, 'Ações', { targetPercent: 40 })
       const fii = await createAssetClass(h.db, 'Fii', { targetPercent: 30 })
-      // Ações 80% (40 p.p. acima), Fii 20% (10 p.p. abaixo).
+      // Ações 80% (40 p.p. acima), Fii 20% (10 p.p. abaixo) — o aporte vai para Fii.
       await position(h, 'PETR4', 800, acoes.id)
       await position(h, 'HGLG11', 200, fii.id)
 
       const res = await h.app.inject({ method: 'GET', url: '/allocation/' })
 
-      expect(res.body.indexOf('Ações')).toBeLessThan(res.body.indexOf('Fii'))
+      expect(res.body.indexOf('Fii')).toBeLessThan(res.body.indexOf('Ações'))
     })
 
     it('avisa quando as metas não somam 100%', async () => {

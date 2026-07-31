@@ -178,8 +178,13 @@ function ClassCard({
         <DeviationBadge bucket={bucket} />
 
         <div class="ms-auto d-flex align-items-center gap-2">
+          {/*
+            "Excesso", não "Reduzir": a carteira é rebalanceada só com aporte novo, nunca
+            com venda. O número acima da meta diz o quanto o resto precisa crescer, não uma
+            ordem de venda — e é por isso que a classe também não vai para o topo da fila.
+          */}
           <span class="small text-muted">
-            {bucket.rebalanceAmount >= 0 ? 'Aportar' : 'Reduzir'}{' '}
+            {bucket.rebalanceAmount >= 0 ? 'Aportar' : 'Excesso'}{' '}
             <span class="fw-semibold text-body">{money(Math.abs(bucket.rebalanceAmount))}</span>
           </span>
           {!unclassified && (

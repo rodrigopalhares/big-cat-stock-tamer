@@ -49,9 +49,13 @@ export type AllocationClass = {
   currentPercent: number
   /** Atual − meta, em pontos percentuais. Negativo = abaixo da meta. */
   deviation: number
-  /** |deviation| — é o que ordena a lista, do mais fora do lugar para o menos. */
+  /** |deviation| — o quanto está fora do lugar, sem o sinal. */
   distance: number
-  /** Reais a aportar (positivo) ou a reduzir (negativo) para bater a meta. */
+  /**
+   * Reais que faltam para bater a meta (positivo) ou que sobram acima dela (negativo).
+   * O excesso não vira venda: a carteira só é rebalanceada por aporte novo, então ele é
+   * o quanto o resto precisa crescer para a classe voltar ao lugar.
+   */
   rebalanceAmount: number
   assets: AllocationAsset[]
 }
@@ -66,9 +70,9 @@ export type Allocation = {
 /**
  * Monta a alocação a partir das classes cadastradas e dos ativos com posição.
  *
- * O balde "Sem classe" só aparece quando tem ativo — mas quando aparece, entra na
- * ordenação como qualquer outra classe. Com meta zero, qualquer dinheiro nele vira
- * distância cheia e ele sobe para o topo, que é onde o problema deve estar.
+ * O balde "Sem classe" só aparece quando tem ativo, e aparece no topo: ele não tem meta
+ * para perseguir, então não entra na régua do aporte — é pendência de cadastro, e no fim
+ * de uma lista longa ninguém a veria.
  */
 export function buildAllocation(
   classes: readonly AllocationClassInput[],
@@ -97,7 +101,14 @@ export function buildAllocation(
     )
   }
 
-  buckets.sort((a, b) => b.distance - a.distance || a.name.localeCompare(b.name, 'pt-BR'))
+  // A lista é a fila do próximo aporte: quem está mais abaixo da meta primeiro, quem já
+  // passou dela no fim. O rebalanceamento é sempre por dinheiro novo, nunca por venda —
+  // ordenar pela distância absoluta jogaria para o topo justamente a classe onde não se
+  // deve pôr mais nada.
+  buckets.sort((a, b) => {
+    if ((a.id === null) !== (b.id === null)) return a.id === null ? -1 : 1
+    return a.deviation - b.deviation || a.name.localeCompare(b.name, 'pt-BR')
+  })
 
   return {
     totalValue,
