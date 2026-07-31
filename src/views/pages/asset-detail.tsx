@@ -1,3 +1,4 @@
+import type { AssetClassView } from '../../modules/allocation/allocation.schema.js'
 import type { AssetView } from '../../modules/asset/asset.schema.js'
 import type { DividendView } from '../../modules/dividend/dividend.schema.js'
 import type { AssetPosition } from '../../modules/portfolio/portfolio.schema.js'
@@ -6,6 +7,7 @@ import { date as fmtDate, money, percent, quantity, signClass } from '../../shar
 import type { IsoDate } from '../../shared/iso-date.js'
 import { AssetBadge, DividendBadge, TransactionBadge } from '../components/badge.js'
 import { Layout } from '../layout.js'
+import { EditAssetModal, editAssetAttrs } from '../partials/edit-asset-modal.js'
 import { DividendModal } from './dividends.js'
 import { TransactionModal } from './transactions.js'
 
@@ -13,6 +15,8 @@ import { TransactionModal } from './transactions.js'
 
 export type AssetDetailPageProps = {
   asset: AssetView
+  /** Classes cadastradas, para o select do modal de edição. */
+  classes: AssetClassView[]
   position: AssetPosition | null
   transactions: TransactionView[]
   dividends: DividendView[]
@@ -22,6 +26,7 @@ export type AssetDetailPageProps = {
 
 export function AssetDetailPage({
   asset,
+  classes,
   position,
   transactions,
   dividends,
@@ -44,9 +49,20 @@ export function AssetDetailPage({
             </h2>
             <div class="text-muted">{asset.name ?? '—'}</div>
           </div>
-          <a href="/assets/" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-arrow-left" /> Voltar
-          </a>
+          <div class="d-flex gap-2">
+            {/* returnTo faz o formulário voltar para esta página, não para a lista. */}
+            <button
+              type="button"
+              class="btn btn-outline-primary btn-sm"
+              data-return-to={returnTo}
+              {...editAssetAttrs(asset)}
+            >
+              <i class="bi bi-pencil" /> Editar
+            </button>
+            <a href="/assets/" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-arrow-left" /> Voltar
+            </a>
+          </div>
         </div>
 
         {position !== null && <PositionCards position={position} />}
@@ -108,6 +124,7 @@ export function AssetDetailPage({
         </div>
       </div>
 
+      <EditAssetModal classes={classes} />
       <TransactionModal />
       <DividendModal />
       <script src="/js/transactions.js" defer />

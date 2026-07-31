@@ -37,6 +37,8 @@ export type AssetView = {
   currency: string
   delisted: boolean
   hasPosition: boolean
+  /** Classe de alocação; null é o balde "Sem classe" de `/allocation/`. */
+  assetClassId: number | null
   createdAt: Date
 }
 
@@ -49,6 +51,7 @@ export function toAssetView(asset: Asset): AssetView {
     currency: asset.currency,
     delisted: asset.delisted,
     hasPosition: asset.hasPosition,
+    assetClassId: asset.assetClassId,
     createdAt: asset.createdAt,
   }
 }

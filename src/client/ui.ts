@@ -83,8 +83,11 @@ function openEditAssetModal(trigger: HTMLElement): void {
   setValue('editName', d['assetName'] ?? '')
   setValue('editYfTicker', d['assetYfTicker'] ?? '')
   selectOption('editType', d['assetType'] || 'STOCK')
+  selectOption('editAssetClass', d['assetClassId'] ?? '')
   selectOption('editCurrency', d['assetCurrency'] || 'BRL')
   setChecked('editDelisted', d['assetDelisted'] === 'true')
+  // Sem data-return-to (a lista), o formulário volta para /assets/ pelo padrão do servidor.
+  setValue('editReturnTo', d['returnTo'] ?? '')
 
   const modal = document.getElementById('editAssetModal')
   if (modal !== null) new bootstrap.Modal(modal).show()

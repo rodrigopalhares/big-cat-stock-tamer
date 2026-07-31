@@ -28,6 +28,8 @@ const EditForm = z.object({
   yf_ticker: z.string().default(''),
   currency: z.string().default('BRL'),
   delisted: z.string().default('false'),
+  // Vazio é "sem classe", que é diferente de "não mexer": o select sempre manda um valor.
+  asset_class_id: z.string().default(''),
   returnTo: z.string().optional(),
 })
 
@@ -52,6 +54,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
       return reply.html(
         AssetsPage({
           assets: await c.assets.findFiltered(filters),
+          classes: await c.assetClasses.listViews(),
           selectedType: filters.type ?? '',
           selectedPosition: filters.position ?? '',
           selectedDelisted: filters.delisted ?? '',
@@ -64,16 +67,18 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
       const asset = await c.assets.findById(ticker)
       if (asset === null) throw HttpError.notFound('Asset not found')
 
-      const [entity, transactions, dividends] = await Promise.all([
+      const [entity, transactions, dividends, classes] = await Promise.all([
         c.db.asset.findUniqueOrThrow({ where: { ticker } }),
         c.transactions.listTransactions({ ticker }),
         c.dividends.listDividends(ticker),
+        c.assetClasses.listViews(),
       ])
       const positions = await c.portfolio.buildPositions([entity], false)
 
       return reply.html(
         AssetDetailPage({
           asset,
+          classes,
           position: positions[0] ?? null,
           transactions: transactions.map(toTransactionView),
           dividends: dividends.map(toDividendView),
@@ -91,6 +96,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
         return reply.html(
           AssetsPage({
             assets: await c.assets.findAll(),
+            classes: await c.assetClasses.listViews(),
             selectedType: '',
             selectedPosition: '',
             selectedDelisted: '',
@@ -130,6 +136,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
         yfTicker: form.yf_ticker,
         currency: form.currency,
         delisted: form.delisted === 'on' || form.delisted === 'true',
+        assetClassId: form.asset_class_id === '' ? null : Number(form.asset_class_id),
       })
       return reply.redirect(form.returnTo ?? '/assets/', 302)
     })

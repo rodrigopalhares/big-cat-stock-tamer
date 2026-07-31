@@ -85,11 +85,21 @@ export class AssetService {
       yfTicker?: string | null
       currency?: string | null
       delisted: boolean
+      /**
+       * Ausente preserva a classe atual; `null` explícito tira a classe. O formulário
+       * sempre manda o campo, então "sem classe" precisa ser distinguível de "não veio".
+       */
+      assetClassId?: number | null
     },
   ): Promise<AssetView> {
     const normalized = ticker.toUpperCase()
     const current = await this.db.asset.findUnique({ where: { ticker: normalized } })
     if (current === null) throw HttpError.notFound('Asset not found')
+
+    // Id inválido viraria erro de FK do Prisma, que sai como 500. Confere antes.
+    if (fields.assetClassId !== undefined && fields.assetClassId !== null) {
+      await this.assetClasses.requireExists(fields.assetClassId)
+    }
 
     const asset = await this.db.asset.update({
       where: { ticker: normalized },
@@ -99,6 +109,7 @@ export class AssetService {
         yfTicker: blankToNull(fields.yfTicker),
         currency: fields.currency ? fields.currency : current.currency,
         delisted: fields.delisted,
+        ...(fields.assetClassId === undefined ? {} : { assetClassId: fields.assetClassId }),
       },
     })
     return toAssetView(asset)

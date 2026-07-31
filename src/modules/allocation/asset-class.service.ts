@@ -2,7 +2,7 @@ import type { Db } from '../../config/db.js'
 import { defaultClassNameForType } from '../../domain/asset-class.js'
 import type { AssetClass } from '../../generated/prisma/client.js'
 import { HttpError } from '../../shared/http-error.js'
-import type { AssetClassForm } from './allocation.schema.js'
+import { type AssetClassForm, type AssetClassView, toAssetClassView } from './allocation.schema.js'
 
 /** CRUD das classes de alocação e a classificação padrão de ativo novo. */
 export class AssetClassService {
@@ -10,6 +10,16 @@ export class AssetClassService {
 
   list(): Promise<AssetClass[]> {
     return this.db.assetClass.findMany({ orderBy: { name: 'asc' } })
+  }
+
+  /** O mesmo, no formato que as views recebem. */
+  async listViews(): Promise<AssetClassView[]> {
+    return (await this.list()).map(toAssetClassView)
+  }
+
+  /** Estoura 404 se a classe não existe. Usado por quem grava `assets.asset_class_id`. */
+  async requireExists(id: number): Promise<void> {
+    await this.findOrFail(id)
   }
 
   async create(form: AssetClassForm): Promise<AssetClass> {

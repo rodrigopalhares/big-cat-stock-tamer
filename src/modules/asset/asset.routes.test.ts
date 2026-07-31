@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createHarness, type Harness } from '../../../tests/app-harness.js'
 import { clearAllData } from '../../../tests/db.js'
-import { createAsset, createTransaction } from '../../../tests/factories.js'
+import { createAsset, createAssetClass, createTransaction } from '../../../tests/factories.js'
 import { server, tesouroCsv, yahooChart } from '../../../tests/msw.js'
 
 // Porte de src/test/kotlin/com/stocks/controller/AssetControllerTest.kt
@@ -108,6 +108,24 @@ describe('rotas de ativos', () => {
     })
   })
 
+  describe('GET /assets/:ticker', () => {
+    it('traz o modal de edição preenchido, sem passar pela lista', async () => {
+      const fii = await createAssetClass(h.db, 'Fii')
+      await createAsset(h.db, 'HGLG11', { name: 'CSHG Logística', assetClassId: fii.id })
+
+      const res = await h.app.inject({ method: 'GET', url: '/assets/HGLG11' })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('editAssetModal')
+      expect(res.body).toContain('data-edit-asset')
+      expect(res.body).toContain(`data-asset-class-id="${fii.id}"`)
+      // Volta para o detalhe, não para /assets/.
+      expect(res.body).toContain('data-return-to="/assets/HGLG11"')
+      // O select traz as classes cadastradas.
+      expect(res.body).toContain('asset_class_id')
+    })
+  })
+
   describe('POST /assets/:ticker/edit', () => {
     it('atualiza e redireciona', async () => {
       await createAsset(h.db, 'PETR4')
@@ -135,6 +153,52 @@ describe('rotas de ativos', () => {
 
       const asset = await h.db.asset.findUniqueOrThrow({ where: { ticker: 'PETR4' } })
       expect(asset.delisted).toBe(true)
+    })
+
+    it('troca a classe de alocação', async () => {
+      const fii = await createAssetClass(h.db, 'Fii')
+      await createAsset(h.db, 'HGLG11')
+
+      await h.app.inject({
+        method: 'POST',
+        url: '/assets/HGLG11/edit',
+        payload: {
+          name: '',
+          type: 'REIT',
+          yf_ticker: '',
+          currency: 'BRL',
+          asset_class_id: String(fii.id),
+        },
+      })
+
+      const asset = await h.db.asset.findUniqueOrThrow({ where: { ticker: 'HGLG11' } })
+      expect(asset.assetClassId).toBe(fii.id)
+    })
+
+    it('classe em branco tira a classe do ativo', async () => {
+      const fii = await createAssetClass(h.db, 'Fii')
+      await createAsset(h.db, 'HGLG11', { assetClassId: fii.id })
+
+      await h.app.inject({
+        method: 'POST',
+        url: '/assets/HGLG11/edit',
+        payload: { name: '', type: 'REIT', yf_ticker: '', currency: 'BRL', asset_class_id: '' },
+      })
+
+      const asset = await h.db.asset.findUniqueOrThrow({ where: { ticker: 'HGLG11' } })
+      expect(asset.assetClassId).toBeNull()
+    })
+
+    it('classe inexistente responde 404 em vez de erro de FK', async () => {
+      await createAsset(h.db, 'PETR4')
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/assets/PETR4/edit',
+        payload: { name: '', type: 'STOCK', yf_ticker: '', currency: 'BRL', asset_class_id: '999' },
+      })
+
+      expect(res.statusCode).toBe(404)
     })
 
     it('respeita returnTo', async () => {

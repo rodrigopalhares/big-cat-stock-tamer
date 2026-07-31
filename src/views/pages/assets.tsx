@@ -1,12 +1,15 @@
 import { ASSET_TYPES } from '../../domain/constants.js'
+import type { AssetClassView } from '../../modules/allocation/allocation.schema.js'
 import type { AssetView } from '../../modules/asset/asset.schema.js'
 import { AssetBadge } from '../components/badge.js'
 import { Layout } from '../layout.js'
+import { EditAssetModal, editAssetAttrs } from '../partials/edit-asset-modal.js'
 
 /** Porte de src/main/resources/templates/assets.html. */
 
 export type AssetsPageProps = {
   assets: AssetView[]
+  classes: AssetClassView[]
   selectedType: string
   selectedPosition: string
   selectedDelisted: string
@@ -15,6 +18,7 @@ export type AssetsPageProps = {
 
 export function AssetsPage({
   assets,
+  classes,
   selectedType,
   selectedPosition,
   selectedDelisted,
@@ -75,7 +79,7 @@ export function AssetsPage({
           </div>
         </div>
 
-        <EditAssetModal />
+        <EditAssetModal classes={classes} />
       </div>
     </Layout>
   )
@@ -236,13 +240,7 @@ function AssetTable({ assets }: { assets: AssetView[] }) {
                   type="button"
                   class="btn btn-sm btn-outline-primary"
                   title="Editar"
-                  data-asset-ticker={asset.ticker}
-                  data-asset-name={asset.name ?? ''}
-                  data-asset-type={asset.type ?? 'STOCK'}
-                  data-asset-yf-ticker={asset.yfTicker ?? ''}
-                  data-asset-currency={asset.currency}
-                  data-asset-delisted={String(asset.delisted)}
-                  data-edit-asset
+                  {...editAssetAttrs(asset)}
                 >
                   <i class="bi bi-pencil" />
                 </button>
@@ -261,84 +259,6 @@ function AssetTable({ assets }: { assets: AssetView[] }) {
           ))}
         </tbody>
       </table>
-    </div>
-  )
-}
-
-function EditAssetModal() {
-  return (
-    <div class="modal fade" id="editAssetModal" tabindex={-1}>
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              <i class="bi bi-pencil" /> Editar Ativo — <span id="editModalTicker" />
-            </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" />
-          </div>
-          <form id="editAssetForm" method="post">
-            <div class="modal-body">
-              <div class="mb-3">
-                <label class="form-label">Nome</label>
-                <input
-                  type="text"
-                  id="editName"
-                  name="name"
-                  class="form-control"
-                  placeholder="Ex: Petrobras PN"
-                />
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Tipo</label>
-                <select id="editType" name="type" class="form-select">
-                  {ASSET_TYPES.map((t) => (
-                    <option value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">
-                  YF Ticker <span class="text-muted small">(Yahoo Finance)</span>
-                </label>
-                <input
-                  type="text"
-                  id="editYfTicker"
-                  name="yf_ticker"
-                  class="form-control"
-                  placeholder="Ex: PETR4.SA"
-                />
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Moeda</label>
-                <select id="editCurrency" name="currency" class="form-select">
-                  <option value="BRL">BRL — Real</option>
-                  <option value="USD">USD — Dólar</option>
-                </select>
-              </div>
-              <div class="form-check mb-3">
-                <input
-                  class="form-check-input"
-                  type="checkbox"
-                  id="editDelisted"
-                  name="delisted"
-                  value="on"
-                />
-                <label class="form-check-label" for="editDelisted">
-                  Deslistado
-                </label>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                Cancelar
-              </button>
-              <button type="submit" class="btn btn-primary">
-                <i class="bi bi-check-lg" /> Salvar
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
     </div>
   )
 }
