@@ -91,10 +91,12 @@ function MonthRow({ row, tickers }: { row: MonthlyEvolutionRow; tickers: string[
               <span class="text-muted">—</span>
             ) : (
               <>
-                {money(snapshot.marketValue)}
+                <span class="num">{money(snapshot.marketValue)}</span>
                 <br />
                 <small class="text-muted">
-                  {quantity(snapshot.quantity)} × {money(snapshot.marketPrice)}
+                  <span class="num">
+                    {quantity(snapshot.quantity)} × {money(snapshot.marketPrice)}
+                  </span>
                 </small>
               </>
             )}

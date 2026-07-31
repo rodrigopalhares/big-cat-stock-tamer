@@ -7,7 +7,8 @@ import { Layout } from '../layout.js'
 
 /**
  * Alocação por classe: o quanto cada classe pesa hoje, o quanto deveria pesar e o que
- * fazer a respeito. As classes vêm ordenadas do domínio — mais longe da meta primeiro.
+ * fazer a respeito. As classes vêm ordenadas do domínio — quem está mais abaixo da meta
+ * primeiro, que é a ordem em que o próximo aporte deve entrar.
  */
 
 export type AllocationPageProps = {
@@ -80,11 +81,11 @@ function Summary({ totalValue, totalTarget }: { totalValue: number; totalTarget:
       <div class="card-body d-flex flex-wrap align-items-center gap-4">
         <div>
           <div class="text-muted small">Patrimônio total</div>
-          <div class="fs-4 fw-semibold">{money(totalValue)}</div>
+          <div class="num fs-4 fw-semibold">{money(totalValue)}</div>
         </div>
         <div>
           <div class="text-muted small">Soma das metas</div>
-          <div class={`fs-4 fw-semibold ${offTarget ? 'text-warning' : ''}`}>
+          <div class={`num fs-4 fw-semibold ${offTarget ? 'text-warning' : ''}`}>
             {decimal(totalTarget, 2)}%
           </div>
         </div>
@@ -146,8 +147,8 @@ function ClassCard({
         </span>
 
         <div class="text-muted small">
-          <span class="fw-semibold text-body">{money(bucket.currentValue)}</span> ·{' '}
-          {decimal(bucket.currentPercent, 2)}% da carteira
+          <span class="num fw-semibold text-body">{money(bucket.currentValue)}</span> ·{' '}
+          <span class="num">{decimal(bucket.currentPercent, 2)}%</span> da carteira
         </div>
 
         <div class="d-flex align-items-center gap-1 small text-muted">
@@ -158,7 +159,7 @@ function ClassCard({
             <div class="input-group input-group-sm" style="width: 7rem">
               <input
                 type="number"
-                class="form-control form-control-sm text-end"
+                class="num form-control form-control-sm text-end"
                 name="target_percent"
                 value={decimalInput(bucket.targetPercent)}
                 min="0"
@@ -185,7 +186,7 @@ function ClassCard({
           */}
           <span class="small text-muted">
             {bucket.rebalanceAmount >= 0 ? 'Aportar' : 'Excesso'}{' '}
-            <span class="fw-semibold text-body">{money(Math.abs(bucket.rebalanceAmount))}</span>
+            <span class="num fw-semibold text-body">{money(Math.abs(bucket.rebalanceAmount))}</span>
           </span>
           {!unclassified && (
             <>
@@ -252,7 +253,8 @@ function DeviationBadge({ bucket }: { bucket: AllocationClass }) {
   const below = bucket.deviation < 0
   return (
     <span class={`badge ${below ? 'bg-warning text-dark' : 'bg-info text-dark'}`}>
-      {below ? '↓' : '↑'} {decimal(Math.abs(bucket.deviation), 2)} p.p. {below ? 'abaixo' : 'acima'}
+      {below ? '↓' : '↑'} <span class="num">{decimal(Math.abs(bucket.deviation), 2)}</span> p.p.{' '}
+      {below ? 'abaixo' : 'acima'}
     </span>
   )
 }

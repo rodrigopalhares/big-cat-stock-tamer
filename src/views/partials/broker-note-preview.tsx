@@ -70,7 +70,9 @@ export function BrokerNotePreview({ result }: { result: BrokerNoteImport }) {
                 <td class="text-end">{fmtQuantity(group.quantity)}</td>
                 {/* Quatro casas: o médio ponderado quase nunca cai num centavo redondo. */}
                 <td class="text-end">
-                  {currencySymbol('BRL')} {decimal(group.price, 4)}
+                  <span class="num">
+                    {currencySymbol('BRL')} {decimal(group.price, 4)}
+                  </span>
                 </td>
                 <td class="text-end">{money(group.value, 'BRL')}</td>
                 <td class="text-end">{money(group.fees, 'BRL')}</td>
@@ -100,7 +102,7 @@ export function BrokerNotePreview({ result }: { result: BrokerNoteImport }) {
           {result.fees.map((fee, index) => (
             <span>
               {index > 0 && ' · '}
-              {fee.label} {money(fee.value, 'BRL')}
+              {fee.label} <span class="num">{money(fee.value, 'BRL')}</span>
             </span>
           ))}
         </p>

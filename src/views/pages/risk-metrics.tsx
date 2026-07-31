@@ -110,7 +110,7 @@ function SummaryCard({ label, value }: { label: string; value: string | null }) 
       <div class="card border-0 shadow-sm h-100">
         <div class="card-body">
           <div class="text-muted small mb-1">{label}</div>
-          <div class={`fs-4 fw-bold ${value === null ? 'text-muted' : ''}`}>{value ?? '—'}</div>
+          <div class={`num fs-4 fw-bold ${value === null ? 'text-muted' : ''}`}>{value ?? '—'}</div>
         </div>
       </div>
     </div>
