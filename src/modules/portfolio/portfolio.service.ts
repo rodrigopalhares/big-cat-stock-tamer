@@ -152,9 +152,11 @@ export class PortfolioService {
     const yfToAsset = new Map<string, string>()
     const tdToAsset = new Map<string, string>()
 
-    const withTransactions = await this.tickersWithTransactions()
     for (const asset of assets) {
-      if (!withTransactions.has(asset.ticker)) continue
+      // Só quem ainda está em carteira: posição encerrada não tem valor de mercado para
+      // atualizar, e a cotação do dia dela não entra em soma nenhuma. A linha do papel
+      // vendido continua na tabela, mostrando o último preço já gravado.
+      if (!asset.hasPosition) continue
       if (asset.delisted) continue
       if (asset.type !== null && NO_QUOTE_TYPES.has(asset.type as AssetType)) continue
 
@@ -213,11 +215,6 @@ export class PortfolioService {
         records.push({ assetId: assetTicker, date: today, close: price })
     }
     await this.priceHistory.upsertPrices(records)
-  }
-
-  private async tickersWithTransactions(): Promise<Set<string>> {
-    const grouped = await this.db.transaction.groupBy({ by: ['assetId'] })
-    return new Set(grouped.map((g) => g.assetId))
   }
 
   private async loadTransactionsByAsset(

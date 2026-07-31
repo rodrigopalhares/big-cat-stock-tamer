@@ -208,7 +208,7 @@ describe('PriceHistoryService', () => {
   describe('runDailyUpdate', () => {
     it('grava só o preço de hoje', async () => {
       server.use(yahooChart('yahoo_chart_historical.json'))
-      await createAsset(db, 'PETR3', { yfTicker: 'PETR3.SA' })
+      await createAsset(db, 'PETR3', { yfTicker: 'PETR3.SA', hasPosition: true })
       await createTransaction(db, 'PETR3', { date: '2024-01-01' })
 
       // O fixture não tem preço de 30/06, então nada é gravado.
@@ -223,9 +223,37 @@ describe('PriceHistoryService', () => {
       await expect(service.runDailyUpdate(TODAY)).resolves.toBeUndefined()
     })
 
+    it('posição encerrada não busca cotação', async () => {
+      // Sem handler do Yahoo: se o serviço tentasse buscar, o teste estouraria na rede.
+      await createAsset(db, 'MGLU3', { yfTicker: 'MGLU3.SA', hasPosition: false })
+      await createTransaction(db, 'MGLU3', { date: '2024-01-01' })
+
+      await service.runDailyUpdate(TODAY)
+
+      expect(await db.priceHistory.count({ where: { assetId: 'MGLU3' } })).toBe(0)
+    })
+
+    it('deslistado sem posição não gera preço interpolado', async () => {
+      await createAsset(db, 'HGTX3', { yfTicker: 'HGTX3.SA', delisted: true, hasPosition: false })
+      await createTransaction(db, 'HGTX3', { date: '2024-01-01', price: 10 })
+
+      await service.runDailyUpdate(TODAY)
+
+      expect(await db.priceHistory.count({ where: { assetId: 'HGTX3' } })).toBe(0)
+    })
+
+    it('deslistado com posição continua gerando preço interpolado', async () => {
+      await createAsset(db, 'HGTX3', { yfTicker: 'HGTX3.SA', delisted: true, hasPosition: true })
+      await createTransaction(db, 'HGTX3', { date: '2024-01-01', price: 10 })
+
+      await service.runDailyUpdate(TODAY)
+
+      expect(await db.priceHistory.count({ where: { assetId: 'HGTX3' } })).toBeGreaterThan(0)
+    })
+
     it('erro da API não derruba a atualização', async () => {
       server.use(yahooError(503))
-      await createAsset(db, 'PETR3', { yfTicker: 'PETR3.SA' })
+      await createAsset(db, 'PETR3', { yfTicker: 'PETR3.SA', hasPosition: true })
       await createTransaction(db, 'PETR3', { date: '2024-01-01' })
 
       await expect(service.runDailyUpdate(TODAY)).resolves.toBeUndefined()

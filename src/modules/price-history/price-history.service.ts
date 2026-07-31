@@ -161,28 +161,35 @@ export class PriceHistoryService {
     }
   }
 
-  /** Busca só o preço de hoje — roda no scheduler das 18:30. */
+  /**
+   * Busca só o preço de hoje — roda no scheduler das 18:30.
+   *
+   * Só de quem ainda está em carteira. Papel já vendido não muda mais o patrimônio nem a
+   * evolução: a cotação de hoje dele não entra em conta nenhuma, e buscá-la só gastava
+   * chamada de API — dezenas delas, num acervo em que a maioria dos ativos já saiu.
+   * O histórico do período em que a posição existiu continua gravado, e é o `runBackfill`
+   * quem preenche buraco antigo, inclusive de posição encerrada.
+   */
   async runDailyUpdate(today: IsoDate = todayIso()): Promise<void> {
     const assets = await this.loadAssetsWithTransactions()
+    const active = assets.filter((a) => a.transactionCount > 0 && a.hasPosition)
 
-    for (const asset of assets) {
-      if (asset.delisted && asset.transactionCount > 0) {
+    for (const asset of active) {
+      if (asset.delisted) {
         await this.generateDelistedPrices(asset.ticker, today)
       }
     }
 
-    const withTransactions = assets
-      .filter((a) => a.transactionCount > 0)
-      .map(
-        (a): AssetTickerInfo => ({
-          ticker: a.ticker,
-          yfTicker: a.yfTicker,
-          type: a.type,
-          delisted: a.delisted,
-        }),
-      )
+    const activeTickers = active.map(
+      (a): AssetTickerInfo => ({
+        ticker: a.ticker,
+        yfTicker: a.yfTicker,
+        type: a.type,
+        delisted: a.delisted,
+      }),
+    )
 
-    const maps = categorizeAssets(withTransactions)
+    const maps = categorizeAssets(activeTickers)
 
     if (maps.yfTickerMap.size > 0) {
       const batch = await this.yahoo.fetchHistoricalQuotesBatch(maps.yfTickerMap, today)
@@ -215,13 +222,14 @@ export class PriceHistoryService {
       yfTicker: string | null
       type: string
       delisted: boolean
+      hasPosition: boolean
       transactionCount: number
       firstTransactionDate: IsoDate | null
     }>
   > {
     const [assets, grouped] = await Promise.all([
       this.db.asset.findMany({
-        select: { ticker: true, yfTicker: true, type: true, delisted: true },
+        select: { ticker: true, yfTicker: true, type: true, delisted: true, hasPosition: true },
         orderBy: { ticker: 'asc' },
       }),
       this.db.transaction.groupBy({

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createHarness, type Harness } from '../../../tests/app-harness.js'
 import { clearAllData } from '../../../tests/db.js'
 import { createAsset, createAssetClass, createPriceHistory } from '../../../tests/factories.js'
+import { HttpResponse, http, server, TESOURO_CSV } from '../../../tests/msw.js'
 import type { Allocation } from '../../domain/allocation.js'
 import { today } from '../../shared/iso-date.js'
 
@@ -94,6 +95,8 @@ describe('rotas de alocação', () => {
     })
 
     it('posição sem cotação fica de fora, mas avisa em vez de sumir', async () => {
+      // O CSV do Tesouro fora do ar é justamente o caso que faz a posição ficar sem preço.
+      server.use(http.get(TESOURO_CSV, () => new HttpResponse(null, { status: 503 })))
       const rendaFixa = await createAssetClass(h.db, 'Renda Fixa', { targetPercent: 50 })
       await position(h, 'PETR4', 1000, null)
       // Sem price_history: o portfólio não acha preço e o valor de mercado fica null.

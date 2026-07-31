@@ -181,6 +181,24 @@ describe('PortfolioService', () => {
       expect(position?.delisted).toBe(true)
     })
 
+    it('posição encerrada não é consultada na API', async () => {
+      // Vendido: continua na lista pelo resultado realizado, mas sem valor de mercado a
+      // atualizar. Sem handler do Yahoo — se chamasse a API, o teste falharia.
+      await createAsset(db, 'MGLU3', {
+        yfTicker: 'MGLU3.SA',
+        hasPosition: false,
+        realizedPnl: 500,
+        realizedPnlBrl: 500,
+      })
+      await createPriceHistory(db, 'MGLU3', '2024-06-01', 3)
+
+      const [position] = await service.buildPositions(await db.asset.findMany(), true, TODAY)
+
+      // O último preço gravado, não o de hoje.
+      expect(position?.currentPrice).toBe(3)
+      expect(position?.currentValue).toBeNull()
+    })
+
     it('tipo sem cotação usa apenas o histórico', async () => {
       await seedPosition('CDB1', { type: 'RENDA_FIXA' })
       await createPriceHistory(db, 'CDB1', '2024-06-01', 100)
