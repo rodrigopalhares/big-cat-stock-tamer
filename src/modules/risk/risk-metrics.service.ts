@@ -23,10 +23,17 @@ export const MIN_RELIABLE_DATA_POINTS = 12
 const LOOKBACK_YEARS = 5
 const RISK_ASSET_TYPES = ['STOCK', 'REIT']
 
+/** `with` esconde quem não tem posição aberta; `all` lista todo ativo já calculado. */
+export type PositionFilter = 'with' | 'all'
+
 export type RiskMetricsResult = {
   ticker: string
   name: string | null
   type: string | null
+  hasPosition: boolean
+  currentValue: number
+  /** Fatia que a posição ocupa dentro do próprio tipo; null quando o tipo não vale nada. */
+  typeShare: number | null
   beta: number | null
   alphaAnnual: number | null
   rSquared: number | null
@@ -112,7 +119,7 @@ export class RiskMetricsService {
   }
 
   /** Última rodada de métricas, com o beta da carteira ponderado pelo valor de cada posição. */
-  async getSummary(): Promise<RiskMetricsSummary> {
+  async getSummary(position: PositionFilter = 'with'): Promise<RiskMetricsSummary> {
     const latest = await this.db.riskMetric.findFirst({
       orderBy: { calculatedAt: 'desc' },
       select: { calculatedAt: true },
@@ -128,13 +135,32 @@ export class RiskMetricsService {
     })
     const assetByTicker = new Map(assets.map((a) => [a.ticker, a]))
 
-    const metrics: RiskMetricsResult[] = rows
+    const currentValues = await this.currentValues(rows.map((r) => r.ticker))
+
+    // Somado sobre todos os ativos, mesmo os que o filtro vai esconder: quem não tem
+    // posição vale zero e não muda o total do tipo.
+    const totalByType = new Map<string, number>()
+    for (const row of rows) {
+      const type = assetByTicker.get(row.ticker)?.type
+      if (type === undefined || type === null) continue
+      totalByType.set(type, (totalByType.get(type) ?? 0) + (currentValues.get(row.ticker) ?? 0))
+    }
+
+    const all: RiskMetricsResult[] = rows
+      // Sem regressão a linha inteira seria um traço em cada coluna — não informa nada.
+      // O ativo continua contando no total do tipo e no beta da carteira, só não é listado.
+      .filter((row) => row.beta !== null)
       .map((row) => {
         const asset = assetByTicker.get(row.ticker)
+        const currentValue = currentValues.get(row.ticker) ?? 0
+        const typeTotal = asset?.type == null ? 0 : (totalByType.get(asset.type) ?? 0)
         return {
           ticker: row.ticker,
           name: asset?.name ?? null,
           type: asset?.type ?? null,
+          hasPosition: (asset?.hasPosition ?? false) && (asset?.quantity ?? 0) > 0,
+          currentValue,
+          typeShare: typeTotal > 0 ? currentValue / typeTotal : null,
           beta: row.beta,
           alphaAnnual: row.alpha,
           rSquared: row.rSquared,
@@ -146,21 +172,17 @@ export class RiskMetricsService {
         (a, b) => (a.type ?? '').localeCompare(b.type ?? '') || a.ticker.localeCompare(b.ticker),
       )
 
-    const currentValues = await this.currentValues(rows.map((r) => r.ticker))
+    // O beta da carteira ignora o filtro: ele descreve a carteira inteira, não a lista à vista.
     const totalValue = [...currentValues.values()].reduce((total, v) => total + v, 0)
     const portfolioBeta =
       totalValue > 0
-        ? metrics
+        ? all
             .filter((m) => m.beta !== null)
-            .reduce(
-              (total, m) =>
-                total + ((currentValues.get(m.ticker) ?? 0) / totalValue) * (m.beta as number),
-              0,
-            )
+            .reduce((total, m) => total + (m.currentValue / totalValue) * (m.beta as number), 0)
         : null
 
     return {
-      metrics,
+      metrics: position === 'all' ? all : all.filter((m) => m.hasPosition),
       portfolioBeta,
       cdiAnnual: rows[0]?.cdiAnnual ?? null,
       calculatedAt: latest.calculatedAt as IsoDate,

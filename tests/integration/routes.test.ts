@@ -847,7 +847,8 @@ describe('rotas da aplicação', () => {
     })
 
     it('mostra o beta e marca o não confiável', async () => {
-      await createAsset(h.db, 'PETR4', { type: 'STOCK' })
+      await createAsset(h.db, 'PETR4', { type: 'STOCK', hasPosition: true, quantity: 10 })
+      await createPriceHistory(h.db, 'PETR4', '2024-06-01', 10)
       await h.db.riskMetric.create({
         data: { ticker: 'PETR4', calculatedAt: '2024-06-30', beta: 1.25, dataPoints: 5 },
       })
@@ -855,6 +856,21 @@ describe('rotas da aplicação', () => {
       const res = await h.app.inject({ method: 'GET', url: '/risk-metrics/' })
       expect(res.body).toContain('1,25')
       expect(res.body).toContain('⚠️')
+      // Único ativo do tipo — a posição é 100% do STOCK.
+      expect(res.body).toContain('100,00%')
+    })
+
+    it('esconde o ativo sem posição até pedirem todos', async () => {
+      await createAsset(h.db, 'VALE3', { type: 'STOCK' })
+      await h.db.riskMetric.create({
+        data: { ticker: 'VALE3', calculatedAt: '2024-06-30', beta: 1.25, dataPoints: 12 },
+      })
+
+      const filtered = await h.app.inject({ method: 'GET', url: '/risk-metrics/' })
+      expect(filtered.body).not.toContain('VALE3')
+
+      const all = await h.app.inject({ method: 'GET', url: '/risk-metrics/?position=all' })
+      expect(all.body).toContain('VALE3')
     })
   })
 

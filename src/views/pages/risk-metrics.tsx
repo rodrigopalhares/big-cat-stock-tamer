@@ -1,4 +1,4 @@
-import type { RiskMetricsResult } from '../../modules/risk/risk-metrics.service.js'
+import type { PositionFilter, RiskMetricsResult } from '../../modules/risk/risk-metrics.service.js'
 import { decimal, date as fmtDate, percent } from '../../shared/format.js'
 import type { IsoDate } from '../../shared/iso-date.js'
 import { AssetBadge } from '../components/badge.js'
@@ -25,11 +25,17 @@ const R2_HELP =
 
 const UNRELIABLE_HELP = 'Menos de 12 meses de dados — resultado pode não ser confiável'
 
+const TYPE_SHARE_HELP =
+  'Quanto o valor atual da posição representa dentro do próprio tipo de ativo — o denominador ' +
+  'é a soma de todos os ativos do tipo, inclusive os que o filtro esconde. Ativo sem posição ' +
+  'fica com 0%.'
+
 export type RiskMetricsPageProps = {
   metrics: RiskMetricsResult[]
   portfolioBeta: number | null
   cdiAnnual: number | null
   calculatedAt: IsoDate | null
+  selectedPosition: PositionFilter
 }
 
 export function RiskMetricsPage({
@@ -37,7 +43,10 @@ export function RiskMetricsPage({
   portfolioBeta,
   cdiAnnual,
   calculatedAt,
+  selectedPosition,
 }: RiskMetricsPageProps) {
+  // Lista vazia com cálculo feito é o filtro escondendo tudo, não falta de dados.
+  const hasCalculation = calculatedAt !== null
   const hasData = metrics.length > 0
 
   return (
@@ -59,7 +68,7 @@ export function RiskMetricsPage({
           </button>
         </div>
 
-        {hasData && (
+        {hasCalculation && (
           <div class="row g-3 mb-4">
             <SummaryCard
               label="Beta da Carteira (ponderado)"
@@ -79,16 +88,34 @@ export function RiskMetricsPage({
         <div class="alert alert-info py-2 px-3 mb-3 small">
           <i class="bi bi-info-circle me-1" />
           Benchmark: <strong>IBOVESPA</strong> · Retornos mensais · Janela de 5 anos · Apenas ativos{' '}
-          <strong>STOCK</strong> e <strong>REIT</strong>
+          <strong>STOCK</strong> e <strong>REIT</strong> · Ativos sem série suficiente para a
+          regressão ficam de fora da lista
         </div>
 
         <div class="card border-0 shadow-sm">
-          <div class="card-header bg-white">
-            <span class="fw-semibold">Indicadores por Ativo</span>
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <span class="fw-semibold">
+              Indicadores por Ativo <span class="badge bg-secondary ms-1">{metrics.length}</span>
+            </span>
+            {hasCalculation && <PositionFilterForm selectedPosition={selectedPosition} />}
           </div>
           <div class="card-body p-0">
             {hasData ? (
               <MetricsTable metrics={metrics} />
+            ) : hasCalculation ? (
+              <div class="text-center text-muted py-5">
+                <p class="mt-2">Nenhum ativo para exibir.</p>
+                <p class="small">
+                  {selectedPosition === 'with' ? (
+                    <>
+                      Selecione <strong>Todos os ativos</strong> para incluir quem não tem posição
+                      aberta.
+                    </>
+                  ) : (
+                    'Nenhum ativo tem série mensal suficiente para a regressão.'
+                  )}
+                </p>
+              </div>
             ) : (
               <div class="text-center text-muted py-5">
                 <p class="mt-2">Nenhuma métrica calculada.</p>
@@ -117,6 +144,21 @@ function SummaryCard({ label, value }: { label: string; value: string | null }) 
   )
 }
 
+function PositionFilterForm({ selectedPosition }: { selectedPosition: PositionFilter }) {
+  return (
+    <form method="get" action="/risk-metrics/" class="d-flex align-items-center mb-0">
+      <select name="position" class="form-select form-select-sm" style="width:auto" data-autosubmit>
+        <option value="with" selected={selectedPosition === 'with'}>
+          Apenas com posição
+        </option>
+        <option value="all" selected={selectedPosition === 'all'}>
+          Todos os ativos
+        </option>
+      </select>
+    </form>
+  )
+}
+
 function MetricsTable({ metrics }: { metrics: RiskMetricsResult[] }) {
   return (
     <div class="table-responsive">
@@ -125,6 +167,7 @@ function MetricsTable({ metrics }: { metrics: RiskMetricsResult[] }) {
           <tr>
             <th>Ativo</th>
             <th>Tipo</th>
+            <HelpHeader label="% do Tipo" help={TYPE_SHARE_HELP} />
             <HelpHeader label="Beta" help={BETA_HELP} />
             <HelpHeader label="Alpha (a.a.)" help={ALPHA_HELP} />
             <HelpHeader label="R²" help={R2_HELP} />
@@ -133,7 +176,7 @@ function MetricsTable({ metrics }: { metrics: RiskMetricsResult[] }) {
         </thead>
         <tbody>
           {metrics.map((m) => (
-            <tr>
+            <tr style={m.hasPosition ? '' : 'opacity: 0.55'}>
               <td>
                 <a href={`/assets/${m.ticker}`} class="text-decoration-none fw-semibold">
                   {m.ticker}
@@ -141,6 +184,13 @@ function MetricsTable({ metrics }: { metrics: RiskMetricsResult[] }) {
               </td>
               <td>
                 {m.type === null ? <span class="text-muted">—</span> : <AssetBadge type={m.type} />}
+              </td>
+              <td class="text-end">
+                {m.typeShare === null ? (
+                  <span class="text-muted">—</span>
+                ) : (
+                  <span class={m.hasPosition ? '' : 'text-muted'}>{percent(m.typeShare)}</span>
+                )}
               </td>
               <td class="text-end">
                 {m.beta === null ? (
