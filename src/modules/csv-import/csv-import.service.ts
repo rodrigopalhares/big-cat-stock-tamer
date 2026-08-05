@@ -1,4 +1,10 @@
 import type { Db } from '../../config/db.js'
+import type { B3MovimentacaoResult } from '../../domain/csv/b3-movimentacao.js'
+import {
+  dividendKey,
+  markAlreadyImported,
+  parseB3Movimentacao,
+} from '../../domain/csv/b3-movimentacao.js'
 import type { DividendCsvRow } from '../../domain/csv/dividend-csv.js'
 import { parseDividendCsvRows } from '../../domain/csv/dividend-csv.js'
 import { sortByImportOrder } from '../../domain/csv/import-order.js'
@@ -8,6 +14,7 @@ import {
   extractDistinctTickers,
   parseCsvRows,
 } from '../../domain/csv/transaction-csv.js'
+import { readXlsxSheet } from '../../domain/xlsx/xlsx-reader.js'
 import type { AssetInfoLookup } from '../../integrations/asset-info.client.js'
 import { isoDate } from '../../shared/iso-date.js'
 import type { AssetClassService } from '../allocation/asset-class.service.js'
@@ -185,6 +192,43 @@ export class CsvImportService {
     }))
   }
 
+  /**
+   * Extrato "Movimentação" da B3 (`.xlsx`) → as mesmas linhas de preview do CSV colado.
+   * Não existe um segundo caminho de escrita: daqui em diante é o `/dividends/batch` de
+   * sempre, com o preview editável no meio.
+   */
+  async parseB3MovimentacaoXlsx(file: Uint8Array): Promise<B3MovimentacaoResult> {
+    const { rows, discarded } = parseB3Movimentacao(
+      readXlsxSheet(file),
+      await this.existingTickers(),
+    )
+
+    const marked = markAlreadyImported(rows, await this.dividendKeysBetween(rows))
+    return {
+      rows: sortByImportOrder(marked, (row) => ({
+        status: row.error === null ? 'EXISTS' : 'ERROR',
+        type: row.type,
+        name: row.ticker,
+      })),
+      discarded,
+    }
+  }
+
+  /**
+   * Só os proventos do período do arquivo: buscar a tabela inteira para conferir duplicata
+   * de dois meses puxaria milhares de linhas a cada upload.
+   */
+  private async dividendKeysBetween(rows: readonly DividendCsvRow[]): Promise<Set<string>> {
+    const dates = rows.filter((row) => row.error === null).map((row) => row.date)
+    if (dates.length === 0) return new Set()
+
+    const existing = await this.db.dividend.findMany({
+      where: { date: { gte: dates.reduce(min), lte: dates.reduce(max) } },
+      select: { assetId: true, date: true, type: true, totalAmount: true },
+    })
+    return new Set(existing.map((d) => dividendKey(d.assetId, d.date, d.type, d.totalAmount)))
+  }
+
   async batchImportDividends(rows: readonly DividendBatchRowRequest[]): Promise<number> {
     let inserted = 0
     for (const row of rows) {
@@ -207,3 +251,7 @@ export class CsvImportService {
     return new Set(assets.map((a) => a.ticker))
   }
 }
+
+// Data ISO ordena como texto, então min/max de string bastam.
+const min = (a: string, b: string): string => (b < a ? b : a)
+const max = (a: string, b: string): string => (b > a ? b : a)

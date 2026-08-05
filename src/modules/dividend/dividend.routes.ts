@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify'
 import { z } from 'zod'
 import type { Container } from '../../container.js'
+import { HttpError } from '../../shared/http-error.js'
 import { isoDate, today as todayIso } from '../../shared/iso-date.js'
 import { TransactionTickerInfo } from '../../views/components/ticker-info.js'
 import { DividendsPage } from '../../views/pages/dividends.js'
@@ -89,6 +90,19 @@ export function dividendRoutes(c: Container): FastifyPluginAsync {
       return reply.partial(DividendCsvPreview({ rows }))
     })
 
+    /**
+     * Upload do extrato de Movimentação da B3. Devolve o mesmo fragmento do CSV — a única
+     * diferença é o resumo do que foi descartado, para o total bater com o arquivo.
+     */
+    app.post('/dividends/parse-xlsx', async (req, reply) => {
+      const upload = await req.file()
+      if (upload === undefined) throw HttpError.badRequest('Nenhum arquivo enviado.')
+
+      const file = await upload.toBuffer()
+      const result = await parseSheet(c, new Uint8Array(file))
+      return reply.partial(DividendCsvPreview({ rows: result.rows, discarded: result.discarded }))
+    })
+
     app.post('/dividends/batch', async (req) => {
       const body = BatchBody.parse(req.body)
       return { inserted: await c.csvImport.batchImportDividends(body.rows) }
@@ -120,5 +134,18 @@ export function dividendRoutes(c: Container): FastifyPluginAsync {
       await c.dividends.deleteDividend(Number(req.params.id))
       return reply.code(204).send()
     })
+  }
+}
+
+/**
+ * Arquivo que não é o extrato da B3 é erro do usuário, não falha do servidor: o leitor de
+ * xlsx e a conferência do cabeçalho jogam `Error`, e sem isso viraria 500 sem explicação.
+ */
+async function parseSheet(c: Container, file: Uint8Array) {
+  try {
+    return await c.csvImport.parseB3MovimentacaoXlsx(file)
+  } catch (error) {
+    if (error instanceof HttpError) throw error
+    throw HttpError.badRequest(error instanceof Error ? error.message : String(error))
   }
 }

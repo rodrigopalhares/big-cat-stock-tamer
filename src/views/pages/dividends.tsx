@@ -276,43 +276,107 @@ function CsvImportModal() {
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
-              <i class="bi bi-file-earmark-spreadsheet" /> Importar Proventos via CSV
+              <i class="bi bi-file-earmark-spreadsheet" /> Importar Proventos
             </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" />
           </div>
           <div class="modal-body d-flex flex-column overflow-hidden">
-            <div class="flex-shrink-0 mb-3">
-              <label class="form-label">Cole os dados do CSV (separado por tab):</label>
-              <textarea
-                id="divCsvTextarea"
-                name="csv"
-                class="form-control font-monospace"
-                rows={6}
-                placeholder="PETR4&#9;01/03/2026&#9;DIVIDENDO&#9;1,50&#9;0,00&#9;BRL&#9;XP&#9;&#9;"
-              />
-              <div class="form-text">
-                Formato: ticker &lt;tab&gt; data &lt;tab&gt; tipo &lt;tab&gt; valor &lt;tab&gt; IR
-                &lt;tab&gt; moeda &lt;tab&gt; corretora &lt;tab&gt; [ignorar] &lt;tab&gt; notas
-              </div>
-            </div>
-            <div class="flex-shrink-0 mb-3">
+            {/* div em vez de ul/li pelo mesmo motivo do modal de transações: o lint não
+                quer papel interativo dentro de lista. */}
+            <div class="nav nav-tabs flex-shrink-0 mb-3" role="tablist">
               <button
                 type="button"
-                class="btn btn-secondary"
-                hx-post="/dividends/parse-csv"
-                hx-include="#divCsvTextarea"
-                hx-target="#div-csv-preview-area"
-                hx-indicator="#divCsvSpinner"
+                class="nav-link active"
+                data-bs-toggle="tab"
+                data-bs-target="#divCsvTabPane"
+                role="tab"
               >
-                <i class="bi bi-arrow-repeat" /> Processar
+                <i class="bi bi-clipboard" /> CSV
               </button>
-              <span id="divCsvSpinner" class="htmx-indicator">
-                <span class="spinner-border spinner-border-sm" role="status" /> Processando...
-              </span>
+              <button
+                type="button"
+                class="nav-link"
+                data-bs-toggle="tab"
+                data-bs-target="#divXlsxTabPane"
+                role="tab"
+              >
+                <i class="bi bi-file-earmark-arrow-up" /> Extrato da B3
+              </button>
             </div>
+
+            <div class="tab-content flex-shrink-0 mb-3">
+              <div class="tab-pane fade show active" id="divCsvTabPane" role="tabpanel">
+                <label class="form-label" for="divCsvTextarea">
+                  Cole os dados do CSV (separado por tab):
+                </label>
+                <textarea
+                  id="divCsvTextarea"
+                  name="csv"
+                  class="form-control font-monospace"
+                  rows={6}
+                  placeholder="PETR4&#9;01/03/2026&#9;DIVIDENDO&#9;1,50&#9;0,00&#9;BRL&#9;XP&#9;&#9;"
+                />
+                <div class="form-text">
+                  Formato: ticker &lt;tab&gt; data &lt;tab&gt; tipo &lt;tab&gt; valor &lt;tab&gt; IR
+                  &lt;tab&gt; moeda &lt;tab&gt; corretora &lt;tab&gt; [ignorar] &lt;tab&gt; notas
+                </div>
+                <div class="mt-3">
+                  <button
+                    type="button"
+                    class="btn btn-secondary"
+                    hx-post="/dividends/parse-csv"
+                    hx-include="#divCsvTextarea"
+                    hx-target="#div-csv-preview-area"
+                    hx-indicator="#divCsvSpinner"
+                  >
+                    <i class="bi bi-arrow-repeat" /> Processar
+                  </button>
+                  <span id="divCsvSpinner" class="htmx-indicator">
+                    <span class="spinner-border spinner-border-sm" role="status" /> Processando...
+                  </span>
+                </div>
+              </div>
+
+              <XlsxImportPane />
+            </div>
+
             <div id="div-csv-preview-area" class="flex-grow-1 overflow-auto min-h-0" />
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Aba do extrato da B3. O preview cai na mesma área da aba do CSV — do "Confirmar
+ * Importação" em diante os dois caminhos são um só.
+ */
+function XlsxImportPane() {
+  return (
+    <div class="tab-pane fade" id="divXlsxTabPane" role="tabpanel">
+      <label class="form-label" for="divXlsxFile">
+        Envie o extrato de Movimentação da B3 (.xlsx):
+      </label>
+      <input
+        type="file"
+        class="form-control"
+        id="divXlsxFile"
+        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      />
+      <div class="form-text">
+        Área do Investidor → Extrato → Movimentação → Baixar em Excel. Rendimento, dividendo, JCP e
+        a taxa de aluguel viram provento; transferência e a perna em ações do empréstimo são
+        descartadas. O que já está no histórico chega com "Ignorar" marcado, então dá para enviar o
+        período inteiro sem recortar.
+      </div>
+      <div class="mt-3">
+        <button type="button" class="btn btn-secondary" data-div-xlsx-parse>
+          <i class="bi bi-arrow-repeat" /> Processar
+        </button>
+        <span id="divXlsxSpinner" class="d-none ms-2">
+          <span class="spinner-border spinner-border-sm" role="status" /> Lendo o extrato...
+        </span>
       </div>
     </div>
   )

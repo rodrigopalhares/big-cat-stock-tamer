@@ -28,6 +28,14 @@ export type DividendCsvRow = {
   readonly broker: string
   readonly notes: string
   readonly error: string | null
+  /**
+   * Ressalva que **não** impede a importação — o extrato da B3 tem linhas certas o bastante
+   * para importar e ambíguas o bastante para conferir (ver `b3-movimentacao.ts`). Erro some
+   * com a linha; aviso deixa ela passar com a dúvida à vista.
+   */
+  readonly warning: string | null
+  /** Linha que chega com "Ignorar" já marcado: duplicata ou evento que não é provento. */
+  readonly skipByDefault: boolean
 }
 
 const MIN_COLUMNS = 7
@@ -59,6 +67,8 @@ function parseSingleRow(
       broker: '',
       notes: '',
       error: `Colunas insuficientes (esperado pelo menos ${MIN_COLUMNS}, encontrado ${cols.length})`,
+      warning: null,
+      skipByDefault: false,
     }
   }
 
@@ -75,6 +85,8 @@ function parseSingleRow(
       broker: column(cols, 6).trim(),
       notes: column(cols, 8).trim(),
       error: 'Ticker vazio',
+      warning: null,
+      skipByDefault: false,
     }
   }
 
@@ -116,6 +128,8 @@ function parseSingleRow(
     broker,
     notes,
     error: errors.length > 0 ? errors.join('; ') : null,
+    warning: null,
+    skipByDefault: false,
   }
 }
 

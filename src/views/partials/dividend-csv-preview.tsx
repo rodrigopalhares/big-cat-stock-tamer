@@ -8,16 +8,37 @@ import type { DividendCsvRow } from '../../domain/csv/dividend-csv.js'
  * Diferente do CSV de transações, aqui não há etapa de revisão de ativos: provento exige
  * ativo já cadastrado, então linha com ticker desconhecido vem marcada como erro.
  */
-export function DividendCsvPreview({ rows }: { rows: DividendCsvRow[] }) {
+export function DividendCsvPreview({
+  rows,
+  discarded,
+}: {
+  rows: DividendCsvRow[]
+  /** Linhas de custódia do extrato da B3 que nunca seriam provento. Ausente no CSV colado. */
+  discarded?: number
+}) {
   if (rows.length === 0) {
-    return <div class="alert alert-warning">Nenhuma linha válida encontrada no CSV.</div>
+    return (
+      <div class="alert alert-warning">
+        Nenhuma linha de provento encontrada.
+        {discarded !== undefined && discarded > 0 && (
+          <span> {discarded} linhas do extrato são movimentação de custódia.</span>
+        )}
+      </div>
+    )
   }
 
   const withError = rows.filter((row) => row.error !== null).length
-  const importable = rows.length - withError
+  const skipped = rows.filter((row) => row.error === null && row.skipByDefault).length
+  const importable = rows.length - withError - skipped
 
   return (
     <div>
+      {discarded !== undefined && (
+        <div class="alert alert-secondary py-2 small">
+          <i class="bi bi-funnel" /> {rows.length} linhas de provento · {discarded} linhas de
+          custódia descartadas (transferência, cessão de direitos e a perna em ações do empréstimo).
+        </div>
+      )}
       {withError > 0 && (
         <div class="form-check form-switch mb-2">
           <input
@@ -61,6 +82,7 @@ export function DividendCsvPreview({ rows }: { rows: DividendCsvRow[] }) {
         <span class="text-muted small">
           {rows.length} linhas processadas
           {withError > 0 && <span class="text-danger ms-2">({withError} com erro)</span>}
+          {skipped > 0 && <span class="text-warning-emphasis ms-2">({skipped} ignoradas)</span>}
         </span>
         <button
           type="button"
@@ -79,9 +101,13 @@ export function DividendCsvPreview({ rows }: { rows: DividendCsvRow[] }) {
 
 function PreviewRow({ row }: { row: DividendCsvRow }) {
   const hasError = row.error !== null
+  const hasWarning = !hasError && row.warning !== null
 
   return (
-    <tr class={hasError ? 'table-danger' : ''} data-has-error={String(hasError)}>
+    <tr
+      class={hasError ? 'table-danger' : hasWarning ? 'table-warning' : ''}
+      data-has-error={String(hasError)}
+    >
       <td>{row.rowIndex + 1}</td>
       <td>
         <input
@@ -170,12 +196,20 @@ function PreviewRow({ row }: { row: DividendCsvRow }) {
           <span class="badge bg-danger csv-error-badge" title={row.error ?? ''}>
             {row.error}
           </span>
+        ) : hasWarning ? (
+          <span class="badge bg-warning text-dark" title={row.warning ?? ''}>
+            {row.warning}
+          </span>
         ) : (
           <span class="badge bg-success">OK</span>
         )}
       </td>
       <td class="text-center">
-        <input type="checkbox" class="form-check-input div-csv-ignore-check" checked={hasError} />
+        <input
+          type="checkbox"
+          class="form-check-input div-csv-ignore-check"
+          checked={hasError || row.skipByDefault}
+        />
       </td>
     </tr>
   )

@@ -22,7 +22,48 @@ document.addEventListener('click', (event) => {
   }
 
   if (target?.closest('[data-div-csv-batch-submit]') !== null) void submitBatch()
+  else if (target?.closest('[data-div-xlsx-parse]') !== null) void parseXlsx()
 })
+
+/** Envia o extrato da B3 e joga o preview na mesma área que o CSV colado usa. */
+async function parseXlsx(): Promise<void> {
+  const file = byId<HTMLInputElement>('divXlsxFile')?.files?.[0]
+  const area = byId('div-csv-preview-area')
+  if (area === null) return
+  if (file === undefined) {
+    showError(area, 'Selecione o arquivo do extrato.')
+    return
+  }
+
+  const spinner = byId('divXlsxSpinner')
+  const button = document.querySelector<HTMLButtonElement>('[data-div-xlsx-parse]')
+  if (button !== null) button.disabled = true
+  spinner?.classList.remove('d-none')
+  area.innerHTML = ''
+
+  const body = new FormData()
+  body.append('file', file)
+
+  try {
+    const response = await fetch('/dividends/parse-xlsx', { method: 'POST', body })
+    const text = await response.text()
+    if (!response.ok) throw new Error(text === '' ? `Erro ${response.status}` : text)
+    area.innerHTML = text
+  } catch (error) {
+    showError(area, error instanceof Error ? error.message : String(error))
+  } finally {
+    if (button !== null) button.disabled = false
+    spinner?.classList.add('d-none')
+  }
+}
+
+function showError(area: HTMLElement, message: string): void {
+  area.textContent = ''
+  const alert = document.createElement('div')
+  alert.className = 'alert alert-danger'
+  alert.textContent = message
+  area.appendChild(alert)
+}
 
 /**
  * O mesmo modal serve para criar e para editar. Quem cria é a tela do ativo, onde o ticker
@@ -106,10 +147,6 @@ async function submitBatch(): Promise<void> {
     if (!response.ok) throw new Error(`Erro ao importar: ${response.status}`)
     location.href = '/dividends/'
   } catch (error) {
-    area.textContent = ''
-    const alert = document.createElement('div')
-    alert.className = 'alert alert-danger'
-    alert.textContent = error instanceof Error ? error.message : String(error)
-    area.appendChild(alert)
+    showError(area, error instanceof Error ? error.message : String(error))
   }
 }

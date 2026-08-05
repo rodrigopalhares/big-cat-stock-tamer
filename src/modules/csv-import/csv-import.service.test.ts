@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { clearAllData, createTestDb, type TestDb } from '../../../tests/db.js'
 import { createAsset } from '../../../tests/factories.js'
 import { server, yahooChart, yahooChartBySymbol } from '../../../tests/msw.js'
+import { buildXlsx, movimentacaoXlsx } from '../../../tests/xlsx.js'
 import { BcbClient } from '../../integrations/bcb/bcb.client.js'
 import { YahooClient } from '../../integrations/yahoo/yahoo.client.js'
 import { AssetClassService } from '../allocation/asset-class.service.js'
@@ -331,6 +332,73 @@ describe('CsvImportService', () => {
 
       expect(inserted).toBe(2)
       expect(await db.dividend.count()).toBe(2)
+    })
+  })
+
+  describe('parseB3MovimentacaoXlsx', () => {
+    const XP = 'XP INVESTIMENTOS CCTVM S/A.'
+    const linha = (movimento: string, produto: string, valor: string, data = '10/06/2026') => [
+      'Credito',
+      data,
+      movimento,
+      produto,
+      XP,
+      '100',
+      '-',
+      valor,
+    ]
+
+    it('separa provento de movimentação de custódia e ordena erro na frente', async () => {
+      await createAsset(db, 'PETR4')
+
+      const { rows, discarded } = await service.parseB3MovimentacaoXlsx(
+        movimentacaoXlsx([
+          linha('Rendimento', 'PETR4 - PAPEL DE TESTE', '500'),
+          linha('Transferência', 'PETR4 - PAPEL DE TESTE', '-'),
+          linha('Dividendo', 'XXXX9 - PAPEL DE FORA', '80'),
+        ]),
+      )
+
+      expect(discarded).toBe(1)
+      expect(rows.map((row) => [row.ticker, row.error === null])).toEqual([
+        ['XXXX9', false],
+        ['PETR4', true],
+      ])
+    })
+
+    it('marca para ignorar o provento que já está no banco', async () => {
+      await createAsset(db, 'PETR4')
+      await service.batchImportDividends([
+        {
+          ticker: 'PETR4',
+          date: '2026-06-10',
+          type: 'RENDIMENTO',
+          totalAmount: 500,
+          taxWithheld: 0,
+          currency: 'BRL',
+          broker: 'XP',
+          notes: 'CEI-Movimentação',
+        },
+      ])
+
+      const { rows } = await service.parseB3MovimentacaoXlsx(
+        movimentacaoXlsx([
+          linha('Rendimento', 'PETR4 - PAPEL DE TESTE', '500'),
+          linha('Rendimento', 'PETR4 - PAPEL DE TESTE', '500', '10/07/2026'),
+        ]),
+      )
+
+      // Mesma data e valor → reimportação; o mês seguinte é provento novo.
+      expect(rows.map((row) => [row.date, row.skipByDefault])).toEqual([
+        ['2026-06-10', true],
+        ['2026-07-10', false],
+      ])
+    })
+
+    it('recusa planilha que não é o extrato da B3', async () => {
+      await expect(
+        service.parseB3MovimentacaoXlsx(buildXlsx([['Ticker', 'Data']])),
+      ).rejects.toThrow(/extrato de Movimentação da B3/)
     })
   })
 })

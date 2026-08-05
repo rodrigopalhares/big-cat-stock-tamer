@@ -6,8 +6,10 @@ description: >
   fix, or extend dividends/proventos — adding new dividend types, changing the form, table
   or edit modal, modifying how dividends affect the portfolio/XIRR calculation, adding
   filters, changing validation, fixing bugs in the dividend flow, or touching the dividend
-  CSV import. Trigger on mentions of: dividendos, proventos, JCP, rendimento, bonificacao,
-  BTC, IR retido, dividend pnl, cash flows de proventos, pagina de proventos, /dividends/.
+  CSV import or the B3 statement (.xlsx) upload. Trigger on mentions of: dividendos,
+  proventos, JCP, rendimento, bonificacao, BTC, IR retido, dividend pnl, cash flows de
+  proventos, pagina de proventos, /dividends/, extrato da B3, movimentacao, importar xlsx,
+  planilha da B3, CEI, aluguel de acoes, reembolso.
 ---
 
 # Dividends (Proventos) Feature
@@ -87,8 +89,14 @@ so you can make targeted changes without exploring the codebase.
 | `src/modules/dividend/dividend.service.test.ts` | CRUD, filters, USD conversion, PnL, cash flows, chart flows |
 | `src/domain/chart.test.ts` | `buildMonthlyDividendSeries()` — month gaps, per-type sums |
 | `src/domain/csv/dividend-csv.test.ts` | Pure parsing of the dividend CSV |
-| `src/modules/csv-import/csv-import.service.test.ts` | Batch import into the DB |
+| `src/domain/csv/b3-movimentacao.test.ts` | Pure mapping of the B3 statement + duplicate marking |
+| `src/domain/xlsx/xlsx-reader.test.ts` | Pure `.xlsx` reading |
+| `src/modules/csv-import/csv-import.service.test.ts` | Batch import into the DB, B3 dedup against it |
+| `src/modules/dividend/dividend.routes.test.ts` | `POST /dividends/parse-xlsx` (multipart) |
 | `tests/integration/routes.test.ts` | HTML/JSON routes and portfolio integration |
+
+Extrato de verdade **não** entra no repositório nem nos testes: `tests/xlsx.ts` gera a
+planilha na hora, com ticker inventado e valor redondo, pelo mesmo motivo de `tests/pdf.ts`.
 
 ## Database Schema
 
@@ -163,6 +171,7 @@ All registered by `dividendRoutes(container)` in `dividend.routes.ts`.
 | POST | `/dividends/:id/delete` | HTML | Deletes, redirects to `returnTo` or `/dividends/` |
 | GET | `/dividends/ticker-info?ticker=X` | HTMX | Ticker status fragment (empty if under 3 chars) |
 | POST | `/dividends/parse-csv` | HTMX | Renders `DividendCsvPreview` from pasted CSV |
+| POST | `/dividends/parse-xlsx` | multipart | Same preview, from the B3 statement upload |
 | POST | `/dividends/batch` | JSON | Imports the reviewed rows, returns `{ inserted }` |
 | GET | `/dividends/api` | JSON | List, filterable by `ticker` and `type` |
 | POST | `/dividends/api` | JSON | Creates, returns 201 + response body |
@@ -279,6 +288,47 @@ flow, and note the dividend version uses the `div-csv-*` class and id prefixes.
 The preview comes sorted by `sortByImportOrder()` (`src/domain/csv/import-order.ts`): linha
 com erro primeiro, depois tipo e ticker. Provento exige ativo cadastrado, então só existem
 os status `ERROR` e `EXISTS` aqui.
+
+Uma linha de preview carrega três marcas, não uma: `error` (some da importação),
+`warning` (importa com a ressalva à vista, badge amarelo) e `skipByDefault` (chega com
+"Ignorar" marcado). O CSV colado só usa `error`; os outros dois existem para o extrato da
+B3 abaixo.
+
+### Touching the B3 statement import
+Mesmo preview, mesmo `/dividends/batch` — a única entrada nova é o upload. Não existe um
+segundo caminho de escrita.
+
+| File | Role |
+|------|------|
+| `src/domain/xlsx/xlsx-reader.ts` | Lê `.xlsx` sem dependência: zip por `inflateRawSync` + regex no XML. Puro |
+| `src/domain/csv/b3-movimentacao.ts` | `parseB3Movimentacao()` + `markAlreadyImported()` + `dividendKey()`. Puro |
+| `src/modules/csv-import/csv-import.service.ts` | `parseB3MovimentacaoXlsx()` — junta os dois e consulta o banco |
+| `src/modules/dividend/dividend.routes.ts` | `POST /dividends/parse-xlsx` (multipart), erro de planilha vira 400 |
+| `src/views/pages/dividends.tsx` | `XlsxImportPane()` — a aba "Extrato da B3" do modal |
+| `src/client/dividends.ts` | `parseXlsx()` — envia o `FormData` e joga o HTML na área de preview |
+| `tests/xlsx.ts` | `movimentacaoXlsx()` / `buildXlsx()` — planilha gerada na hora, dados fictícios |
+
+O que o extrato exige saber antes de mexer:
+
+- **`Valor da Operação` é o líquido; `Preço unitário` é bruto e arredondado a 3 casas.**
+  Reconstruir o valor por `quantidade × preço` erra dezenas de reais por linha. Por isso o
+  IR fica em 0 e o bruto recebe o líquido — é o que o histórico do banco já faz.
+- **O aluguel do BTC vem em duas linhas**, uma com as ações emprestadas e sem valor, outra
+  com a taxa. Só a segunda é dinheiro; importar as duas dobraria o provento. Daí a regra de
+  descartar linha sem valor, que também limpa transferência e cessão de direitos.
+- **`Reembolso` é provento de ação alugada e não diz se era dividendo ou JCP** — o mesmo
+  `ITUB3` aparece como JCP num mês e como Reembolso no outro. Vira `DIVIDENDO` com aviso,
+  para o usuário corrigir no preview.
+- **`Restituição de Capital` reduz o preço médio, não é provento** — entra marcado para
+  ignorar, com o aviso de lançar como transação `R.CAP`.
+- **Movimentação desconhecida não é descartada calada**: vira linha com aviso e "Ignorar"
+  marcado, senão um layout novo da B3 sumiria na contagem.
+- **Duplicata é `ticker|data|tipo|valor`** (`dividendKey`). Sem o valor, dois aluguéis do
+  mesmo dia e papel viram um só; sem os outros três, `MDIA3` pagando 81,00 todo mês vira
+  duplicata de si mesmo. A consulta é limitada ao período do arquivo.
+
+`readXlsxSheet` alinha as células pela referência (`r="C7"`) porque célula vazia não é
+gravada no XML — sem isso uma coluna em branco desloca todas as seguintes.
 
 ## Test Patterns
 
