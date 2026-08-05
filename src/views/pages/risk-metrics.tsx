@@ -75,7 +75,7 @@ export function RiskMetricsPage({
               value={portfolioBeta === null ? null : decimal(portfolioBeta)}
             />
             <SummaryCard
-              label="CDI (Selic Meta)"
+              label="CDI"
               value={cdiAnnual === null ? null : `${percent(cdiAnnual)} a.a.`}
             />
             <SummaryCard

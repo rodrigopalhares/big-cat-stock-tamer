@@ -3,7 +3,7 @@ import { HttpClient, type Logger, silentLogger } from '../http.js'
 import { BcbPtaxResponse, BcbSeriesResponse } from './bcb.schema.js'
 
 /**
- * Cliente do Banco Central: PTAX (dólar) e SGS (Selic meta, usada como proxy do CDI).
+ * Cliente do Banco Central: PTAX (dólar) e SGS (CDI).
  * Porte de BcbPtaxClient.kt e de `fetchCdiAnnualRate` em BenchmarkService.kt.
  */
 
@@ -11,8 +11,17 @@ const PTAX_BASE =
   'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/' +
   'CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)'
 
-/** Selic meta — o BCB não publica série diária de CDI aberta. */
-const CDI_SERIES = '4391'
+/**
+ * CDI anualizado base 252, em % ao ano — a taxa que `fetchCdiAnnualRate` promete devolver.
+ *
+ * Não confundir com as vizinhas, que já custaram caro aqui:
+ * - `4391` é o CDI *acumulado no mês*, em % ao mês. Lida como taxa anual, o dia 4 de agosto
+ *   devolvia "0,05% a.a." — o mês em curso, ainda pela metade.
+ * - `432` é a Selic meta, outro número, sempre um pouco acima do CDI (14,25 contra 14,15).
+ * - `12` é o CDI diário, em % ao dia; é a série certa para compor fator ao longo do tempo,
+ *   não para responder "qual é o CDI hoje".
+ */
+const CDI_SERIES = '4389'
 
 export type PtaxQuote = {
   readonly date: IsoDate

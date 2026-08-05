@@ -78,6 +78,25 @@ describe('fetchPtaxRange', () => {
 })
 
 describe('fetchCdiAnnualRate', () => {
+  /**
+   * A 4389 é o CDI anualizado. O `bcbSeries` casa com qualquer série, então sem este teste
+   * trocar o número não quebra nada: a 4391 (CDI do mês, % a.m.) devolve um número menor e
+   * plausível, e o erro só aparece na tela como um CDI de 0,05% a.a.
+   */
+  it('consulta a série 4389, do CDI anualizado', async () => {
+    let requestUrl = ''
+    server.use(
+      http.get(BCB_SGS, ({ request }) => {
+        requestUrl = request.url
+        return HttpResponse.json([])
+      }),
+    )
+
+    await client().fetchCdiAnnualRate()
+
+    expect(requestUrl).toContain('bcdata.sgs.4389/')
+  })
+
   it('converte percentual com vírgula em fração', async () => {
     server.use(bcbSeries([{ data: '01/03/2025', valor: '14,25' }]))
 
