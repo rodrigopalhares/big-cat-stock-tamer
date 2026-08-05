@@ -12,6 +12,8 @@ export type CdiComparison = {
   ratioOfCdi: number | null
   /** TIR anual da sombra, sobre exatamente o mesmo cronograma de fluxos da carteira. */
   cdiIrrAnnual: number | null
+  /** A mesma TIR ao mês, derivada da anual como a da carteira. */
+  cdiIrrMonthly: number | null
   /**
    * Último dia com taxa gravada. Série defasada rende menos e favorece a carteira, então
    * a tela mostra até onde a conta foi de fato.

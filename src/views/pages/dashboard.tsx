@@ -83,7 +83,7 @@ export function DashboardPage(props: DashboardPageProps) {
 
         <SummaryCards {...props} />
 
-        <CdiComparisonCards cdi={props.cdi} irrAnnual={props.irrAnnual} />
+        <CdiComparisonCards cdi={props.cdi} />
 
         {chart !== null && (
           <div class="card border-0 shadow-sm mb-4">
@@ -239,19 +239,14 @@ const CDI_HELP =
   'é idêntico dos dois lados, então a diferença que sobra é escolha de ativo, não de timing.'
 
 /**
- * A carteira contra a sombra no CDI.
+ * A carteira contra a sombra no CDI, em dinheiro. As duas TIR ficam no rodapé da tabela,
+ * lado a lado — repeti-las aqui só dividiria a atenção.
  *
  * Some inteira sem série gravada ou sem valor de mercado — meio número aqui seria pior que
  * nenhum. A data da última taxa fica visível de propósito: série defasada rende menos e
  * faz a carteira parecer melhor do que é.
  */
-function CdiComparisonCards({
-  cdi,
-  irrAnnual,
-}: {
-  cdi: CdiComparison | null
-  irrAnnual: number | null
-}) {
+function CdiComparisonCards({ cdi }: { cdi: CdiComparison | null }) {
   if (cdi === null) return null
 
   const ahead = cdi.difference >= 0
@@ -276,15 +271,6 @@ function CdiComparisonCards({
         label={<>% do CDI</>}
         value={cdi.ratioOfCdi === null ? null : percent(cdi.ratioOfCdi)}
         valueClass={ahead ? 'text-success' : 'text-danger'}
-      />
-      <Card
-        label={<>TIR do CDI (a.a.)</>}
-        value={cdi.cdiIrrAnnual === null ? null : percent(cdi.cdiIrrAnnual)}
-      />
-      <Card
-        label={<>TIR da Carteira (a.a.)</>}
-        value={irrAnnual === null ? null : percent(irrAnnual)}
-        valueClass={irrAnnual === null ? '' : signClass(irrAnnual)}
       />
       {cdi.lastRateDate !== null && (
         <div class="col-12">
@@ -386,7 +372,13 @@ function PositionRow({ position: p }: { position: AssetPosition }) {
   return (
     <tr data-type={p.type} data-quantity={String(p.quantity)}>
       <td>
-        <a href={`/assets/${p.ticker}`} class="fw-bold text-decoration-none">
+        {/* O nome vai no title, não no corpo da célula: além de encher a tabela, ele entrava
+            no `textContent` que a ordenação lê, e "PETR4" comparava como "PETR4Petrobras PN". */}
+        <a
+          href={`/assets/${p.ticker}`}
+          class="fw-bold text-decoration-none"
+          title={p.name ?? undefined}
+        >
           {p.ticker}
         </a>
         {p.delisted && (
@@ -395,12 +387,6 @@ function PositionRow({ position: p }: { position: AssetPosition }) {
             title="Deslistado"
             style="font-size: 0.8em"
           />
-        )}
-        {p.name !== null && (
-          <>
-            <br />
-            <small class="text-muted">{p.name}</small>
-          </>
         )}
       </td>
       <td>
@@ -466,6 +452,7 @@ function TotalsRow({
   realizedPnl,
   irrMonthly,
   irrAnnual,
+  cdi,
 }: DashboardPageProps) {
   return (
     <tfoot class="table-light fw-bold">
@@ -494,6 +481,31 @@ function TotalsRow({
           {irrAnnual === null ? '—' : percent(irrAnnual)}
         </td>
       </tr>
+      <CdiTotalsRow cdi={cdi} />
     </tfoot>
+  )
+}
+
+/**
+ * A sombra do CDI logo abaixo do total, para a TIR das duas ficar lado a lado.
+ *
+ * Só valor e TIR: custo, provento e lucro realizado não têm equivalente numa conta que só
+ * rende juro, e preencher essas células com o número da carteira sugeriria uma equivalência
+ * que não existe.
+ */
+function CdiTotalsRow({ cdi }: { cdi: CdiComparison | null }) {
+  if (cdi === null) return null
+
+  return (
+    <tr class="fw-normal text-muted">
+      <td colSpan={7}>
+        <i class="bi bi-arrow-return-right me-1" />
+        Se fosse CDI
+      </td>
+      <td class="text-end">{money(cdi.cdiValue)}</td>
+      <td colSpan={3} />
+      <td class="text-end">{cdi.cdiIrrMonthly === null ? '—' : percent(cdi.cdiIrrMonthly)}</td>
+      <td class="text-end">{cdi.cdiIrrAnnual === null ? '—' : percent(cdi.cdiIrrAnnual)}</td>
+    </tr>
   )
 }

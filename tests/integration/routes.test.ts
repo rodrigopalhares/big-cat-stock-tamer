@@ -67,6 +67,20 @@ describe('rotas da aplicação', () => {
       expect(res.body).toContain('15.000,00')
     })
 
+    it('o nome do ativo fica no title do ticker, fora do corpo da tabela', async () => {
+      await createAsset(h.db, 'PETR4', { name: 'Petrobras PN' })
+      await createTransaction(h.db, 'PETR4', { quantity: 100, price: 10, date: '2024-01-01' })
+      await h.container.assets.refreshPositionFields('PETR4')
+      await createPriceHistory(h.db, 'PETR4', '2024-06-01', 15)
+
+      const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+      // O nome existe só como atributo; a ordenação lê o textContent da célula, e o nome
+      // ali dentro fazia "PETR4" comparar como "PETR4Petrobras PN".
+      expect(res.body).toContain('title="Petrobras PN"')
+      expect(res.body).not.toContain('>Petrobras PN<')
+    })
+
     it('ordena as posições por tipo e depois por ticker', async () => {
       server.use(yahooChart('yahoo_chart_empty.json'))
       for (const [ticker, type] of [
@@ -119,6 +133,38 @@ describe('rotas da aplicação', () => {
         // Sombra de 10.000 rendendo um dia; a carteira vale 15.000.
         expect(res.body).toContain('10.005,00')
         expect(res.body).toContain('02/01/2024')
+      })
+
+      it('a TIR do CDI sai no rodapé da tabela, ao lado da TIR da carteira', async () => {
+        await seedCarteiraComCdi()
+
+        const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+        const tfoot = /<tfoot[\s\S]*?<\/tfoot>/.exec(res.body)?.[0] ?? ''
+
+        expect(tfoot).toContain('Se fosse CDI')
+        expect(tfoot).toContain('Total')
+      })
+
+      /**
+       * A linha do CDI usa colSpan para pular as colunas sem equivalente. Errar a soma
+       * desalinha o rodapé inteiro, e nenhum outro teste olharia para isso.
+       */
+      it('a linha do CDI cobre exatamente as colunas do cabeçalho', async () => {
+        await seedCarteiraComCdi()
+
+        const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+        const table = /<table id="positionsTable"[\s\S]*?<\/table>/.exec(res.body)?.[0] ?? ''
+        // `<th[\s>]` e não `<th`, senão o próprio `<thead>` entra na contagem.
+        const colunas = (/<thead[\s\S]*?<\/thead>/.exec(table)?.[0].match(/<th[\s>]/g) ?? []).length
+
+        const linhaCdi = /<tr[^>]*>(?:(?!<\/tr>)[\s\S])*Se fosse CDI[\s\S]*?<\/tr>/.exec(table)?.[0]
+        expect(linhaCdi).toBeDefined()
+
+        const largura = [...(linhaCdi as string).matchAll(/<td(?:\s+colSpan="(\d+)")?/gi)].reduce(
+          (total, m) => total + Number(m[1] ?? 1),
+          0,
+        )
+        expect(largura).toBe(colunas)
       })
 
       it('a linha do CDI vai para o gráfico', async () => {

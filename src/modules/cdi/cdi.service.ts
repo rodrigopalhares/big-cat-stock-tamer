@@ -1,6 +1,7 @@
 import type { Db } from '../../config/db.js'
 import { calculateXirr } from '../../domain/calculation.js'
 import { type CdiRate, simulateCdi } from '../../domain/cdi.js'
+import { annualToMonthlyRate } from '../../domain/regression.js'
 import type { CashFlow } from '../../domain/xirr.js'
 import type { BcbClient } from '../../integrations/bcb/bcb.client.js'
 import type { Logger } from '../../integrations/http.js'
@@ -93,14 +94,16 @@ export class CdiService {
     if (cashFlows.length === 0) return null
 
     const { finalValue, lastRateDate } = simulateCdi(cashFlows, rates, today)
+    // Mesmo cronograma dos dois lados: é isso que torna a comparação de TIR legítima.
+    const cdiIrrAnnual = calculateXirr(cashFlows, finalValue, today)
 
     return {
       cdiValue: finalValue,
       portfolioValue,
       difference: portfolioValue - finalValue,
       ratioOfCdi: finalValue > 0 ? portfolioValue / finalValue : null,
-      // Mesmo cronograma dos dois lados: é isso que torna a comparação de TIR legítima.
-      cdiIrrAnnual: calculateXirr(cashFlows, finalValue, today),
+      cdiIrrAnnual,
+      cdiIrrMonthly: cdiIrrAnnual === null ? null : annualToMonthlyRate(cdiIrrAnnual),
       lastRateDate,
     }
   }
