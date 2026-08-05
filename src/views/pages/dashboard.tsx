@@ -1,5 +1,13 @@
+import type { CdiComparison } from '../../modules/cdi/cdi.schema.js'
 import type { AssetPosition } from '../../modules/portfolio/portfolio.schema.js'
-import { decimal, money, percent, quantity, signClass } from '../../shared/format.js'
+import {
+  decimal,
+  date as fmtDate,
+  money,
+  percent,
+  quantity,
+  signClass,
+} from '../../shared/format.js'
 import { AssetBadge } from '../components/badge.js'
 import { Layout } from '../layout.js'
 
@@ -12,6 +20,8 @@ export type ChartData = {
   /** Aporte líquido acumulado mês a mês — o mesmo número do card, ao longo do tempo. */
   netContribution: number[]
   ibov: Array<number | null>
+  /** Saldo da carteira-sombra no CDI, mês a mês. */
+  cdi: Array<number | null>
 }
 
 /** Proventos por mês, uma série por tipo de ativo — barras empilhadas + média móvel. */
@@ -34,6 +44,7 @@ export type DashboardPageProps = {
   irrMonthly: number | null
   hasUsd: boolean
   usdRate: number | null
+  cdi: CdiComparison | null
   chart: ChartData | null
   dividendChart: DividendChartData | null
 }
@@ -71,6 +82,8 @@ export function DashboardPage(props: DashboardPageProps) {
         )}
 
         <SummaryCards {...props} />
+
+        <CdiComparisonCards cdi={props.cdi} irrAnnual={props.irrAnnual} />
 
         {chart !== null && (
           <div class="card border-0 shadow-sm mb-4">
@@ -147,6 +160,7 @@ export function DashboardPage(props: DashboardPageProps) {
           data-invested={JSON.stringify(chart.invested)}
           data-net-contribution={JSON.stringify(chart.netContribution)}
           data-ibov={JSON.stringify(chart.ibov)}
+          data-cdi={JSON.stringify(chart.cdi)}
         />
       )}
       {dividendChart !== null && (
@@ -215,6 +229,72 @@ function SummaryCards({
         value={money(dividendPnl)}
         valueClass="text-success"
       />
+    </div>
+  )
+}
+
+const CDI_HELP =
+  'Os mesmos aportes, nas mesmas datas, rendendo CDI. Comparar assim — e não a TIR contra ' +
+  'o CDI nominal do período — é o que neutraliza a irregularidade dos aportes: o cronograma ' +
+  'é idêntico dos dois lados, então a diferença que sobra é escolha de ativo, não de timing.'
+
+/**
+ * A carteira contra a sombra no CDI.
+ *
+ * Some inteira sem série gravada ou sem valor de mercado — meio número aqui seria pior que
+ * nenhum. A data da última taxa fica visível de propósito: série defasada rende menos e
+ * faz a carteira parecer melhor do que é.
+ */
+function CdiComparisonCards({
+  cdi,
+  irrAnnual,
+}: {
+  cdi: CdiComparison | null
+  irrAnnual: number | null
+}) {
+  if (cdi === null) return null
+
+  const ahead = cdi.difference >= 0
+
+  return (
+    <div class="row g-3 mb-4">
+      <Card
+        label={
+          <>
+            Se fosse CDI
+            <i class="bi bi-info-circle ms-1" title={CDI_HELP} />
+          </>
+        }
+        value={money(cdi.cdiValue)}
+      />
+      <Card
+        label={<>{ahead ? 'Acima do CDI' : 'Abaixo do CDI'}</>}
+        value={money(Math.abs(cdi.difference))}
+        valueClass={ahead ? 'text-success' : 'text-danger'}
+      />
+      <Card
+        label={<>% do CDI</>}
+        value={cdi.ratioOfCdi === null ? null : percent(cdi.ratioOfCdi)}
+        valueClass={ahead ? 'text-success' : 'text-danger'}
+      />
+      <Card
+        label={<>TIR do CDI (a.a.)</>}
+        value={cdi.cdiIrrAnnual === null ? null : percent(cdi.cdiIrrAnnual)}
+      />
+      <Card
+        label={<>TIR da Carteira (a.a.)</>}
+        value={irrAnnual === null ? null : percent(irrAnnual)}
+        valueClass={irrAnnual === null ? '' : signClass(irrAnnual)}
+      />
+      {cdi.lastRateDate !== null && (
+        <div class="col-12">
+          <div class="text-muted small">
+            <i class="bi bi-info-circle me-1" />
+            Série do CDI até <strong>{fmtDate(cdi.lastRateDate)}</strong> — depois dessa data a
+            simulação não rende.
+          </div>
+        </div>
+      )}
     </div>
   )
 }

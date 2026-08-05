@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { Container } from '../../container.js'
+import { buildCdiChartLine } from '../../domain/cdi.js'
 import {
   buildIbovChartLine,
   buildMonthlyDividendSeries,
@@ -39,6 +40,7 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
           irrMonthly: summary.irrMonthly,
           hasUsd: positions.some((p) => p.currency === 'USD'),
           usdRate: usdPosition?.exchangeRate ?? null,
+          cdi: await c.cdi.compare(summary),
           chart: await buildChart(c, positions),
           dividendChart: await buildDividendChart(c),
         }),
@@ -47,6 +49,9 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
 
     app.post('/portfolio/update-prices', async (_req, reply) => {
       await c.priceHistory.runDailyUpdate()
+      // O CDI entra aqui de carona: é o botão "vai buscar tudo que é externo", e sem ele
+      // a série só apareceria no job das 18:30 — dashboard nunca busca por conta própria.
+      await c.cdi.runBackfill()
       return reply.type('text/html; charset=utf-8').send('')
     })
 
@@ -110,6 +115,11 @@ async function buildChart(
       positions.flatMap((p) => p.allCashFlowsBrl),
     ),
     ibov: buildIbovChartLine(months as IsoDate[], invested, ibovPrices),
+    cdi: buildCdiChartLine(
+      months as IsoDate[],
+      positions.flatMap((p) => p.allCashFlowsBrl),
+      await c.cdi.getRates(),
+    ),
   }
 }
 

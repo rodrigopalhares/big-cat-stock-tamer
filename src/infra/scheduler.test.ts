@@ -10,6 +10,7 @@ describe('scheduler', () => {
   const deps = (overrides: Record<string, unknown> = {}) => ({
     priceHistory: { runDailyUpdate: vi.fn(async () => {}) },
     exchangeRates: { getRate: vi.fn(async () => 5) },
+    cdi: { runBackfill: vi.fn(async () => 0) },
     backup: { ensureBackups: vi.fn(async () => {}) },
     ...overrides,
   })
@@ -72,6 +73,7 @@ describe('scheduler', () => {
 
     // Só o backup roda na inicialização; cotação espera o horário do pregão.
     expect(d.priceHistory.runDailyUpdate).not.toHaveBeenCalled()
+    expect(d.cdi.runBackfill).not.toHaveBeenCalled()
     scheduler.stop()
   })
 })

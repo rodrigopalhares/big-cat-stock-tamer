@@ -5,7 +5,7 @@ import { today } from '../../src/shared/iso-date.js'
 import { createHarness, type Harness } from '../app-harness.js'
 import { clearAllData } from '../db.js'
 import { createAsset, createDividend, createPriceHistory, createTransaction } from '../factories.js'
-import { server, yahooChart } from '../msw.js'
+import { BCB_SGS, bcbSeries, HttpResponse, http, server, yahooChart } from '../msw.js'
 
 // Porte de PortfolioControllerTest, TransactionControllerTest, DividendControllerTest
 // e MonthlyEvolutionControllerTest.
@@ -86,6 +86,87 @@ describe('rotas da aplicação', () => {
       expect(res.body.indexOf('HGLG11')).toBeGreaterThan(-1)
       expect(res.body.indexOf('HGLG11')).toBeLessThan(res.body.indexOf('PETR4'))
       expect(res.body.indexOf('PETR4')).toBeLessThan(res.body.indexOf('VALE3'))
+    })
+
+    describe('comparação com o CDI', () => {
+      /** Carteira valendo 15.000 sobre um aporte de 10.000, com um dia útil de CDI. */
+      async function seedCarteiraComCdi() {
+        await createAsset(h.db, 'PETR4')
+        await createTransaction(h.db, 'PETR4', { quantity: 1000, price: 10, date: '2024-01-02' })
+        await h.container.assets.refreshPositionFields('PETR4')
+        await createPriceHistory(h.db, 'PETR4', '2024-06-01', 15)
+        await h.db.cdiRate.create({ data: { date: '2024-01-02', rate: 0.0005 } })
+      }
+
+      it('sem série gravada o bloco do CDI não aparece', async () => {
+        await createAsset(h.db, 'PETR4')
+        await createTransaction(h.db, 'PETR4', { quantity: 1000, price: 10, date: '2024-01-02' })
+        await h.container.assets.refreshPositionFields('PETR4')
+        await createPriceHistory(h.db, 'PETR4', '2024-06-01', 15)
+
+        const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+        expect(res.body).not.toContain('Se fosse CDI')
+      })
+
+      it('mostra o bloco e a data da última taxa', async () => {
+        await seedCarteiraComCdi()
+
+        const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+        expect(res.body).toContain('Se fosse CDI')
+        expect(res.body).toContain('Acima do CDI')
+        // Sombra de 10.000 rendendo um dia; a carteira vale 15.000.
+        expect(res.body).toContain('10.005,00')
+        expect(res.body).toContain('02/01/2024')
+      })
+
+      it('a linha do CDI vai para o gráfico', async () => {
+        await seedCarteiraComCdi()
+        await h.container.evolution.recalculate()
+
+        const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+        const cdi = chartAttr(res.body, 'data-cdi') as Array<number | null>
+
+        expect(cdi.some((v) => v !== null)).toBe(true)
+      })
+
+      /**
+       * O dashboard é a página mais aberta do app e não pode bloquear numa chamada ao BCB.
+       * Quem busca é o job das 18:30 e o botão de atualizar cotações.
+       *
+       * A asserção é sobre a chamada, não sobre o efeito: o `HttpClient` engole erro de
+       * rede devolvendo null, então uma busca acidental no render passaria despercebida
+       * tanto pelo status da página quanto pela contagem de taxas gravadas.
+       */
+      it('renderizar o dashboard não busca a série do CDI', async () => {
+        await seedCarteiraComCdi()
+        let chamou = false
+        server.use(
+          http.get(BCB_SGS, () => {
+            chamou = true
+            return HttpResponse.json([])
+          }),
+        )
+
+        const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+        expect(res.statusCode).toBe(200)
+        expect(chamou).toBe(false)
+      })
+
+      it('o botão de atualizar cotações busca a série', async () => {
+        await seedCarteiraComCdi()
+        server.use(
+          yahooChart('yahoo_chart_empty.json'),
+          bcbSeries([{ data: '03/01/2024', valor: '0,05' }]),
+        )
+
+        const res = await h.app.inject({ method: 'POST', url: '/portfolio/update-prices' })
+
+        expect(res.statusCode).toBe(200)
+        expect(await h.db.cdiRate.count()).toBe(2)
+      })
     })
 
     it('GET /portfolio/api devolve o resumo', async () => {

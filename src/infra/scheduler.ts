@@ -1,6 +1,7 @@
 import { Cron } from 'croner'
 import type { Logger } from '../integrations/http.js'
 import { silentLogger } from '../integrations/http.js'
+import type { CdiService } from '../modules/cdi/cdi.service.js'
 import type { ExchangeRateService } from '../modules/exchange-rate/exchange-rate.service.js'
 import type { PriceHistoryService } from '../modules/price-history/price-history.service.js'
 import type { BackupService } from './backup.js'
@@ -18,6 +19,7 @@ const TIMEZONE = 'America/Sao_Paulo'
 export type SchedulerDeps = {
   priceHistory: PriceHistoryService
   exchangeRates: ExchangeRateService
+  cdi: CdiService
   backup: BackupService
   logger?: Logger
 }
@@ -48,6 +50,9 @@ export function startScheduler(deps: SchedulerDeps): Scheduler {
       guard('atualização diária de preços', async () => {
         await deps.priceHistory.runDailyUpdate()
         await deps.exchangeRates.getRate('USD')
+        // O CDI do dia sai à noite e às 18:30 às vezes ainda não existe. Não precisa de
+        // tratamento: o backfill retoma do último dia gravado e o pega amanhã.
+        await deps.cdi.runBackfill()
       }),
     ),
     // Logo depois da meia-noite, com folga para o dia virar no fuso configurado.

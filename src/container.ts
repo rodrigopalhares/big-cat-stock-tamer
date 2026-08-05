@@ -12,6 +12,7 @@ import { AssetClassService } from './modules/allocation/asset-class.service.js'
 import { AssetService } from './modules/asset/asset.service.js'
 import { AuthService } from './modules/auth/auth.service.js'
 import { BrokerNoteService } from './modules/broker-note/broker-note.service.js'
+import { CdiService } from './modules/cdi/cdi.service.js'
 import { CsvImportService } from './modules/csv-import/csv-import.service.js'
 import { DividendService } from './modules/dividend/dividend.service.js'
 import { EvolutionService } from './modules/evolution/evolution.service.js'
@@ -48,6 +49,7 @@ export function buildContainer(db: Db, env: Env, logger: Logger = silentLogger) 
   const portfolio = new PortfolioService(db, yahoo, tesouro, priceHistory, dividends, exchangeRates)
   const allocation = new AllocationService(db, portfolio, assetClasses)
   const evolution = new EvolutionService(db, priceHistory, assets, logger)
+  const cdi = new CdiService(db, bcb, logger)
   const benchmarks = new BenchmarkService(db, yahoo, bcb, logger)
   const riskMetrics = new RiskMetricsService(db, benchmarks, logger)
   const csvImport = new CsvImportService(db, assetInfo, transactions, dividends, assetClasses)
@@ -84,6 +86,7 @@ export function buildContainer(db: Db, env: Env, logger: Logger = silentLogger) 
     exchangeRates,
     priceHistory,
     portfolio,
+    cdi,
     evolution,
     benchmarks,
     riskMetrics,

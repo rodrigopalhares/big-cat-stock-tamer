@@ -62,6 +62,7 @@ function buildChart(): void {
   const invested = parse<number[]>(dataEl.dataset['invested'], [])
   const netContribution = parse<number[]>(dataEl.dataset['netContribution'], [])
   const ibov = parse<Array<number | null>>(dataEl.dataset['ibov'], [])
+  const cdi = parse<Array<number | null>>(dataEl.dataset['cdi'], [])
 
   const datasets: ChartDataset[] = rawDatasets.map((ds) => ({
     label: ds.label,
@@ -81,6 +82,9 @@ function buildChart(): void {
   datasets.push(referenceLine('Aporte Líquido', netContribution, 'rgb(255, 193, 7)'))
   if (ibov.some((v) => v !== null))
     datasets.push(referenceLine('IBOVESPA', ibov, 'rgb(40, 167, 69)'))
+  // Mesmos aportes rendendo CDI. Não é a mesma pergunta da linha do IBOVESPA, que projeta
+  // o investido inicial pelo índice e portanto supõe aporte único no começo.
+  if (cdi.some((v) => v !== null)) datasets.push(referenceLine('CDI', cdi, 'rgb(13, 110, 253)'))
 
   new Chart(canvas, {
     type: 'line',

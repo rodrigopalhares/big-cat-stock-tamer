@@ -1,4 +1,11 @@
-import { type IsoDate, isoDateOrNull } from '../../shared/iso-date.js'
+import {
+  addDays,
+  addMonths,
+  fromBrazilianDate,
+  type IsoDate,
+  isoDateOrNull,
+  toBrazilianDate,
+} from '../../shared/iso-date.js'
 import { HttpClient, type Logger, silentLogger } from '../http.js'
 import { BcbPtaxResponse, BcbSeriesResponse } from './bcb.schema.js'
 
@@ -23,10 +30,25 @@ const PTAX_BASE =
  */
 const CDI_SERIES = '4389'
 
+/** CDI diário, em % ao dia — a série que compõe fator ao longo do tempo. */
+const CDI_DAILY_SERIES = '12'
+
+/**
+ * O SGS aceita no máximo dez anos por consulta em série diária. Cinco deixa margem para
+ * o limite apertar sem quebrar a carga inicial, ao custo de uma requisição a mais.
+ */
+const WINDOW_YEARS = 5
+
 export type PtaxQuote = {
   readonly date: IsoDate
   readonly buyRate: number
   readonly sellRate: number
+}
+
+export type CdiDailyRate = {
+  readonly date: IsoDate
+  /** Fração ao dia, já dividida por 100. */
+  readonly rate: number
 }
 
 export class BcbClient {
@@ -85,10 +107,80 @@ export class BcbClient {
     const rate = Number(entry.valor.replace(',', '.'))
     return Number.isFinite(rate) ? rate / 100 : null
   }
+
+  /**
+   * CDI diário do período, como fração ao dia (0,052531% a.d. → 0.00052531).
+   *
+   * Só dias úteis — é o que o BCB publica, e é o que rende. Lista vazia em qualquer falha.
+   *
+   * O SGS recusa janela maior que dez anos em série diária, devolvendo 406. Como
+   * `getJson` transforma status ruim em `null`, um pedido único cobrindo a carteira
+   * inteira falharia calado: zero taxa gravada e nenhum erro na tela. Daí o fatiamento.
+   */
+  async fetchCdiDailyRange(startDate: IsoDate, endDate: IsoDate): Promise<CdiDailyRate[]> {
+    if (startDate > endDate) return []
+
+    const rates: CdiDailyRate[] = []
+    for (const [from, to] of splitIntoWindows(startDate, endDate)) {
+      const url =
+        `https://api.bcb.gov.br/dados/serie/bcdata.sgs.${CDI_DAILY_SERIES}/dados?formato=json` +
+        `&dataInicial=${toSgsDate(from)}&dataFinal=${toSgsDate(to)}`
+
+      const raw = await this.http.getJson(url)
+      // Uma janela vazia é normal (período sem publicação); uma que falhou já foi logada
+      // pelo HttpClient. Nos dois casos seguir em frente é melhor que perder o resto.
+      if (raw === null) continue
+
+      const parsed = BcbSeriesResponse.safeParse(raw)
+      if (!parsed.success) {
+        this.logger.warn('Resposta da série diária do CDI em formato inesperado')
+        continue
+      }
+
+      for (const entry of parsed.data) {
+        const date = fromBrazilianDate(entry.data)
+        if (date === null) {
+          this.logger.warn(`Data inválida na série do CDI: ${entry.data}`)
+          continue
+        }
+        const percent = Number(entry.valor.replace(',', '.'))
+        if (!Number.isFinite(percent)) {
+          this.logger.warn(`Taxa inválida na série do CDI em ${entry.data}: ${entry.valor}`)
+          continue
+        }
+        rates.push({ date, rate: percent / 100 })
+      }
+    }
+    return rates
+  }
 }
 
 /** O PTAX espera a data em MM-dd-yyyy. */
 function toBcbDate(date: IsoDate): string {
   const [year, month, day] = date.split('-') as [string, string, string]
   return `${month}-${day}-${year}`
+}
+
+/** O SGS espera a data em dd/MM/yyyy. */
+function toSgsDate(date: IsoDate): string {
+  return toBrazilianDate(date)
+}
+
+/** Fatia o período em janelas de `WINDOW_YEARS`, inclusivas e sem sobreposição. */
+function splitIntoWindows(startDate: IsoDate, endDate: IsoDate): Array<[IsoDate, IsoDate]> {
+  const windows: Array<[IsoDate, IsoDate]> = []
+  let from = startDate
+
+  while (from <= endDate) {
+    // -1 dia para a janela seguinte não repetir o último dia desta.
+    const limit = addDays(addYears(from, WINDOW_YEARS), -1)
+    const to = limit < endDate ? limit : endDate
+    windows.push([from, to])
+    from = addDays(to, 1)
+  }
+  return windows
+}
+
+function addYears(date: IsoDate, years: number): IsoDate {
+  return addMonths(date, years * 12)
 }

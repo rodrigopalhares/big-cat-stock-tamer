@@ -16,6 +16,7 @@ const app = await buildApp({ env, db, container })
 const scheduler = startScheduler({
   priceHistory: container.priceHistory,
   exchangeRates: container.exchangeRates,
+  cdi: container.cdi,
   backup: container.backup,
   logger: appLogger(),
 })

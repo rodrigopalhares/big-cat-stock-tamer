@@ -191,6 +191,24 @@ model BenchmarkPrice {
   @@map("benchmark_prices")
 }
 
+/**
+ * Série diária do CDI (SGS 12), usada para simular a carteira-sombra: os mesmos aportes
+ * rendendo CDI, para responder "e se eu tivesse deixado no CDI?".
+ *
+ * Só dia útil, de propósito. Ao contrário de `exchange_rates`, que repete a cotação de
+ * sexta no fim de semana para uma transação de sábado ter taxa, aqui repetir criaria
+ * rendimento que não existiu — o acumulado atravessa o fim de semana sem multiplicar nada.
+ */
+model CdiRate {
+  id        Int      @id @default(autoincrement())
+  date      String   @unique(map: "uq_cdi_rates_date")
+  /// Fração diária, já dividida por 100 (0,052531% a.d. → 0.00052531).
+  rate      Float
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("cdi_rates")
+}
+
 model RiskMetric {
   id           Int      @id @default(autoincrement())
   ticker       String

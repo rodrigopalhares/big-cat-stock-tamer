@@ -113,6 +113,27 @@ em vez de sumir da conta.
 **Nada de rede dentro de transação.** O SQLite tem escritor único; segurar o lock durante uma
 chamada HTTP trava a aplicação inteira. Busque primeiro, escreva depois.
 
+**A comparação com o CDI é uma carteira-sombra, não uma taxa.** `CdiService.compare` aplica os
+*mesmos* fluxos de caixa da carteira numa conta rendendo CDI diário. Comparar a TIR contra o CDI
+nominal do período seria mais simples e estaria errado: a TIR é ponderada por dinheiro-tempo e o
+CDI acumulado não, então com aportes irregulares os dois números não falam do mesmo período. Com
+o cronograma idêntico dos dois lados, a diferença que sobra é escolha de ativo.
+
+Três detalhes que já custaram caro:
+
+- **A série diária do BCB (SGS 12) recusa janela maior que dez anos**, com 406. A carteira começa
+  em 2008, então um pedido único falharia — e como `HttpClient` transforma status ruim em `null`,
+  falharia *calado*. Por isso `fetchCdiDailyRange` fatia em janelas de cinco anos.
+- **A série não repete fim de semana**, ao contrário de `exchange_rates`. Lá repetir a cotação de
+  sexta é certo, porque transação de sábado precisa de taxa; aqui repetir criaria rendimento que
+  não existiu.
+- **O dashboard nunca busca a série.** Quem popula é o job das 18:30 e o botão "Atualizar
+  Cotações" — a carga inicial leva ~22s. Série defasada rende menos e faz a carteira parecer
+  melhor do que é, então a tela mostra a data da última taxa em vez de esconder o problema.
+
+**O CDI vem da série 4389.** A 4391 é o CDI *acumulado no mês* (% a.m.) e a 432 é a Selic meta;
+trocar uma pela outra devolve um número plausível e errado. Ver o teste que fixa o número na URL.
+
 **`Float` continua `Float`.** Não troque por `Decimal` sem uma bateria de validação própria —
 os resultados de TIR e preço médio mudariam.
 

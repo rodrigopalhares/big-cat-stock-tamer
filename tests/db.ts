@@ -56,6 +56,7 @@ export async function clearAllData(prisma: TestDb): Promise<void> {
     prisma.exchangeRate.deleteMany(),
     prisma.benchmarkPrice.deleteMany(),
     prisma.riskMetric.deleteMany(),
+    prisma.cdiRate.deleteMany(),
   ])
 }
 
