@@ -40,6 +40,22 @@ function referenceLine(label: string, data: Array<number | null>, color: string)
   }
 }
 
+/**
+ * Menor e maior valor entre as linhas de referência, ignorando os buracos (`null`).
+ *
+ * Null quando não há nenhuma — aí o eixo fica com o dimensionamento natural das áreas.
+ * Lê do próprio `datasets` em vez das séries soltas para uma linha nova entrar na conta
+ * sozinha, sem depender de alguém lembrar de somá-la aqui.
+ */
+function boundsOf(datasets: readonly ChartDataset[]): { min: number; max: number } | null {
+  const values = datasets
+    .filter((ds) => ds['yAxisID'] === REFERENCE_AXIS)
+    .flatMap((ds) => (ds['data'] as Array<number | null>) ?? [])
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+
+  return values.length === 0 ? null : { min: Math.min(...values), max: Math.max(...values) }
+}
+
 const brl = (value: number, digits = 0) =>
   `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`
 
@@ -86,6 +102,12 @@ function buildChart(): void {
   // o investido inicial pelo índice e portanto supõe aporte único no começo.
   if (cdi.some((v) => v !== null)) datasets.push(referenceLine('CDI', cdi, 'rgb(13, 110, 253)'))
 
+  // O eixo das áreas é dimensionado só pelo patrimônio empilhado, e o das referências
+  // copia o dele. Uma linha que passe do topo da carteira sai cortada — o CDI passa
+  // quando a carteira está atrás dele, e "Total Investido" passa quando ela está no
+  // prejuízo. Daí esticar o eixo para caber a maior das referências.
+  const referenceBounds = boundsOf(datasets)
+
   new Chart(canvas, {
     type: 'line',
     data: { labels, datasets },
@@ -97,6 +119,10 @@ function buildChart(): void {
         y: {
           stacked: true,
           position: 'right',
+          // `suggested*` e não `min`/`max`: só estica o eixo, nunca encolhe abaixo do que
+          // as áreas precisam.
+          suggestedMax: referenceBounds?.max,
+          suggestedMin: referenceBounds === null ? undefined : Math.min(0, referenceBounds.min),
           ticks: { callback: (v: number) => brl(v) },
         },
         // Eixo invisível para as linhas de referência não entrarem no empilhamento,
