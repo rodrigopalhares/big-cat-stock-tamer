@@ -855,6 +855,55 @@ describe('rotas da aplicação', () => {
       expect(res.body).toContain('85,00')
     })
 
+    it('filtra a lista pelo tipo do ativo', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createAsset(h.db, 'MXRF11', { type: 'REIT' })
+      await createDividend(h.db, 'PETR4', { totalAmount: 100 })
+      await createDividend(h.db, 'MXRF11', { totalAmount: 42 })
+
+      const res = await h.app.inject({ method: 'GET', url: '/dividends/?assetType=REIT' })
+
+      expect(res.body).toContain('MXRF11')
+      expect(res.body).not.toContain('/assets/PETR4')
+    })
+
+    it('o filtro só oferece tipo de ativo que tem provento', async () => {
+      await createAsset(h.db, 'MXRF11', { type: 'REIT' })
+      await createAsset(h.db, 'BOVA11', { type: 'ETF' })
+      await createDividend(h.db, 'MXRF11')
+
+      const res = await h.app.inject({ method: 'GET', url: '/dividends/' })
+      const filter = /<select name="assetType"[\s\S]*?<\/select>/.exec(res.body)?.[0] ?? ''
+
+      expect(filter).toContain('REIT')
+      expect(filter).not.toContain('ETF')
+    })
+
+    it('trocar o tipo do provento não perde o filtro de ativo', async () => {
+      await createAsset(h.db, 'MXRF11', { type: 'REIT' })
+      await createDividend(h.db, 'MXRF11', { type: 'RENDIMENTO' })
+
+      const res = await h.app.inject({ method: 'GET', url: '/dividends/?assetType=REIT' })
+
+      // Os dois selects no mesmo form: submeter um manda o outro junto.
+      const form = /<form method="get" action="\/dividends\/"[\s\S]*?<\/form>/.exec(res.body)?.[0]
+      expect(form).toContain('name="assetType"')
+      expect(form).toContain('name="type"')
+      expect(form).toContain('value="REIT" selected')
+    })
+
+    it('GET /dividends/api filtra pelo tipo do ativo', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createAsset(h.db, 'MXRF11', { type: 'REIT' })
+      await createDividend(h.db, 'PETR4')
+      await createDividend(h.db, 'MXRF11')
+
+      const res = await h.app.inject({ method: 'GET', url: '/dividends/api?assetType=reit' })
+
+      expect(res.json()).toHaveLength(1)
+      expect(res.json()[0].assetId).toBe('MXRF11')
+    })
+
     it('edita e volta para a origem informada', async () => {
       await createAsset(h.db, 'PETR4')
       const dividend = await createDividend(h.db, 'PETR4', { totalAmount: 100, taxWithheld: 0 })

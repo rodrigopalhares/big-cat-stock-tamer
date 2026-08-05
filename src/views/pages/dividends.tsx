@@ -10,8 +10,11 @@ import { Layout } from '../layout.js'
 export type DividendsPageProps = {
   dividends: DividendView[]
   assets: Array<{ ticker: string; name: string }>
+  /** Tipos de ativo que aparecem no histórico — só eles entram no filtro. */
+  assetTypes: string[]
   selectedTicker: string | null
   selectedType: string
+  selectedAssetType: string
   today: IsoDate
 }
 
@@ -166,12 +169,34 @@ function NewDividendForm({ assets, today }: DividendsPageProps) {
   )
 }
 
-function Filters({ selectedTicker, selectedType }: DividendsPageProps) {
-  const hasFilters = selectedTicker !== null || selectedType !== ''
+/**
+ * Os dois selects moram no mesmo `form`: submeter um manda o outro junto, então trocar o
+ * tipo de provento não apaga o filtro de ativo. O `ticker` vem escondido pelo mesmo motivo.
+ */
+function Filters({
+  assetTypes,
+  selectedTicker,
+  selectedType,
+  selectedAssetType,
+}: DividendsPageProps) {
+  const hasFilters = selectedTicker !== null || selectedType !== '' || selectedAssetType !== ''
   return (
     <div class="d-flex align-items-center gap-2">
       <form method="get" action="/dividends/" class="d-flex align-items-center gap-2 mb-0">
         {selectedTicker !== null && <input type="hidden" name="ticker" value={selectedTicker} />}
+        <select
+          name="assetType"
+          class="form-select form-select-sm"
+          style="width:auto"
+          data-autosubmit
+        >
+          <option value="">Ativo: Todos</option>
+          {assetTypes.map((t) => (
+            <option value={t} selected={t === selectedAssetType}>
+              {t}
+            </option>
+          ))}
+        </select>
         <select name="type" class="form-select form-select-sm" style="width:auto" data-autosubmit>
           <option value="">Tipo: Todos</option>
           {DIVIDEND_TYPES.map((t) => (

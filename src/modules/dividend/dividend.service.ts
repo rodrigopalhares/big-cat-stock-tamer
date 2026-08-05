@@ -55,14 +55,38 @@ export class DividendService {
     })
   }
 
-  async listDividends(ticker?: string | null, type?: string | null): Promise<Dividend[]> {
+  /**
+   * [type] é o tipo do provento (DIVIDENDO, JCP…); [assetType] é o tipo do papel que pagou
+   * (STOCK, REIT…) e filtra pela relação, não por coluna de `dividends`.
+   */
+  async listDividends(
+    ticker?: string | null,
+    type?: string | null,
+    assetType?: string | null,
+  ): Promise<Dividend[]> {
     return this.db.dividend.findMany({
       where: {
         ...(ticker ? { assetId: ticker.toUpperCase() } : {}),
         ...(type ? { type: type.toUpperCase() } : {}),
+        ...(assetType ? { asset: { type: assetType.toUpperCase() } } : {}),
       },
       orderBy: { date: 'desc' },
     })
+  }
+
+  /**
+   * Tipos de ativo que aparecem no histórico, para o filtro da tela. Sai da relação em vez
+   * de `ASSET_TYPES` porque metade dos tipos nunca paga provento — oferecer TESOURO_DIRETO
+   * ou CRYPTO num filtro que só devolve lista vazia é ruído.
+   */
+  async listAssetTypesWithDividends(): Promise<string[]> {
+    const assets = await this.db.asset.findMany({
+      where: { dividends: { some: {} } },
+      select: { type: true },
+      distinct: ['type'],
+      orderBy: { type: 'asc' },
+    })
+    return assets.map((a) => a.type)
   }
 
   async updateDividend(id: number, input: DividendInput): Promise<void> {

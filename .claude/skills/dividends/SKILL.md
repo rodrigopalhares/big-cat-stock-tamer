@@ -146,7 +146,14 @@ class DividendService {
   // BEFORE the write — asset creation may hit the network, which must never happen
   // inside a write transaction.
 
-  listDividends(ticker?: string | null, type?: string | null): Promise<Dividend[]>  // date DESC
+  listDividends(ticker?, type?, assetType?): Promise<Dividend[]>     // date DESC
+  // `type` é o tipo do PROVENTO (DIVIDENDO, JCP…); `assetType` é o do PAPEL (STOCK, REIT…)
+  // e filtra pela relação — `where: { asset: { type } }` —, não por coluna de `dividends`.
+
+  listAssetTypesWithDividends(): Promise<string[]>                   // distinct, ordenado
+  // Insumo do filtro da tela. Sai da relação em vez de `ASSET_TYPES` porque metade dos tipos
+  // nunca paga provento, e opção que só devolve lista vazia é ruído.
+
   updateDividend(id: number, input: DividendInput): Promise<void>   // 404 if missing
   deleteDividend(id: number): Promise<void>                          // 404 if missing
   getDividendPnlByAsset(): Promise<Map<string, number>>              // groupBy + sum, in BRL
@@ -165,7 +172,7 @@ All registered by `dividendRoutes(container)` in `dividend.routes.ts`.
 
 | Method | Path | Type | Behaviour |
 |--------|------|------|-----------|
-| GET | `/dividends/` | HTML | Page with form, filters (`ticker`, `type`) and table |
+| GET | `/dividends/` | HTML | Page with form, filters (`ticker`, `type`, `assetType`) and table |
 | POST | `/dividends/new` | HTML | Creates, redirects to `returnTo` or `/dividends/` |
 | POST | `/dividends/:id/edit` | HTML | Updates, redirects to `returnTo` or `/dividends/` |
 | POST | `/dividends/:id/delete` | HTML | Deletes, redirects to `returnTo` or `/dividends/` |
@@ -173,7 +180,7 @@ All registered by `dividendRoutes(container)` in `dividend.routes.ts`.
 | POST | `/dividends/parse-csv` | HTMX | Renders `DividendCsvPreview` from pasted CSV |
 | POST | `/dividends/parse-xlsx` | multipart | Same preview, from the B3 statement upload |
 | POST | `/dividends/batch` | JSON | Imports the reviewed rows, returns `{ inserted }` |
-| GET | `/dividends/api` | JSON | List, filterable by `ticker` and `type` |
+| GET | `/dividends/api` | JSON | List, filterable by `ticker`, `type` and `assetType` |
 | POST | `/dividends/api` | JSON | Creates, returns 201 + response body |
 | DELETE | `/dividends/api/:id` | JSON | Returns 204 |
 

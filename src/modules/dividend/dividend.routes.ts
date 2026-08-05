@@ -17,7 +17,11 @@ import {
 
 /** Porte de src/main/kotlin/com/stocks/controller/DividendController.kt. */
 
-const ListQuery = z.object({ ticker: z.string().nullish(), type: z.string().nullish() })
+const ListQuery = z.object({
+  ticker: z.string().nullish(),
+  type: z.string().nullish(),
+  assetType: z.string().nullish(),
+})
 const CsvForm = z.object({ csv: z.string().default('') })
 const BatchBody = z.object({ rows: z.array(z.custom<DividendBatchRowRequest>()) })
 
@@ -34,17 +38,20 @@ export function dividendRoutes(c: Container): FastifyPluginAsync {
       const query = ListQuery.parse(req.query)
       const selectedTicker = query.ticker ? query.ticker.toUpperCase() : null
 
-      const [dividends, assets] = await Promise.all([
-        c.dividends.listDividends(selectedTicker, query.type),
+      const [dividends, assets, assetTypes] = await Promise.all([
+        c.dividends.listDividends(selectedTicker, query.type, query.assetType),
         c.db.asset.findMany({ select: { ticker: true, name: true }, orderBy: { ticker: 'asc' } }),
+        c.dividends.listAssetTypesWithDividends(),
       ])
 
       return reply.html(
         DividendsPage({
           dividends: dividends.map(toDividendView),
           assets: assets.map((a) => ({ ticker: a.ticker, name: a.name ?? '' })),
+          assetTypes,
           selectedTicker,
           selectedType: query.type ?? '',
+          selectedAssetType: query.assetType ?? '',
           today: todayIso(),
         }),
       )
@@ -112,7 +119,7 @@ export function dividendRoutes(c: Container): FastifyPluginAsync {
 
     app.get('/dividends/api', async (req) => {
       const query = ListQuery.parse(req.query)
-      const dividends = await c.dividends.listDividends(query.ticker, query.type)
+      const dividends = await c.dividends.listDividends(query.ticker, query.type, query.assetType)
       return dividends.map(toDividendResponse)
     })
 

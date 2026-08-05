@@ -136,14 +136,21 @@ describe('DividendService', () => {
     beforeEach(async () => {
       await createAsset(db, 'PETR4')
       await createAsset(db, 'VALE3')
+      await createAsset(db, 'MXRF11', { type: 'REIT' })
       await createDividend(db, 'PETR4', { date: '2024-01-10', type: 'DIVIDENDO' })
       await createDividend(db, 'PETR4', { date: '2024-03-20', type: 'JCP' })
       await createDividend(db, 'VALE3', { date: '2024-02-15', type: 'DIVIDENDO' })
+      await createDividend(db, 'MXRF11', { date: '2024-02-20', type: 'RENDIMENTO' })
     })
 
     it('ordena por data decrescente', async () => {
       const result = await service.listDividends()
-      expect(result.map((d) => d.date)).toEqual(['2024-03-20', '2024-02-15', '2024-01-10'])
+      expect(result.map((d) => d.date)).toEqual([
+        '2024-03-20',
+        '2024-02-20',
+        '2024-02-15',
+        '2024-01-10',
+      ])
     })
 
     it('filtra por ticker', async () => {
@@ -157,6 +164,42 @@ describe('DividendService', () => {
 
     it('combina ticker e tipo', async () => {
       expect(await service.listDividends('PETR4', 'DIVIDENDO')).toHaveLength(1)
+    })
+
+    it('filtra por tipo do ativo, que é do papel e não do provento', async () => {
+      const result = await service.listDividends(null, null, 'reit')
+      expect(result.map((d) => d.assetId)).toEqual(['MXRF11'])
+    })
+
+    it('combina tipo do ativo com tipo do provento', async () => {
+      // STOCK tem DIVIDENDO e JCP; só os dois DIVIDENDO de ação devem sobrar.
+      const result = await service.listDividends(null, 'DIVIDENDO', 'STOCK')
+      expect(result.map((d) => d.assetId)).toEqual(['VALE3', 'PETR4'])
+    })
+
+    it('tipo de ativo sem provento devolve vazio', async () => {
+      expect(await service.listDividends(null, null, 'ETF')).toEqual([])
+    })
+  })
+
+  describe('listAssetTypesWithDividends', () => {
+    it('devolve só os tipos que aparecem no histórico, sem repetir', async () => {
+      await createAsset(db, 'PETR4')
+      await createAsset(db, 'VALE3')
+      await createAsset(db, 'MXRF11', { type: 'REIT' })
+      // ETF cadastrado mas sem provento: não pode virar opção de um filtro que só devolve vazio.
+      await createAsset(db, 'BOVA11', { type: 'ETF' })
+      await createDividend(db, 'PETR4')
+      await createDividend(db, 'VALE3')
+      await createDividend(db, 'MXRF11')
+
+      expect(await service.listAssetTypesWithDividends()).toEqual(['REIT', 'STOCK'])
+    })
+
+    it('sem provento nenhum, devolve vazio', async () => {
+      await createAsset(db, 'PETR4')
+
+      expect(await service.listAssetTypesWithDividends()).toEqual([])
     })
   })
 
