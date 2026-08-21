@@ -125,3 +125,19 @@ export function transactionTypeMeta(type: string): TransactionTypeMeta {
   if (meta === null) throw new Error(`Tipo de transação desconhecido: ${type}`)
   return meta
 }
+
+/**
+ * Sinal com que as taxas entram no total **líquido** da tabela de transações.
+ *
+ * Só na compra o dinheiro sai do bolso e a corretagem soma; na venda e na redução de
+ * capital ela é descontada do que se recebe. Nos eventos sem caixa as taxas são zero,
+ * então o sinal não muda nada.
+ *
+ * É o sinal do extrato, não o do formulário: lá se digita o bruto (`total_price`), que é
+ * quantidade × preço e ignora as taxas. Os dois números são diferentes de propósito e cada
+ * um tem o seu rótulo na tela — confundir um com o outro é o que fazia a linha de uma venda
+ * voltar 2 × taxas menor do que o digitado.
+ */
+export function feesSign(meta: TransactionTypeMeta): 1 | -1 {
+  return meta.sign === 1 && meta.costEffect === 'MARKET' ? 1 : -1
+}

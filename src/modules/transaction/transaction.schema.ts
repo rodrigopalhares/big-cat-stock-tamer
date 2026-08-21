@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { TRANSACTION_TYPES } from '../../domain/constants.js'
 import type { Transaction } from '../../generated/prisma/client.js'
 import type { IsoDate } from '../../shared/iso-date.js'
+import { feesSign, transactionTypeMeta } from '../../shared/transaction-types.js'
 
 /** Porte de src/main/kotlin/com/stocks/dto/TransactionDtos.kt. */
 
@@ -55,24 +56,26 @@ export type TransactionView = {
   notes: string | null
   /** Quando presente, a linha ganha o link para a nota de negociação de origem. */
   brokerNoteId: number | null
-  /** Valor **bruto** do negócio: quantidade × preço unitário, sem as taxas. */
-  total: number
+  /** Valor **líquido**: o que saiu ou entrou na conta, já com as taxas. */
+  netTotal: number
   currency: string
   priceBrl: number
   feesBrl: number
-  totalBrl: number
+  netTotalBrl: number
 }
 
 /**
- * O total da linha é o valor **bruto** — quantidade × preço, sem taxas.
+ * O total da linha é o valor **líquido** — o que de fato saiu ou entrou na conta, com as
+ * taxas somadas na compra e descontadas na venda, pelo `feesSign`.
  *
- * Antes as taxas entravam no total com sinal por tipo: somavam na compra e eram descontadas
- * na venda. Ficava incoerente com o formulário, que sempre somava — quem digitasse o bruto
- * de uma venda no campo "Valor Bruto" via a linha voltar 2 × taxas menor. Bruto é o mesmo
- * número dos dois lados, e as taxas já têm coluna própria ao lado.
+ * O nome é `netTotal`, e não `total`, de propósito: o formulário tem um campo `total_price`
+ * que é o **bruto** (quantidade × preço, sem taxas). Os dois são números diferentes e
+ * legítimos, e cada tela rotula o seu — foi chamar os dois de "total" que fez a linha de
+ * uma venda voltar 2 × taxas menor do que o digitado.
  */
 export function toTransactionView(tx: Transaction): TransactionView {
   const absQuantity = Math.abs(tx.quantity)
+  const sign = feesSign(transactionTypeMeta(tx.type))
   return {
     id: tx.id,
     assetTicker: tx.assetId,
@@ -84,11 +87,11 @@ export function toTransactionView(tx: Transaction): TransactionView {
     broker: tx.broker,
     notes: tx.notes,
     brokerNoteId: tx.brokerNoteId,
-    total: absQuantity * tx.price,
+    netTotal: absQuantity * tx.price + sign * tx.fees,
     currency: tx.currency,
     priceBrl: tx.priceBrl,
     feesBrl: tx.feesBrl,
-    totalBrl: absQuantity * tx.priceBrl,
+    netTotalBrl: absQuantity * tx.priceBrl + sign * tx.feesBrl,
   }
 }
 

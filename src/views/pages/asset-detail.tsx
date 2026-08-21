@@ -216,8 +216,8 @@ function TransactionsTable({
             <th class="text-end">Qtd</th>
             <th class="text-end">Preço</th>
             <th class="text-end">Taxas</th>
-            <th class="text-end" title="Quantidade × preço unitário, sem as taxas">
-              Total Bruto
+            <th class="text-end" title="O que saiu ou entrou na conta, já com as taxas">
+              Total Líquido
             </th>
             <th>Corretora</th>
             <th class="text-center">Ações</th>
@@ -233,7 +233,7 @@ function TransactionsTable({
               <td class="text-end">{quantity(t.quantity)}</td>
               <td class="text-end">{money(t.price, t.currency)}</td>
               <td class="text-end text-muted">{money(t.fees, t.currency)}</td>
-              <td class="text-end fw-semibold">{money(t.total, t.currency)}</td>
+              <td class="text-end fw-semibold">{money(t.netTotal, t.currency)}</td>
               <td class="text-muted">{t.broker ?? '—'}</td>
               <td class="text-center text-nowrap">
                 <button

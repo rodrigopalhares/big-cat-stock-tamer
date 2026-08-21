@@ -463,8 +463,8 @@ function HistoryTable({ transactions }: { transactions: TransactionView[] }) {
             <th class="text-end">Qtd</th>
             <th class="text-end">Preço</th>
             <th class="text-end">Taxas</th>
-            <th class="text-end" title="Quantidade × preço unitário, sem as taxas">
-              Total Bruto
+            <th class="text-end" title="O que saiu ou entrou na conta, já com as taxas">
+              Total Líquido
             </th>
             <th>Corretora</th>
             <th class="text-center">Ações</th>
@@ -503,7 +503,7 @@ function TransactionRow({ transaction: t }: { transaction: TransactionView }) {
       <td class="text-end">{quantity(t.quantity)}</td>
       <td class="text-end">{dual(t.price, t.priceBrl)}</td>
       <td class="text-end text-muted">{dual(t.fees, t.feesBrl)}</td>
-      <td class="text-end fw-semibold">{dual(t.total, t.totalBrl)}</td>
+      <td class="text-end fw-semibold">{dual(t.netTotal, t.netTotalBrl)}</td>
       <td class="text-muted">
         {t.broker ?? '—'}
         {t.brokerNoteId !== null && (

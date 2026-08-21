@@ -430,8 +430,8 @@ describe('rotas da aplicação', () => {
       expect(res.body).toContain('01/06/2024')
       expect(res.body).toContain('25,50')
       expect(res.body).toContain('XP')
-      // Bruto: 100 × 25,50. As taxas têm coluna própria e ficam fora do total.
-      expect(res.body).toContain('2.550,00')
+      // Líquido: 100 × 25,50 + 10 de taxas — é o que saiu da conta.
+      expect(res.body).toContain('2.560,00')
     })
 
     it('cria via formulário e redireciona', async () => {

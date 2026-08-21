@@ -3,11 +3,13 @@ import type { Transaction } from '../../generated/prisma/client.js'
 import { toTransactionView } from './transaction.schema.js'
 
 /**
- * O total da linha é o bruto: quantidade × preço, sem taxas, para todo tipo.
+ * A tabela mostra o líquido: as taxas somam na compra e são descontadas na venda.
  *
- * O caso que motivou a regra foi uma venda de TD:IPCA2026 — 29,45 × 4.453,821 com 7.987,98
- * de taxas. O formulário somava as taxas ao total e a tabela as descontava, então o bruto
- * digitado voltava 2 × taxas menor. Os dois lados agora dizem o mesmo número.
+ * O que o formulário pede é outra coisa — o bruto, quantidade × preço. Os números da venda
+ * de TD:IPCA2026 estão aqui de propósito para deixar a diferença explícita: 29,45 ×
+ * 4.453,821 dá R$ 131.165,03 de bruto, e com R$ 7.987,98 de taxas o líquido é R$
+ * 123.177,05. Chamar os dois de "total" foi o que fez a linha voltar 2 × taxas menor do que
+ * o digitado.
  */
 function tx(overrides: Partial<Transaction>): Transaction {
   return {
@@ -30,26 +32,26 @@ function tx(overrides: Partial<Transaction>): Transaction {
 }
 
 describe('toTransactionView', () => {
-  it('compra: total é o bruto, sem somar as taxas', () => {
-    expect(toTransactionView(tx({}))).toMatchObject({ total: 2500, fees: 10 })
+  it('compra: as taxas somam ao que saiu da conta', () => {
+    expect(toTransactionView(tx({}))).toMatchObject({ netTotal: 2510, fees: 10 })
   })
 
-  it('venda: total é o bruto, sem descontar as taxas', () => {
+  it('venda: as taxas são descontadas do que entrou na conta', () => {
     const view = toTransactionView(
       tx({ type: 'SELL', quantity: -29.45, price: 4453.821, fees: 7987.98 }),
     )
 
     expect(view.quantity).toBe(29.45)
-    expect(view.total).toBeCloseTo(131165.03, 2)
+    expect(view.netTotal).toBeCloseTo(123177.05, 2)
     expect(view.fees).toBeCloseTo(7987.98, 2)
   })
 
-  it('redução de capital: total é o bruto recebido', () => {
+  it('redução de capital: as taxas saem do valor devolvido', () => {
     const view = toTransactionView(
       tx({ type: 'REDUCAO_CAPITAL', quantity: 100, price: 2, fees: 5 }),
     )
 
-    expect(view.total).toBe(200)
+    expect(view.netTotal).toBe(195)
   })
 
   it('a coluna em reais segue a mesma regra', () => {
@@ -57,7 +59,13 @@ describe('toTransactionView', () => {
       tx({ type: 'SELL', quantity: -10, price: 8, fees: 1, priceBrl: 40, feesBrl: 5 }),
     )
 
-    expect(view.total).toBe(80)
-    expect(view.totalBrl).toBe(400)
+    expect(view.netTotal).toBe(79)
+    expect(view.netTotalBrl).toBe(395)
+  })
+
+  it('evento sem taxas: líquido e bruto coincidem', () => {
+    const view = toTransactionView(tx({ type: 'BONIFICACAO', quantity: 50, price: 3, fees: 0 }))
+
+    expect(view.netTotal).toBe(150)
   })
 })

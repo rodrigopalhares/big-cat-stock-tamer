@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { TRANSACTION_TYPES } from '../domain/constants.js'
 import {
+  feesSign,
   TRANSACTION_TYPE_LIST,
   transactionTypeMeta,
   transactionTypeMetaOrNull,
@@ -49,6 +50,11 @@ describe('transactionTypeMeta', () => {
     expect(transactionTypeMeta('AGRUPAMENTO').badgeClass).not.toBe(
       transactionTypeMeta('SELL').badgeClass,
     )
+  })
+
+  it('só na compra as taxas somam ao líquido', () => {
+    const somam = TRANSACTION_TYPES.filter((t) => feesSign(transactionTypeMeta(t)) === 1)
+    expect(somam).toEqual(['BUY'])
   })
 
   it('tipo desconhecido lança', () => {
