@@ -76,11 +76,19 @@ export class TransactionService {
   }
 
   /**
-   * Deduz preço unitário e taxas a partir do que o formulário trouxe.
-   * Com o valor total preenchido, calcula o que faltar: preço a partir do total,
-   * ou taxas como a diferença entre o total e quantidade × preço.
+   * Deduz o preço unitário a partir do que o formulário trouxe.
    *
-   * Evento sem caixa não negocia preço, então sai antes da exigência de preço ou total.
+   * O "valor bruto" é quantidade × preço, sem taxas — são duas formas de dizer a mesma
+   * coisa, então ele serve para informar o preço quando só o bruto da nota está à mão.
+   * As taxas ficam de fora da conta: são um campo independente, e é isso que faz o número
+   * digitado voltar igual na tabela.
+   *
+   * Quando os dois vêm preenchidos o preço ganha, porque é o campo mais preciso: o bruto
+   * chega arredondado em centavos, e derivar o preço dele mexeria na quarta casa a cada
+   * vez que o modal de edição fosse salvo sem alterar nada. Para acertar a linha pelo
+   * bruto, basta apagar o preço — a tela diz isso no placeholder.
+   *
+   * Evento sem caixa não negocia preço, então sai antes da exigência de preço ou bruto.
    * A redução de capital passa pela regra normal — sem valor por ação ela não diz nada.
    */
   resolvePrice(
@@ -94,22 +102,15 @@ export class TransactionService {
       return normalizePriceFees(type, price ?? 0, fees)
     }
 
-    let resolvedPrice = price ?? null
-    let resolvedFees = fees
-
-    if (totalPrice != null && totalPrice > 0) {
-      if (resolvedPrice !== null && resolvedPrice > 0) {
-        resolvedFees = totalPrice - quantity * resolvedPrice
-      } else {
-        resolvedPrice = (totalPrice - resolvedFees) / quantity
-      }
-    }
+    const fromTotal =
+      totalPrice != null && totalPrice > 0 && quantity > 0 ? totalPrice / quantity : null
+    const resolvedPrice = price != null && price > 0 ? price : fromTotal
 
     if (resolvedPrice === null || resolvedPrice <= 0) {
-      throw HttpError.badRequest('Informe o preço unitário ou o valor total')
+      throw HttpError.badRequest('Informe o preço unitário ou o valor bruto')
     }
 
-    return { price: resolvedPrice, fees: resolvedFees }
+    return { price: resolvedPrice, fees }
   }
 
   /** Cria a transação, criando o ativo automaticamente quando ele não existe. */

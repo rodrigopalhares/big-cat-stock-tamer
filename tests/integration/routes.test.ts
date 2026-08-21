@@ -430,8 +430,8 @@ describe('rotas da aplicação', () => {
       expect(res.body).toContain('01/06/2024')
       expect(res.body).toContain('25,50')
       expect(res.body).toContain('XP')
-      // 100 × 25,50 + 10 de taxas.
-      expect(res.body).toContain('2.560,00')
+      // Bruto: 100 × 25,50. As taxas têm coluna própria e ficam fora do total.
+      expect(res.body).toContain('2.550,00')
     })
 
     it('cria via formulário e redireciona', async () => {
@@ -479,7 +479,7 @@ describe('rotas da aplicação', () => {
       expect(res.headers.location).toBe('/assets/PETR4')
     })
 
-    it('valor total sem preço deduz o preço unitário', async () => {
+    it('valor bruto sem preço deduz o preço unitário', async () => {
       await createAsset(h.db, 'PETR4')
 
       await h.app.inject({
@@ -489,7 +489,7 @@ describe('rotas da aplicação', () => {
           ticker: 'PETR4',
           type: 'BUY',
           quantity: '100',
-          total_price: '2510',
+          total_price: '2500',
           fees: '10',
           date: '2024-06-01',
           currency: 'BRL',
@@ -498,9 +498,10 @@ describe('rotas da aplicação', () => {
 
       const tx = await h.db.transaction.findFirstOrThrow()
       expect(tx.price).toBeCloseTo(25, 4)
+      expect(tx.fees).toBeCloseTo(10, 4)
     })
 
-    it('sem preço nem total dá 400', async () => {
+    it('sem preço nem bruto dá 400', async () => {
       await createAsset(h.db, 'PETR4')
 
       const res = await h.app.inject({

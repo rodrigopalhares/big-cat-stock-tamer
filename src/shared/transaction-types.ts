@@ -125,14 +125,3 @@ export function transactionTypeMeta(type: string): TransactionTypeMeta {
   if (meta === null) throw new Error(`Tipo de transação desconhecido: ${type}`)
   return meta
 }
-
-/**
- * Sinal com que as taxas entram no total exibido.
- *
- * Só na compra o dinheiro sai do bolso e a corretagem soma; na venda e na redução de
- * capital ela é descontada do que se recebe. Nos eventos sem caixa as taxas são zero,
- * então o sinal não muda nada.
- */
-export function feesSign(meta: TransactionTypeMeta): 1 | -1 {
-  return meta.sign === 1 && meta.costEffect === 'MARKET' ? 1 : -1
-}

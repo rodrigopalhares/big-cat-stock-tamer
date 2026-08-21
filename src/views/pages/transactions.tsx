@@ -335,14 +335,14 @@ function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageP
                 class="form-control"
                 step="0.0001"
                 min="0"
-                placeholder="ou informe o total"
+                placeholder="ou informe o bruto"
               />
             </div>
           </div>
 
           <div class="row g-2 mb-3" id="txMarketExtrasRow">
             <div class="col-6">
-              <label class="form-label">Valor Total</label>
+              <label class="form-label">Valor Bruto</label>
               <input
                 type="number"
                 id="txTotal"
@@ -352,6 +352,7 @@ function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageP
                 min="0"
                 placeholder="opcional"
               />
+              <div class="form-text small">Qtd × preço, sem as taxas</div>
             </div>
             <div class="col-6">
               <label class="form-label">Taxas</label>
@@ -462,7 +463,9 @@ function HistoryTable({ transactions }: { transactions: TransactionView[] }) {
             <th class="text-end">Qtd</th>
             <th class="text-end">Preço</th>
             <th class="text-end">Taxas</th>
-            <th class="text-end">Total</th>
+            <th class="text-end" title="Quantidade × preço unitário, sem as taxas">
+              Total Bruto
+            </th>
             <th>Corretora</th>
             <th class="text-center">Ações</th>
           </tr>
@@ -552,10 +555,10 @@ function TransactionRow({ transaction: t }: { transaction: TransactionView }) {
  * formulário vira o de "Nova Transação" com um `ticker` escondido — o cliente troca a ação,
  * o título e o ícone.
  *
- * Os campos são os mesmos da tela de transações, incluindo "Valor Total": quantidade, preço,
- * total e taxas se completam pela mesma regra em `client/transactions.ts`, e o servidor
- * resolve pelo mesmo `resolvePrice()`. Preço não é `required` no HTML justamente porque
- * informar só o total é uma entrada válida.
+ * Os campos são os mesmos da tela de transações, incluindo "Valor Bruto": quantidade, preço
+ * e bruto se completam pela mesma regra em `client/transactions.ts`, e o servidor resolve
+ * pelo mesmo `resolvePrice()`. Preço não é `required` no HTML justamente porque informar só
+ * o bruto é uma entrada válida.
  */
 export function TransactionModal() {
   return (
@@ -613,13 +616,13 @@ export function TransactionModal() {
                     class="form-control"
                     step="0.0001"
                     min="0"
-                    placeholder="ou informe o total"
+                    placeholder="ou informe o bruto"
                   />
                 </div>
               </div>
               <div class="row g-2 mb-3" id="editTxMarketExtrasRow">
                 <div class="col-6">
-                  <label class="form-label">Valor Total</label>
+                  <label class="form-label">Valor Bruto</label>
                   <input
                     type="number"
                     id="editTxTotal"
@@ -629,6 +632,7 @@ export function TransactionModal() {
                     min="0"
                     placeholder="opcional"
                   />
+                  <div class="form-text small">Qtd × preço, sem as taxas</div>
                 </div>
                 <div class="col-6" id="editTxFeesCol">
                   <label class="form-label">Taxas</label>

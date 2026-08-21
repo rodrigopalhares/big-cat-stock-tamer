@@ -338,7 +338,7 @@ describe('sem APP_ANTHROPIC_API_KEY', () => {
 
 /**
  * A edição passa pelo mesmo `resolvePrice()` da criação. Antes o formulário de edição não
- * mandava o total e exigia preço, então corrigir uma linha pelo valor total da nota só
+ * mandava o bruto e exigia preço, então corrigir uma linha pelo valor da nota só
  * funcionava na tela de transações.
  */
 describe('POST /transactions/:id/edit', () => {
@@ -369,10 +369,10 @@ describe('POST /transactions/:id/edit', () => {
       payload: { type: 'BUY', quantity: '100', date: '2024-01-15', currency: 'BRL', ...payload },
     })
 
-  it('só o valor total deduz o preço unitário', async () => {
+  it('só o valor bruto deduz o preço unitário', async () => {
     const id = await existing()
 
-    const res = await edit(id, { price: '', total_price: '2510', fees: '10' })
+    const res = await edit(id, { price: '', total_price: '2500', fees: '10' })
 
     expect(res.statusCode).toBe(302)
     const tx = await h.db.transaction.findUniqueOrThrow({ where: { id } })
@@ -380,23 +380,25 @@ describe('POST /transactions/:id/edit', () => {
     expect(tx.fees).toBeCloseTo(10, 4)
   })
 
-  it('preço e valor total juntos deduzem as taxas', async () => {
+  // O bruto chega arredondado em centavos; o preço tem quatro casas. Deixar o bruto ganhar
+  // moveria a quarta casa a cada save do modal, que manda os dois campos sempre.
+  it('com preço e bruto juntos o preço ganha, e as taxas ficam como vieram', async () => {
     const id = await existing()
 
-    await edit(id, { price: '25', total_price: '2510', fees: '0' })
+    await edit(id, { price: '25.1234', total_price: '2512.34', fees: '7' })
 
     const tx = await h.db.transaction.findUniqueOrThrow({ where: { id } })
-    expect(tx.price).toBeCloseTo(25, 4)
-    expect(tx.fees).toBeCloseTo(10, 4)
+    expect(tx.price).toBe(25.1234)
+    expect(tx.fees).toBeCloseTo(7, 4)
   })
 
-  it('sem preço e sem total recusa com 400', async () => {
+  it('sem preço e sem bruto recusa com 400', async () => {
     const id = await existing()
 
     const res = await edit(id, { price: '', total_price: '', fees: '0' })
 
     expect(res.statusCode).toBe(400)
-    expect(res.body).toContain('Informe o preço unitário ou o valor total')
+    expect(res.body).toContain('Informe o preço unitário ou o valor bruto')
   })
 
   it('preço sozinho continua valendo', async () => {
@@ -409,7 +411,7 @@ describe('POST /transactions/:id/edit', () => {
     expect(tx.fees).toBeCloseTo(3, 4)
   })
 
-  it('evento sem caixa ignora total e taxas', async () => {
+  it('evento sem caixa ignora bruto e taxas', async () => {
     const id = await existing()
 
     await edit(id, { type: 'DESDOBRAMENTO', price: '10', total_price: '999', fees: '7' })

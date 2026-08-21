@@ -38,23 +38,26 @@ describe('TransactionService', () => {
       expect(service.resolvePrice('BUY', 25.5, null, 10, 100)).toEqual({ price: 25.5, fees: 10 })
     })
 
-    it('valor total com preço unitário calcula as taxas', () => {
-      // 100 × 25 = 2500; total 2510 ⇒ taxas 10
-      expect(service.resolvePrice('BUY', 25, 2510, 0, 100)).toEqual({ price: 25, fees: 10 })
+    it('valor bruto sem preço unitário calcula o preço, sem tocar nas taxas', () => {
+      // 2500 / 100 = 25 — as taxas ficam fora do bruto
+      expect(service.resolvePrice('BUY', null, 2500, 10, 100)).toEqual({ price: 25, fees: 10 })
     })
 
-    it('valor total sem preço unitário calcula o preço', () => {
-      // (2510 − 10) / 100 = 25
-      expect(service.resolvePrice('BUY', null, 2510, 10, 100)).toEqual({ price: 25, fees: 10 })
+    it('com preço e bruto juntos o preço ganha', () => {
+      // O bruto vem arredondado em centavos; o preço tem quatro casas e é quem manda.
+      expect(service.resolvePrice('BUY', 25.1234, 2512.34, 7, 100)).toEqual({
+        price: 25.1234,
+        fees: 7,
+      })
     })
 
-    it('sem preço e sem total dá 400', () => {
+    it('sem preço e sem bruto dá 400', () => {
       expect(() => service.resolvePrice('BUY', null, null, 0, 100)).toThrow(
-        /Informe o preço unitário ou o valor total/,
+        /Informe o preço unitário ou o valor bruto/,
       )
     })
 
-    it('preço zero e sem total dá 400', () => {
+    it('preço zero e sem bruto dá 400', () => {
       expect(() => service.resolvePrice('BUY', 0, null, 0, 100)).toThrow()
     })
 
@@ -79,11 +82,11 @@ describe('TransactionService', () => {
 
     it('redução de capital exige valor por ação, como compra e venda', () => {
       expect(() => service.resolvePrice('REDUCAO_CAPITAL', null, null, 0, 100)).toThrow(
-        /Informe o preço unitário ou o valor total/,
+        /Informe o preço unitário ou o valor bruto/,
       )
     })
 
-    it('redução de capital deduz o valor por ação a partir do total recebido', () => {
+    it('redução de capital deduz o valor por ação a partir do bruto recebido', () => {
       // (200 − 0) / 100 = 2 por ação
       expect(service.resolvePrice('REDUCAO_CAPITAL', null, 200, 0, 100)).toEqual({
         price: 2,

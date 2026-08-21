@@ -2,7 +2,6 @@ import { z } from 'zod'
 import { TRANSACTION_TYPES } from '../../domain/constants.js'
 import type { Transaction } from '../../generated/prisma/client.js'
 import type { IsoDate } from '../../shared/iso-date.js'
-import { feesSign, transactionTypeMeta } from '../../shared/transaction-types.js'
 
 /** Porte de src/main/kotlin/com/stocks/dto/TransactionDtos.kt. */
 
@@ -23,11 +22,12 @@ export const TransactionForm = z.object({
 })
 
 /**
- * Editar é o mesmo formulário de criar, sem o ticker — inclusive o `total_price`.
+ * Editar é o mesmo formulário de criar, sem o ticker — inclusive o `total_price`, que é o
+ * valor **bruto** do negócio.
  *
- * Antes o total ficava de fora e o preço era obrigatório, então corrigir uma linha pelo
- * valor total da nota só dava certo na tela de transações. As duas telas passam pelo mesmo
- * `resolvePrice()`, que é quem exige preço ou total.
+ * Antes o bruto ficava de fora e o preço era obrigatório, então corrigir uma linha pelo
+ * valor da nota só dava certo na tela de transações. As duas telas passam pelo mesmo
+ * `resolvePrice()`, que é quem exige preço ou bruto.
  */
 export const TransactionEditForm = TransactionForm.omit({ ticker: true })
 
@@ -55,6 +55,7 @@ export type TransactionView = {
   notes: string | null
   /** Quando presente, a linha ganha o link para a nota de negociação de origem. */
   brokerNoteId: number | null
+  /** Valor **bruto** do negócio: quantidade × preço unitário, sem as taxas. */
   total: number
   currency: string
   priceBrl: number
@@ -62,9 +63,16 @@ export type TransactionView = {
   totalBrl: number
 }
 
+/**
+ * O total da linha é o valor **bruto** — quantidade × preço, sem taxas.
+ *
+ * Antes as taxas entravam no total com sinal por tipo: somavam na compra e eram descontadas
+ * na venda. Ficava incoerente com o formulário, que sempre somava — quem digitasse o bruto
+ * de uma venda no campo "Valor Bruto" via a linha voltar 2 × taxas menor. Bruto é o mesmo
+ * número dos dois lados, e as taxas já têm coluna própria ao lado.
+ */
 export function toTransactionView(tx: Transaction): TransactionView {
   const absQuantity = Math.abs(tx.quantity)
-  const sign = feesSign(transactionTypeMeta(tx.type))
   return {
     id: tx.id,
     assetTicker: tx.assetId,
@@ -76,11 +84,11 @@ export function toTransactionView(tx: Transaction): TransactionView {
     broker: tx.broker,
     notes: tx.notes,
     brokerNoteId: tx.brokerNoteId,
-    total: absQuantity * tx.price + sign * tx.fees,
+    total: absQuantity * tx.price,
     currency: tx.currency,
     priceBrl: tx.priceBrl,
     feesBrl: tx.feesBrl,
-    totalBrl: absQuantity * tx.priceBrl + sign * tx.feesBrl,
+    totalBrl: absQuantity * tx.priceBrl,
   }
 }
 

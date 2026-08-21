@@ -216,7 +216,9 @@ function TransactionsTable({
             <th class="text-end">Qtd</th>
             <th class="text-end">Preço</th>
             <th class="text-end">Taxas</th>
-            <th class="text-end">Total</th>
+            <th class="text-end" title="Quantidade × preço unitário, sem as taxas">
+              Total Bruto
+            </th>
             <th>Corretora</th>
             <th class="text-center">Ações</th>
           </tr>
