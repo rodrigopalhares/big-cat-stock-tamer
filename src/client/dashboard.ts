@@ -6,6 +6,7 @@
  */
 
 import { assetTypeColor, assetTypeFill } from '../shared/asset-colors.js'
+import { assetTypeLabel } from '../shared/asset-type-labels.js'
 
 type ChartDataset = Record<string, unknown>
 declare const Chart: new (el: Element, config: Record<string, unknown>) => unknown
@@ -80,8 +81,9 @@ function buildChart(): void {
   const ibov = parse<Array<number | null>>(dataEl.dataset['ibov'], [])
   const cdi = parse<Array<number | null>>(dataEl.dataset['cdi'], [])
 
+  // O servidor manda o código do tipo: é a chave da cor. A legenda mostra o rótulo.
   const datasets: ChartDataset[] = rawDatasets.map((ds) => ({
-    label: ds.label,
+    label: assetTypeLabel(ds.label),
     data: ds.data,
     fill: true,
     backgroundColor: assetTypeFill(ds.label),
@@ -178,7 +180,7 @@ function buildDividendsChart(): void {
   const movingAverage = parse<number[]>(dataEl.dataset['dividendMovingAverage'], [])
 
   const datasets: ChartDataset[] = rawDatasets.map((ds) => ({
-    label: ds.label,
+    label: assetTypeLabel(ds.label),
     data: ds.data,
     backgroundColor: assetTypeFill(ds.label),
     borderColor: assetTypeColor(ds.label),

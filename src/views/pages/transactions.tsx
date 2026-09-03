@@ -1,5 +1,6 @@
 import { ASSET_TYPES } from '../../domain/constants.js'
 import type { TransactionView } from '../../modules/transaction/transaction.schema.js'
+import { assetTypeLabel } from '../../shared/asset-type-labels.js'
 import { date as fmtDate, money, quantity } from '../../shared/format.js'
 import type { IsoDate } from '../../shared/iso-date.js'
 import { TRANSACTION_TYPE_LIST } from '../../shared/transaction-types.js'
@@ -21,7 +22,10 @@ export type TransactionsPageProps = {
   nextUrl: string | null
   assets: Array<{ ticker: string; name: string }>
   selectedTicker: string | null
+  /** Tipo de ativo (STOCK, REIT…). */
   selectedType: string
+  /** Operação (BUY, SELL…) — não confundir com o tipo de ativo. */
+  selectedOperation: string
   selectedPosition: string
   /** Trecho de ticker da caixa de busca. */
   search: string
@@ -36,7 +40,7 @@ export function TransactionsPage(props: TransactionsPageProps) {
   const { transactions } = props
 
   return (
-    <Layout title="Transações" path="/transactions/">
+    <Layout title="Transações — Carteira" path="/transactions/">
       <div class="container-fluid py-4 px-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
           <h2 class="mb-0">
@@ -426,6 +430,7 @@ function TransactionTypeSelect({
 function HistoryFilters({
   selectedTicker,
   selectedType,
+  selectedOperation,
   selectedPosition,
   search,
   years,
@@ -435,6 +440,7 @@ function HistoryFilters({
     selectedTicker !== null ||
     search !== '' ||
     selectedType !== '' ||
+    selectedOperation !== '' ||
     selectedPosition !== '' ||
     selectedYear !== null
   return (
@@ -468,11 +474,25 @@ function HistoryFilters({
             </option>
           ))}
         </select>
+        {/* "Tipo" sozinho era ambíguo: o formulário ao lado chama a operação de Tipo. */}
         <select name="type" class="form-select form-select-sm" style="width:auto" data-autosubmit>
-          <option value="">Tipo: Todos</option>
+          <option value="">Tipo de ativo: Todos</option>
           {ASSET_TYPES.map((t) => (
             <option value={t} selected={t === selectedType}>
-              {t}
+              {assetTypeLabel(t)}
+            </option>
+          ))}
+        </select>
+        <select
+          name="operation"
+          class="form-select form-select-sm"
+          style="width:auto"
+          data-autosubmit
+        >
+          <option value="">Operação: Todas</option>
+          {TRANSACTION_TYPE_LIST.map((meta) => (
+            <option value={meta.type} selected={meta.type === selectedOperation}>
+              {meta.labelPt}
             </option>
           ))}
         </select>

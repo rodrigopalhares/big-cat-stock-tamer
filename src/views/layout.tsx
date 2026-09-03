@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { href: '/transactions/', icon: 'bi-arrow-left-right', label: 'Transações' },
   { href: '/dividends/', icon: 'bi-cash-coin', label: 'Proventos' },
   { href: '/evolution/', icon: 'bi-graph-up', label: 'Evolução' },
-  { href: '/risk-metrics/', icon: 'bi-shield-check', label: 'Risk Metrics' },
+  { href: '/risk-metrics/', icon: 'bi-shield-check', label: 'Risco' },
 ] as const
 
 export type LayoutProps = {
@@ -115,10 +115,6 @@ function Navbar({ path }: { path: string }) {
           >
             <i class="bi bi-moon-fill" />
           </button>
-          <span class="navbar-text text-secondary small me-3">
-            <i class="bi bi-circle-fill text-success" style="font-size:0.5rem;" /> Fastify +
-            TypeScript
-          </span>
           <form method="post" action="/logout" class="d-inline">
             <button type="submit" class="btn btn-link nav-link px-2" title="Sair">
               <i class="bi bi-box-arrow-right" />

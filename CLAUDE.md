@@ -83,7 +83,9 @@ Verificadas pelo `dependency-cruiser` no CI, não só combinadas:
   (`views/components/load-more-row.tsx`, `hx-trigger="revealed"`) que busca `/<lista>/rows?offset=`
   com os mesmos filtros. O service recebe `PageWindow` opcional e tem um `count` para o badge.
 - Cor de tipo de ativo sai de `src/shared/asset-colors.ts` — gráficos e badges leem do mesmo
-  mapa, então STOCK é o mesmo azul em toda a interface. Tipo novo entra lá, e só lá.
+  mapa, então STOCK é o mesmo azul em toda a interface. O rótulo em português sai de
+  `src/shared/asset-type-labels.ts` (STOCK é "Ação"); o código fica em `value`, `title` e na
+  chave de cor, nunca em texto de tela. Tipo novo entra nos dois mapas, e só neles.
 
 ## Decisões que valem conhecer antes de mexer
 

@@ -56,8 +56,10 @@ export function evolutionRoutes(c: Container): FastifyPluginAsync {
       )
     })
 
-    app.post('/evolution/recalculate', async (_req, reply) => {
+    app.post('/evolution/recalculate', async (req, reply) => {
       await c.evolution.recalculate()
+      // Pelo botão HTMX a própria página recarrega no sucesso; o POST comum ainda redireciona.
+      if (req.headers['hx-request']) return reply.type('text/html; charset=utf-8').send('')
       return reply.redirect('/evolution/', 302)
     })
 

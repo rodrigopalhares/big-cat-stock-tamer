@@ -1,4 +1,5 @@
 import { assetTypeColor, assetTypeTextColor } from '../../shared/asset-colors.js'
+import { assetTypeLabel } from '../../shared/asset-type-labels.js'
 import { transactionTypeMetaOrNull } from '../../shared/transaction-types.js'
 
 /** Porte de src/main/resources/templates/fragments/badge.html. */
@@ -18,8 +19,9 @@ export function AssetBadge({ type }: { type: string | null }) {
     <span
       class="badge"
       style={`background-color: ${assetTypeColor(type)}; color: ${assetTypeTextColor(type)}`}
+      title={type}
     >
-      {type}
+      {assetTypeLabel(type)}
     </span>
   )
 }

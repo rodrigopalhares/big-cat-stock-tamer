@@ -4,6 +4,7 @@ import type {
 } from '../../modules/evolution/evolution.schema.js'
 import { money, monthLabel, quantity } from '../../shared/format.js'
 import { LoadMoreRow } from '../components/load-more-row.js'
+import { RecalculateEvolutionButton } from '../components/recalculate-button.js'
 import { Layout } from '../layout.js'
 import type { ChartData } from './dashboard.js'
 
@@ -36,11 +37,7 @@ export function EvolutionPage({ months, tickers, total, nextUrl, chart }: Evolut
           <h2 class="mb-0">
             <i class="bi bi-graph-up" /> Evolução Patrimonial
           </h2>
-          <form method="post" action="/evolution/recalculate" class="d-inline">
-            <button type="submit" class="btn btn-outline-secondary btn-sm">
-              <i class="bi bi-arrow-clockwise me-1" /> Recalcular
-            </button>
-          </form>
+          <RecalculateEvolutionButton />
         </div>
 
         {chart !== null && (

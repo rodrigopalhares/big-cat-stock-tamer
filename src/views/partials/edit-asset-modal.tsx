@@ -1,5 +1,6 @@
 import { ASSET_TYPES } from '../../domain/constants.js'
 import type { AssetClassView } from '../../modules/allocation/allocation.schema.js'
+import { assetTypeLabel } from '../../shared/asset-type-labels.js'
 
 /**
  * Modal de edição do ativo, compartilhado pela lista (`/assets/`) e pelo detalhe
@@ -38,7 +39,7 @@ export function EditAssetModal({ classes }: { classes: AssetClassView[] }) {
                 <label class="form-label">Tipo</label>
                 <select id="editType" name="type" class="form-select">
                   {ASSET_TYPES.map((t) => (
-                    <option value={t}>{t}</option>
+                    <option value={t}>{assetTypeLabel(t)}</option>
                   ))}
                 </select>
               </div>

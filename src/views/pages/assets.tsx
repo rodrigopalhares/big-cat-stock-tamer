@@ -1,6 +1,7 @@
 import { ASSET_TYPES } from '../../domain/constants.js'
 import type { AssetClassView } from '../../modules/allocation/allocation.schema.js'
 import type { AssetView } from '../../modules/asset/asset.schema.js'
+import { assetTypeLabel } from '../../shared/asset-type-labels.js'
 import { AssetBadge } from '../components/badge.js'
 import { Layout } from '../layout.js'
 import { EditAssetModal, editAssetAttrs } from '../partials/edit-asset-modal.js'
@@ -30,7 +31,7 @@ export function AssetsPage({
   const hasFilters = selectedType !== '' || selectedPosition !== '' || selectedDelisted !== ''
 
   return (
-    <Layout title="Ativos" path="/assets/">
+    <Layout title="Ativos — Carteira" path="/assets/">
       <div class="container-fluid py-4 px-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
           <h2 class="mb-0">
@@ -133,7 +134,7 @@ function CreateAssetForm() {
             <label class="form-label">Tipo</label>
             <select id="assetType" name="type" class="form-select">
               {ASSET_TYPES.map((t) => (
-                <option value={t}>{t}</option>
+                <option value={t}>{assetTypeLabel(t)}</option>
               ))}
             </select>
           </div>
@@ -170,7 +171,7 @@ function Filters({
         <option value="">Tipo: Todos</option>
         {ASSET_TYPES.map((t) => (
           <option value={t} selected={t === selectedType}>
-            {t}
+            {assetTypeLabel(t)}
           </option>
         ))}
       </select>

@@ -2,6 +2,7 @@ import type { AssetType } from '../../domain/constants.js'
 import { ASSET_TYPES } from '../../domain/constants.js'
 import type { ResolvedAssetInfo } from '../../integrations/asset-info.client.js'
 import type { TickerLookupResult } from '../../modules/transaction/transaction.service.js'
+import { assetTypeLabel } from '../../shared/asset-type-labels.js'
 import { AssetBadge } from './badge.js'
 
 /**
@@ -42,7 +43,7 @@ export function AssetTickerInfo({
       {found ? (
         <div class="alert alert-info small p-2 mb-0">
           <i class="bi bi-cloud-download me-1" />
-          <strong>{ticker}</strong> — {name} <span class="badge bg-secondary">{type}</span>
+          <strong>{ticker}</strong> — {name} <AssetBadge type={type} />
         </div>
       ) : (
         <div class="alert alert-secondary small p-2 mb-0">
@@ -72,7 +73,7 @@ export function AssetTickerInfo({
       <select hx-swap-oob="true" id="assetType" name="type" class="form-select">
         {ASSET_TYPES.map((t) => (
           <option value={t} selected={t === type}>
-            {t}
+            {assetTypeLabel(t)}
           </option>
         ))}
       </select>

@@ -49,7 +49,10 @@ export type TransactionFilters = {
   ticker?: string | null | undefined
   /** Trecho do ticker — a busca da lista. `ITUB` acha ITUB3 e ITUB4. */
   search?: string | null | undefined
+  /** Tipo de ativo (STOCK, REIT…). */
   type?: string | null | undefined
+  /** Operação (BUY, SELL…). */
+  operation?: string | null | undefined
   position?: string | null | undefined
   year?: number | null | undefined
 }
@@ -170,6 +173,7 @@ export class TransactionService {
     if (filters.ticker) clauses.push({ assetId: filters.ticker.toUpperCase() })
     if (search !== '') clauses.push({ assetId: { contains: search } })
     if (eligible !== null) clauses.push({ assetId: { in: [...eligible] } })
+    if (filters.operation) clauses.push({ type: normalizeType(filters.operation) })
     if (filters.year) {
       clauses.push({ date: { gte: `${filters.year}-01-01`, lte: `${filters.year}-12-31` } })
     }

@@ -452,6 +452,19 @@ describe('rotas da aplicação', () => {
       expect(res.body).not.toContain('hx-trigger="revealed"')
     })
 
+    it('filtra por operação e nomeia os dois filtros sem ambiguidade', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4', { quantity: 100, date: '2024-01-15' })
+      await createTransaction(h.db, 'PETR4', { type: 'SELL', quantity: -10, date: '2024-02-15' })
+
+      const res = await h.app.inject({ method: 'GET', url: '/transactions/?operation=SELL' })
+
+      expect(res.body).toContain('Tipo de ativo: Todos')
+      expect(res.body).toContain('Operação: Todas')
+      expect(res.body.match(/data-edit-tx/g)).toHaveLength(1)
+      expect(res.body).toContain('<option value="SELL" selected>')
+    })
+
     it('busca por trecho do ticker e filtro por ano', async () => {
       await createAsset(h.db, 'PETR4')
       await createAsset(h.db, 'VALE3')
@@ -756,12 +769,13 @@ describe('rotas da aplicação', () => {
     it('os formulários de criação e de edição oferecem todos os tipos', async () => {
       const res = await h.app.inject({ method: 'GET', url: '/transactions/' })
 
-      // Um `select` no formulário novo e outro no modal de edição, ambos com os seis tipos.
+      // Um `select` no formulário novo, outro no modal de edição e o filtro de operação do
+      // histórico — os três com os seis tipos.
       for (const id of ['txType', 'editTxType']) {
         expect(res.body).toContain(`id="${id}"`)
       }
       for (const value of TRANSACTION_TYPES) {
-        expect(res.body.match(new RegExp(`value="${value}"`, 'g'))).toHaveLength(2)
+        expect(res.body.match(new RegExp(`value="${value}"`, 'g'))).toHaveLength(3)
       }
     })
 
@@ -1216,6 +1230,16 @@ describe('rotas da aplicação', () => {
       expect(res.json()).toEqual({ status: 'ok' })
     })
 
+    it('recalcular pelo botão HTMX devolve 200 vazio; o POST comum ainda redireciona', async () => {
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/evolution/recalculate',
+        headers: { 'hx-request': 'true' },
+      })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toBe('')
+    })
+
     it('mostra a tabela quando há snapshots', async () => {
       await createAsset(h.db, 'PETR4')
       await h.db.monthlySnapshot.create({
@@ -1233,6 +1257,42 @@ describe('rotas da aplicação', () => {
       const res = await h.app.inject({ method: 'GET', url: '/evolution/' })
       expect(res.body).toContain('01/2024')
       expect(res.body).toContain('PETR4')
+    })
+  })
+
+  describe('rótulos da interface', () => {
+    it('o menu diz Risco, a página diz Métricas de Risco e a navbar não expõe a stack', async () => {
+      const res = await h.app.inject({ method: 'GET', url: '/risk-metrics/' })
+
+      expect(res.body).toContain('Métricas de Risco')
+      expect(res.body).toContain('> Risco</a>')
+      expect(res.body).not.toContain('Risk Metrics')
+      expect(res.body).not.toContain('Fastify + TypeScript')
+      expect(res.body).toContain('<title>Risco — Carteira</title>')
+    })
+
+    it('tipo de ativo aparece em português no badge e no select, com o código no value', async () => {
+      await createAsset(h.db, 'TD:IPCA2035', { type: 'TESOURO_DIRETO' })
+
+      const res = await h.app.inject({ method: 'GET', url: '/assets/' })
+
+      expect(res.body).toContain('title="TESOURO_DIRETO">Tesouro Direto</span>')
+      expect(res.body).toContain('<option value="TESOURO_DIRETO">Tesouro Direto</option>')
+    })
+
+    it('sem snapshot, o dashboard oferece o recálculo no lugar do gráfico', async () => {
+      const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+      expect(res.body).toContain('aparece depois do primeiro recálculo')
+      expect(res.body).toContain('hx-post="/evolution/recalculate"')
+      expect(res.body).not.toContain('id="evolutionChart"')
+    })
+
+    it('os filtros de Proventos separam tipo de ativo de tipo de provento', async () => {
+      const res = await h.app.inject({ method: 'GET', url: '/dividends/' })
+
+      expect(res.body).toContain('Tipo de ativo: Todos')
+      expect(res.body).toContain('Provento: Todos')
     })
   })
 

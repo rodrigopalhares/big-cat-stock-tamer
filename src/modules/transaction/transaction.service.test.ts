@@ -387,6 +387,14 @@ describe('TransactionService', () => {
       expect(await service.listTransactions({ search: 'xyz' })).toEqual([])
     })
 
+    it('filtra por operação, que é o tipo da transação e não do ativo', async () => {
+      await createTransaction(db, 'PETR4', { type: 'SELL', quantity: -5, date: '2024-04-01' })
+
+      const sells = await service.listTransactions({ operation: 'sell' })
+      expect(sells.map((t) => t.type)).toEqual(['SELL'])
+      expect(await service.countTransactions({ operation: 'BUY' })).toBe(3)
+    })
+
     it('filtra por ano', async () => {
       await createTransaction(db, 'PETR4', { date: '2023-12-31' })
 

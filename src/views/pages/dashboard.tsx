@@ -1,5 +1,6 @@
 import type { CdiComparison } from '../../modules/cdi/cdi.schema.js'
 import type { AssetPosition } from '../../modules/portfolio/portfolio.schema.js'
+import { assetTypeLabel } from '../../shared/asset-type-labels.js'
 import {
   decimal,
   date as fmtDate,
@@ -9,6 +10,7 @@ import {
   signClass,
 } from '../../shared/format.js'
 import { AssetBadge } from '../components/badge.js'
+import { RecalculateEvolutionButton } from '../components/recalculate-button.js'
 import { Layout } from '../layout.js'
 
 /** Porte de src/main/resources/templates/dashboard.html. */
@@ -85,7 +87,7 @@ export function DashboardPage(props: DashboardPageProps) {
 
         <CdiComparisonCards cdi={props.cdi} />
 
-        {chart !== null && (
+        {chart !== null ? (
           <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white">
               <span class="fw-semibold">
@@ -96,6 +98,8 @@ export function DashboardPage(props: DashboardPageProps) {
               <canvas id="evolutionChart" height={100} />
             </div>
           </div>
+        ) : (
+          <EvolutionPlaceholder />
         )}
 
         {dividendChart !== null && (
@@ -119,9 +123,9 @@ export function DashboardPage(props: DashboardPageProps) {
             <div class="row g-2 align-items-center">
               <div class="col-auto">
                 <select id="filterType" class="form-select form-select-sm">
-                  <option value="">Todos os tipos</option>
+                  <option value="">Tipo de ativo: Todos</option>
                   {props.assetTypes.map((t) => (
-                    <option value={t}>{t}</option>
+                    <option value={t}>{assetTypeLabel(t)}</option>
                   ))}
                 </select>
               </div>
@@ -174,6 +178,23 @@ export function DashboardPage(props: DashboardPageProps) {
       )}
       <script src="/js/dashboard.js" defer />
     </Layout>
+  )
+}
+
+/**
+ * Sem snapshot mensal o gráfico simplesmente não existia, e nada apontava para o botão na
+ * tela de Evolução. O card vazio diz o que falta e resolve ali mesmo.
+ */
+function EvolutionPlaceholder() {
+  return (
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body text-center py-4 text-muted">
+        <i class="bi bi-graph-up fs-1" />
+        <p class="mt-2 mb-1">O gráfico de evolução aparece depois do primeiro recálculo mensal.</p>
+        <p class="small mb-3">Leva cerca de um minuto e a página recarrega sozinha.</p>
+        <RecalculateEvolutionButton class="btn btn-primary btn-sm" />
+      </div>
+    </div>
   )
 }
 

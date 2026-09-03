@@ -50,11 +50,11 @@ export function RiskMetricsPage({
   const hasData = metrics.length > 0
 
   return (
-    <Layout title="Risk Metrics — Carteira" path="/risk-metrics/">
+    <Layout title="Risco — Carteira" path="/risk-metrics/">
       <div class="container-fluid py-4 px-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
           <h2 class="mb-0">
-            <i class="bi bi-shield-check" /> Risk Metrics
+            <i class="bi bi-shield-check" /> Métricas de Risco
           </h2>
           <button
             type="button"
@@ -79,7 +79,7 @@ export function RiskMetricsPage({
               value={cdiAnnual === null ? null : `${percent(cdiAnnual)} a.a.`}
             />
             <SummaryCard
-              label="Ultima Atualização"
+              label="Última atualização"
               value={calculatedAt === null ? null : fmtDate(calculatedAt)}
             />
           </div>
@@ -87,8 +87,8 @@ export function RiskMetricsPage({
 
         <div class="alert alert-info py-2 px-3 mb-3 small">
           <i class="bi bi-info-circle me-1" />
-          Benchmark: <strong>IBOVESPA</strong> · Retornos mensais · Janela de 5 anos · Apenas ativos{' '}
-          <strong>STOCK</strong> e <strong>REIT</strong> · Ativos sem série suficiente para a
+          Benchmark: <strong>IBOVESPA</strong> · Retornos mensais · Janela de 5 anos · Apenas{' '}
+          <strong>Ações</strong> e <strong>FIIs</strong> · Ativos sem série suficiente para a
           regressão ficam de fora da lista
         </div>
 

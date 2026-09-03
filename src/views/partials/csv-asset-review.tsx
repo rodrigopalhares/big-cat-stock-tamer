@@ -1,6 +1,7 @@
 import { ASSET_TYPES } from '../../domain/constants.js'
 import type { AssetStatus } from '../../domain/csv/transaction-csv.js'
 import type { CsvAssetRow } from '../../modules/csv-import/csv-import.service.js'
+import { assetTypeLabel } from '../../shared/asset-type-labels.js'
 import { AssetBadge } from '../components/badge.js'
 
 /**
@@ -128,7 +129,7 @@ function AssetRow({ row }: { row: CsvAssetRow }) {
           >
             {ASSET_TYPES.map((t) => (
               <option value={t} selected={t === row.type}>
-                {t}
+                {assetTypeLabel(t)}
               </option>
             ))}
           </select>

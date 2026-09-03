@@ -1,5 +1,6 @@
 import { DIVIDEND_TYPES } from '../../domain/constants.js'
 import type { DividendView } from '../../modules/dividend/dividend.schema.js'
+import { assetTypeLabel } from '../../shared/asset-type-labels.js'
 import { date as fmtDate, money } from '../../shared/format.js'
 import type { IsoDate } from '../../shared/iso-date.js'
 import { DividendBadge } from '../components/badge.js'
@@ -34,7 +35,7 @@ export function DividendsPage(props: DividendsPageProps) {
   const { dividends } = props
 
   return (
-    <Layout title="Proventos" path="/dividends/">
+    <Layout title="Proventos — Carteira" path="/dividends/">
       <div class="container-fluid py-4 px-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
           <h2 class="mb-0">
@@ -244,15 +245,15 @@ function Filters({
           style="width:auto"
           data-autosubmit
         >
-          <option value="">Ativo: Todos</option>
+          <option value="">Tipo de ativo: Todos</option>
           {assetTypes.map((t) => (
             <option value={t} selected={t === selectedAssetType}>
-              {t}
+              {assetTypeLabel(t)}
             </option>
           ))}
         </select>
         <select name="type" class="form-select form-select-sm" style="width:auto" data-autosubmit>
-          <option value="">Tipo: Todos</option>
+          <option value="">Provento: Todos</option>
           {DIVIDEND_TYPES.map((t) => (
             <option value={t} selected={t === selectedType}>
               {t}

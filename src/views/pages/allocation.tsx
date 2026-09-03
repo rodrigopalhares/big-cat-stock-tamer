@@ -19,7 +19,7 @@ export type AllocationPageProps = {
 
 export function AllocationPage({ allocation, classes, unpriced }: AllocationPageProps) {
   return (
-    <Layout title="Alocação" path="/allocation/">
+    <Layout title="Alocação — Carteira" path="/allocation/">
       <div class="container-fluid py-4 px-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
           <h2 class="mb-0">
