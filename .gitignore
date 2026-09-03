@@ -32,3 +32,8 @@ Thumbs.db
 # claude
 .claude/*.local.*
 .claude/worktrees/
+
+# auditoria de segurança: venv local e gráficos regenerados pelo script
+docs/security-audit/.venv/
+docs/security-audit/assets/
+docs/security-audit/__pycache__/
