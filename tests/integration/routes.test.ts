@@ -415,6 +415,72 @@ describe('rotas da aplicação', () => {
       expect(res.body).toContain('Nenhuma transação registrada')
     })
 
+    it('a primeira página traz 100 linhas e a sentinela da próxima, com os filtros', async () => {
+      await createAsset(h.db, 'PETR4', { type: 'STOCK' })
+      for (let i = 0; i < 101; i++) {
+        await createTransaction(h.db, 'PETR4', {
+          date: `2024-01-${String((i % 28) + 1).padStart(2, '0')}`,
+        })
+      }
+
+      const res = await h.app.inject({ method: 'GET', url: '/transactions/?type=STOCK' })
+
+      expect(res.body.match(/data-edit-tx/g)).toHaveLength(100)
+      expect(res.body).toContain('hx-trigger="revealed"')
+      expect(res.body).toContain('hx-get="/transactions/rows?type=STOCK&amp;offset=100"')
+      // O contador é do total, não da página.
+      expect(res.body).toContain('<span class="badge bg-secondary ms-1">101</span>')
+    })
+
+    it('/transactions/rows devolve a página seguinte e, na última, nenhuma sentinela', async () => {
+      await createAsset(h.db, 'PETR4')
+      for (let i = 0; i < 101; i++) await createTransaction(h.db, 'PETR4')
+
+      const res = await h.app.inject({ method: 'GET', url: '/transactions/rows?offset=100' })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.body.match(/data-edit-tx/g)).toHaveLength(1)
+      expect(res.body).not.toContain('hx-trigger="revealed"')
+      expect(res.body).not.toContain('<!DOCTYPE')
+    })
+
+    it('lista curta não tem sentinela', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4')
+
+      const res = await h.app.inject({ method: 'GET', url: '/transactions/' })
+      expect(res.body).not.toContain('hx-trigger="revealed"')
+    })
+
+    it('filtra por operação e nomeia os dois filtros sem ambiguidade', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4', { quantity: 100, date: '2024-01-15' })
+      await createTransaction(h.db, 'PETR4', { type: 'SELL', quantity: -10, date: '2024-02-15' })
+
+      const res = await h.app.inject({ method: 'GET', url: '/transactions/?operation=SELL' })
+
+      expect(res.body).toContain('Tipo de ativo: Todos')
+      expect(res.body).toContain('Operação: Todas')
+      expect(res.body.match(/data-edit-tx/g)).toHaveLength(1)
+      expect(res.body).toContain('<option value="SELL" selected>')
+    })
+
+    it('busca por trecho do ticker e filtro por ano', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createAsset(h.db, 'VALE3')
+      await createTransaction(h.db, 'PETR4', { date: '2024-01-15' })
+      await createTransaction(h.db, 'VALE3', { date: '2023-01-15' })
+
+      const search = await h.app.inject({ method: 'GET', url: '/transactions/?q=val' })
+      expect(search.body).toContain('/assets/VALE3')
+      expect(search.body).not.toContain('/assets/PETR4')
+
+      const year = await h.app.inject({ method: 'GET', url: '/transactions/?year=2024' })
+      expect(year.body).toContain('/assets/PETR4')
+      expect(year.body).not.toContain('/assets/VALE3')
+      expect(year.body).toContain('<option value="2024" selected>')
+    })
+
     it('a lista renderiza a linha da transação', async () => {
       await createAsset(h.db, 'PETR4', { name: 'Petrobras' })
       await createTransaction(h.db, 'PETR4', {
@@ -572,6 +638,61 @@ describe('rotas da aplicação', () => {
       expect(asset.avgPrice).toBeCloseTo(10, 4)
     })
 
+    it('venda acima da posição volta 400 em português e não grava', async () => {
+      await createAsset(h.db, 'ITUB3')
+      await createTransaction(h.db, 'ITUB3', { quantity: 1586, price: 20, date: '2024-01-02' })
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/transactions/new',
+        payload: {
+          ticker: 'ITUB3',
+          type: 'SELL',
+          quantity: '999999',
+          price: '40',
+          fees: '0',
+          date: '2026-01-01',
+          currency: 'BRL',
+        },
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(res.body).toContain('Venda de 999.999 ITUB3 em 01/01/2026 supera a posição de 1.586')
+      expect(await h.db.transaction.count()).toBe(1)
+    })
+
+    it('o lote do CSV pede JSON e recebe o motivo em JSON, não a página de erro', async () => {
+      await createAsset(h.db, 'ITUB3')
+      await createTransaction(h.db, 'ITUB3', { quantity: 1586, price: 20, date: '2024-01-02' })
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/transactions/batch',
+        headers: { accept: 'application/json' },
+        payload: {
+          rows: [
+            {
+              ticker: 'ITUB3',
+              date: '2026-09-02',
+              type: 'SELL',
+              quantity: 5000,
+              price: 40,
+              fees: 0,
+              broker: '',
+              notes: '',
+              currency: 'BRL',
+            },
+          ],
+        },
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(res.json()).toEqual({
+        error: 'Venda de 5.000 ITUB3 em 02/09/2026 supera a posição de 1.586 na data.',
+      })
+      expect(await h.db.transaction.count()).toBe(1)
+    })
+
     it('agrupamento reduz a posição sem realizar resultado', async () => {
       await createAsset(h.db, 'PETR4')
       await createTransaction(h.db, 'PETR4', { quantity: 1000, price: 1, date: '2024-01-02' })
@@ -648,12 +769,13 @@ describe('rotas da aplicação', () => {
     it('os formulários de criação e de edição oferecem todos os tipos', async () => {
       const res = await h.app.inject({ method: 'GET', url: '/transactions/' })
 
-      // Um `select` no formulário novo e outro no modal de edição, ambos com os seis tipos.
+      // Um `select` no formulário novo, outro no modal de edição e o filtro de operação do
+      // histórico — os três com os seis tipos.
       for (const id of ['txType', 'editTxType']) {
         expect(res.body).toContain(`id="${id}"`)
       }
       for (const value of TRANSACTION_TYPES) {
-        expect(res.body.match(new RegExp(`value="${value}"`, 'g'))).toHaveLength(2)
+        expect(res.body.match(new RegExp(`value="${value}"`, 'g'))).toHaveLength(3)
       }
     })
 
@@ -674,6 +796,7 @@ describe('rotas da aplicação', () => {
 
     it('a API JSON aceita evento societário e recusa tipo inventado', async () => {
       await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4', { quantity: 1000, price: 1, date: '2024-01-02' })
 
       const ok = await h.app.inject({
         method: 'POST',
@@ -687,17 +810,19 @@ describe('rotas da aplicação', () => {
         },
       })
       expect(ok.statusCode).toBe(201)
-      expect(await h.db.transaction.findFirstOrThrow()).toMatchObject({ quantity: -900 })
+      expect(
+        await h.db.transaction.findFirstOrThrow({ where: { type: 'AGRUPAMENTO' } }),
+      ).toMatchObject({ quantity: -900 })
 
-      // Recusa sem gravar. O código é 500 porque o ZodError não carrega `statusCode` e o
-      // setErrorHandler cai no padrão — vale para toda validação Zod do app, não só aqui.
+      // Recusa sem gravar: o ZodError vira 400 no setErrorHandler, com o campo em português.
       const bad = await h.app.inject({
         method: 'POST',
         url: '/transactions/api',
         payload: { assetId: 'PETR4', type: 'XPTO', quantity: 1, price: 1, date: '2024-06-01' },
       })
-      expect(bad.statusCode).toBeGreaterThanOrEqual(400)
-      expect(await h.db.transaction.count()).toBe(1)
+      expect(bad.statusCode).toBe(400)
+      expect(bad.json().details[0]).toMatch(/^Tipo deve ser um destes: BUY, SELL/)
+      expect(await h.db.transaction.count()).toBe(2)
     })
 
     it('a API JSON não deixa desdobramento gravar preço', async () => {
@@ -904,6 +1029,28 @@ describe('rotas da aplicação', () => {
       expect(res.body).toContain('85,00')
     })
 
+    it('cabeçalho mostra o líquido de tudo que o filtro pegou, e a sentinela leva o filtro', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createAsset(h.db, 'MXRF11', { type: 'REIT' })
+      for (let i = 0; i < 101; i++) {
+        await createDividend(h.db, 'PETR4', { totalAmount: 10, taxWithheld: 1 })
+      }
+      await createDividend(h.db, 'MXRF11', { totalAmount: 1000 })
+
+      const res = await h.app.inject({ method: 'GET', url: '/dividends/?assetType=STOCK' })
+
+      // 101 × 9 líquidos — o MXRF11 fica fora pelo filtro, e a soma passa da página de 100.
+      expect(res.body).toContain('R$ 909,00 líquidos')
+      expect(res.body).toContain('hx-get="/dividends/rows?assetType=STOCK&amp;offset=100"')
+
+      const rows = await h.app.inject({
+        method: 'GET',
+        url: '/dividends/rows?assetType=STOCK&offset=100',
+      })
+      expect(rows.body.match(/data-edit-div/g)).toHaveLength(1)
+      expect(rows.body).not.toContain('hx-trigger="revealed"')
+    })
+
     it('filtra a lista pelo tipo do ativo', async () => {
       await createAsset(h.db, 'PETR4')
       await createAsset(h.db, 'MXRF11', { type: 'REIT' })
@@ -1036,12 +1183,61 @@ describe('rotas da aplicação', () => {
 
     it('API devolve meses e tickers', async () => {
       const res = await h.app.inject({ method: 'GET', url: '/evolution/api' })
-      expect(res.json()).toEqual({ months: [], tickers: [] })
+      expect(res.json()).toEqual({ months: [], tickers: [], currentTickers: [] })
+    })
+
+    it('do mês mais recente para o mais antigo, em páginas de 36, só com colunas de quem tem posição', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createAsset(h.db, 'VALE3')
+      const snapshot = (assetId: string, month: string, quantity: number) => ({
+        assetId,
+        month,
+        quantity,
+        avgPrice: 10,
+        marketPrice: 12,
+        totalCost: quantity * 10,
+        marketValue: quantity * 12,
+      })
+      const months: string[] = []
+      for (let i = 0; i < 40; i++) {
+        const year = 2021 + Math.floor(i / 12)
+        months.push(`${year}-${String((i % 12) + 1).padStart(2, '0')}-01`)
+      }
+      await h.db.monthlySnapshot.createMany({
+        data: [
+          ...months.map((month) => snapshot('PETR4', month, 10)),
+          // VALE3 foi vendida: aparece nos meses antigos e zerada no último.
+          snapshot('VALE3', months[0] as string, 5),
+          snapshot('VALE3', months[39] as string, 0),
+        ],
+      })
+
+      const page = await h.app.inject({ method: 'GET', url: '/evolution/' })
+      const body = page.body.slice(page.body.indexOf('<tbody>'))
+      expect(body.indexOf('04/2024')).toBeLessThan(body.indexOf('03/2024'))
+      expect(page.body).toContain('<th class="text-end">PETR4</th>')
+      expect(page.body).not.toContain('<th class="text-end">VALE3</th>')
+      expect(page.body).toContain('hx-get="/evolution/rows?offset=36"')
+
+      const rest = await h.app.inject({ method: 'GET', url: '/evolution/rows?offset=36' })
+      expect(rest.body).toContain('04/2021')
+      expect(rest.body).toContain('01/2021')
+      expect(rest.body).not.toContain('hx-trigger="revealed"')
     })
 
     it('API de recalcular devolve status ok', async () => {
       const res = await h.app.inject({ method: 'POST', url: '/evolution/api/recalculate' })
       expect(res.json()).toEqual({ status: 'ok' })
+    })
+
+    it('recalcular pelo botão HTMX devolve 200 vazio; o POST comum ainda redireciona', async () => {
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/evolution/recalculate',
+        headers: { 'hx-request': 'true' },
+      })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toBe('')
     })
 
     it('mostra a tabela quando há snapshots', async () => {
@@ -1061,6 +1257,137 @@ describe('rotas da aplicação', () => {
       const res = await h.app.inject({ method: 'GET', url: '/evolution/' })
       expect(res.body).toContain('01/2024')
       expect(res.body).toContain('PETR4')
+    })
+  })
+
+  describe('tabela de posições', () => {
+    it('fecha um subtotal por tipo, com a TIR do grupo, e marca as colunas secundárias', async () => {
+      await createAsset(h.db, 'PETR4', { type: 'STOCK', hasPosition: true })
+      await createAsset(h.db, 'VALE3', { type: 'STOCK', hasPosition: true })
+      await createAsset(h.db, 'HGLG11', { type: 'REIT', hasPosition: true })
+      await createTransaction(h.db, 'PETR4', { quantity: 10, price: 10, date: '2024-01-15' })
+      await createTransaction(h.db, 'VALE3', { quantity: 10, price: 20, date: '2024-01-15' })
+      await createTransaction(h.db, 'HGLG11', { quantity: 1, price: 100, date: '2024-01-15' })
+      for (const ticker of ['PETR4', 'VALE3', 'HGLG11']) {
+        await h.container.assets.refreshPositionFields(ticker)
+      }
+
+      const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+      expect(res.body.match(/data-subtotal/g)).toHaveLength(2)
+      expect(res.body).toContain('Subtotal Ação')
+      expect(res.body).toContain('· 2 ativos')
+      expect(res.body).toContain('Subtotal FII')
+      expect(res.body).toContain('· 1 ativo')
+      // Custo total das duas ações: 100 + 200.
+      expect(res.body).toContain('R$ 300,00')
+      expect(res.body).toContain('positions-table table-sticky"')
+      expect(res.body).toContain('<th class="col-secondary" data-sort="text">Moeda')
+      expect(res.body).toContain('id="toggleColumns"')
+    })
+  })
+
+  describe('exclusão de ativo e acessibilidade', () => {
+    it('a lista não tem mais lixeira por linha; excluir fica no modal, com a contagem do que some', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4')
+      await createDividend(h.db, 'PETR4')
+
+      const res = await h.app.inject({ method: 'GET', url: '/assets/' })
+
+      expect(res.body).not.toContain('action="/assets/PETR4/delete"')
+      expect(res.body).toContain('data-asset-transaction-count="2"')
+      expect(res.body).toContain('data-asset-dividend-count="1"')
+      expect(res.body).toContain('form="deleteAssetForm"')
+      expect(res.body).toContain('id="deleteAssetForm"')
+      expect(res.body).toContain('aria-label="Editar PETR4"')
+    })
+
+    it('o detalhe do ativo traz as mesmas contagens para o modal', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4')
+
+      const res = await h.app.inject({ method: 'GET', url: '/assets/PETR4' })
+      expect(res.body).toContain('data-asset-transaction-count="1"')
+      expect(res.body).toContain('data-asset-dividend-count="0"')
+    })
+
+    it('botões só com ícone têm aria-label e todo rótulo aponta para o seu campo', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4')
+
+      const res = await h.app.inject({ method: 'GET', url: '/transactions/' })
+
+      expect(res.body).toContain('aria-label="Excluir transação"')
+      expect(res.body).toContain('aria-label="Editar transação"')
+      expect(res.body).toContain('for="txDate"')
+      expect(res.body).toContain('id="txDate"')
+      expect(res.body).toContain('for="txType"')
+      // Nenhum rótulo de formulário sem `for` sobrou.
+      expect(res.body).not.toMatch(/<label class="form-label">/)
+    })
+
+    it('a importação oferece um exemplo copiável e um modelo para baixar', async () => {
+      const page = await h.app.inject({ method: 'GET', url: '/transactions/' })
+      expect(page.body).toContain('data-csv-example="csvTextarea"')
+      expect(page.body).toContain('id="csvExampleText"')
+      expect(page.body).toContain('href="/modelos/transacoes.tsv"')
+
+      const model = await h.app.inject({ method: 'GET', url: '/modelos/transacoes.tsv' })
+      expect(model.statusCode).toBe(200)
+      expect(model.body).toContain('PETR4\t01/01/2024\tC\t100')
+
+      const dividends = await h.app.inject({ method: 'GET', url: '/dividends/' })
+      expect(dividends.body).toContain('href="/modelos/proventos.tsv"')
+    })
+  })
+
+  describe('rótulos da interface', () => {
+    it('o menu diz Risco, a página diz Métricas de Risco e a navbar não expõe a stack', async () => {
+      const res = await h.app.inject({ method: 'GET', url: '/risk-metrics/' })
+
+      expect(res.body).toContain('Métricas de Risco')
+      expect(res.body).toContain('> Risco</a>')
+      expect(res.body).not.toContain('Risk Metrics')
+      expect(res.body).not.toContain('Fastify + TypeScript')
+      expect(res.body).toContain('<title>Risco — Carteira</title>')
+    })
+
+    it('tipo de ativo aparece em português no badge e no select, com o código no value', async () => {
+      await createAsset(h.db, 'TD:IPCA2035', { type: 'TESOURO_DIRETO' })
+
+      const res = await h.app.inject({ method: 'GET', url: '/assets/' })
+
+      expect(res.body).toContain('title="TESOURO_DIRETO">Tesouro Direto</span>')
+      expect(res.body).toContain('<option value="TESOURO_DIRETO">Tesouro Direto</option>')
+    })
+
+    it('sem snapshot, o dashboard oferece o recálculo no lugar do gráfico', async () => {
+      const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+      expect(res.body).toContain('aparece depois do primeiro recálculo')
+      expect(res.body).toContain('hx-post="/evolution/recalculate"')
+      expect(res.body).not.toContain('id="evolutionChart"')
+    })
+
+    it('os formulários de lançamento começam recolhidos abaixo de lg', async () => {
+      for (const [url, id] of [
+        ['/transactions/', 'newTransactionForm'],
+        ['/dividends/', 'newDividendForm'],
+        ['/assets/', 'newAssetForm'],
+      ]) {
+        const res = await h.app.inject({ method: 'GET', url: url as string })
+        expect(res.body).toContain(`id="${id}" class="collapse d-lg-block"`)
+        expect(res.body).toContain(`data-bs-target="#${id}"`)
+      }
+    })
+
+    it('os filtros de Proventos separam tipo de ativo de tipo de provento', async () => {
+      const res = await h.app.inject({ method: 'GET', url: '/dividends/' })
+
+      expect(res.body).toContain('Tipo de ativo: Todos')
+      expect(res.body).toContain('Provento: Todos')
     })
   })
 

@@ -14,6 +14,9 @@ import {
   toAssetView,
 } from './asset.schema.js'
 
+/** Contagens que a tela de ativos mostra na confirmação de exclusão. */
+const WITH_COUNTS = { _count: { select: { transactions: true, dividends: true } } } as const
+
 /** Porte de src/main/kotlin/com/stocks/service/AssetService.kt. */
 
 export type AssetUpdateResult = {
@@ -35,7 +38,10 @@ export class AssetService {
   ) {}
 
   async findAll(): Promise<AssetView[]> {
-    const assets = await this.db.asset.findMany({ orderBy: { ticker: 'asc' } })
+    const assets = await this.db.asset.findMany({
+      orderBy: { ticker: 'asc' },
+      include: WITH_COUNTS,
+    })
     return assets.map(toAssetView)
   }
 
@@ -43,6 +49,7 @@ export class AssetService {
     const { type, position, delisted } = filters
 
     const assets = await this.db.asset.findMany({
+      include: WITH_COUNTS,
       where: {
         ...(type ? { type } : {}),
         ...(position === 'with' ? { hasPosition: true } : {}),
@@ -64,7 +71,10 @@ export class AssetService {
   }
 
   async findById(ticker: string): Promise<AssetView | null> {
-    const asset = await this.db.asset.findUnique({ where: { ticker: ticker.toUpperCase() } })
+    const asset = await this.db.asset.findUnique({
+      where: { ticker: ticker.toUpperCase() },
+      include: WITH_COUNTS,
+    })
     return asset === null ? null : toAssetView(asset)
   }
 
@@ -109,7 +119,7 @@ export class AssetService {
   ): Promise<AssetUpdateResult> {
     const normalized = ticker.toUpperCase()
     const current = await this.db.asset.findUnique({ where: { ticker: normalized } })
-    if (current === null) throw HttpError.notFound('Asset not found')
+    if (current === null) throw HttpError.notFound('Ativo não encontrado')
 
     // Id inválido viraria erro de FK do Prisma, que sai como 500. Confere antes.
     if (fields.assetClassId !== undefined && fields.assetClassId !== null) {
@@ -154,7 +164,7 @@ export class AssetService {
 
   async delete(ticker: string): Promise<void> {
     const normalized = ticker.toUpperCase()
-    if (!(await this.exists(normalized))) throw HttpError.notFound('Asset not found')
+    if (!(await this.exists(normalized))) throw HttpError.notFound('Ativo não encontrado')
     // As transações, proventos, preços e snapshots saem por ON DELETE CASCADE.
     await this.db.asset.delete({ where: { ticker: normalized } })
   }

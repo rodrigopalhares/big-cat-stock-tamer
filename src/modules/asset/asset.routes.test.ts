@@ -411,7 +411,7 @@ describe('rotas de ativos', () => {
     it('GET /assets/api/:ticker devolve 404 quando não existe', async () => {
       const res = await h.app.inject({ method: 'GET', url: '/assets/api/XXXX9' })
       expect(res.statusCode).toBe(404)
-      expect(res.json()).toMatchObject({ error: 'Asset not found' })
+      expect(res.json()).toMatchObject({ error: 'Ativo não encontrado' })
     })
   })
 })

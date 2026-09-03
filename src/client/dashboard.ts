@@ -6,6 +6,7 @@
  */
 
 import { assetTypeColor, assetTypeFill } from '../shared/asset-colors.js'
+import { assetTypeLabel } from '../shared/asset-type-labels.js'
 
 type ChartDataset = Record<string, unknown>
 declare const Chart: new (el: Element, config: Record<string, unknown>) => unknown
@@ -80,8 +81,9 @@ function buildChart(): void {
   const ibov = parse<Array<number | null>>(dataEl.dataset['ibov'], [])
   const cdi = parse<Array<number | null>>(dataEl.dataset['cdi'], [])
 
+  // O servidor manda o código do tipo: é a chave da cor. A legenda mostra o rótulo.
   const datasets: ChartDataset[] = rawDatasets.map((ds) => ({
-    label: ds.label,
+    label: assetTypeLabel(ds.label),
     data: ds.data,
     fill: true,
     backgroundColor: assetTypeFill(ds.label),
@@ -178,7 +180,7 @@ function buildDividendsChart(): void {
   const movingAverage = parse<number[]>(dataEl.dataset['dividendMovingAverage'], [])
 
   const datasets: ChartDataset[] = rawDatasets.map((ds) => ({
-    label: ds.label,
+    label: assetTypeLabel(ds.label),
     data: ds.data,
     backgroundColor: assetTypeFill(ds.label),
     borderColor: assetTypeColor(ds.label),
@@ -270,9 +272,18 @@ function wireTable(): void {
   const thead = table.tHead
   if (tbody === undefined || thead === null) return
 
+  wireColumnToggle(table)
+
+  // Subtotal acompanha o grupo no filtro de tipo, mas sai de cena assim que a tabela é
+  // ordenada por uma coluna — não há grupo para ele fechar numa lista ordenada por TIR.
+  let sorted = false
   const applyFilter = (): void => {
     for (const row of Array.from(tbody.rows)) {
       const matchesType = filterType.value === '' || row.dataset['type'] === filterType.value
+      if (row.dataset['subtotal'] !== undefined) {
+        row.style.display = matchesType && !sorted ? '' : 'none'
+        continue
+      }
       const hasPosition = Number(row.dataset['quantity'] ?? '0') > 0
       row.style.display = matchesType && (!filterPosition.checked || hasPosition) ? '' : 'none'
     }
@@ -292,6 +303,8 @@ function wireTable(): void {
       const column = th.cellIndex
       const ascending = currentSort.column === column ? !currentSort.ascending : true
       currentSort = { column, ascending }
+      sorted = true
+      applyFilter()
 
       for (const header of headers) {
         const arrow = header.querySelector('.sort-arrow')
@@ -301,21 +314,56 @@ function wireTable(): void {
       if (arrow !== null) arrow.textContent = ascending ? ' ↑' : ' ↓'
 
       const numeric = th.dataset['sort'] === 'num'
-      const rows = Array.from(tbody.rows).sort((a, b) => {
-        const aValue = cellValue(a, column, numeric)
-        const bValue = cellValue(b, column, numeric)
-        if (numeric) {
+      const rows = Array.from(tbody.rows)
+        .filter((row) => row.dataset['subtotal'] === undefined)
+        .sort((a, b) => {
+          const aValue = cellValue(a, column, numeric)
+          const bValue = cellValue(b, column, numeric)
+          if (numeric) {
+            return ascending
+              ? (aValue as number) - (bValue as number)
+              : (bValue as number) - (aValue as number)
+          }
           return ascending
-            ? (aValue as number) - (bValue as number)
-            : (bValue as number) - (aValue as number)
-        }
-        return ascending
-          ? String(aValue).localeCompare(String(bValue))
-          : String(bValue).localeCompare(String(aValue))
-      })
+            ? String(aValue).localeCompare(String(bValue))
+            : String(bValue).localeCompare(String(aValue))
+        })
       for (const row of rows) tbody.appendChild(row)
     })
   }
+}
+
+const COLUMNS_KEY = 'positions.showSecondary'
+
+/**
+ * "Colunas extras" liga as colunas secundárias (Moeda, TIR/mês). A escolha fica no
+ * navegador: quem quer ver a TIR mensal quer vê-la sempre, não a cada visita.
+ */
+function wireColumnToggle(table: HTMLTableElement): void {
+  const toggle = document.getElementById('toggleColumns')
+  if (!(toggle instanceof HTMLInputElement)) return
+
+  const apply = (show: boolean): void => {
+    table.classList.toggle('show-secondary', show)
+    toggle.checked = show
+  }
+
+  let stored = false
+  try {
+    stored = localStorage.getItem(COLUMNS_KEY) === 'true'
+  } catch {
+    // Armazenamento bloqueado: fica no padrão, sem quebrar a página.
+  }
+  apply(stored)
+
+  toggle.addEventListener('change', () => {
+    apply(toggle.checked)
+    try {
+      localStorage.setItem(COLUMNS_KEY, String(toggle.checked))
+    } catch {
+      // Idem: a escolha só não sobrevive ao reload.
+    }
+  })
 }
 
 /** Lê o valor da célula para ordenação, desfazendo a formatação pt-BR. */

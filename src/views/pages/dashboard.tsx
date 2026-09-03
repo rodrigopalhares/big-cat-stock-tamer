@@ -1,5 +1,6 @@
 import type { CdiComparison } from '../../modules/cdi/cdi.schema.js'
-import type { AssetPosition } from '../../modules/portfolio/portfolio.schema.js'
+import type { AssetPosition, PortfolioSummary } from '../../modules/portfolio/portfolio.schema.js'
+import { assetTypeLabel } from '../../shared/asset-type-labels.js'
 import {
   decimal,
   date as fmtDate,
@@ -9,6 +10,7 @@ import {
   signClass,
 } from '../../shared/format.js'
 import { AssetBadge } from '../components/badge.js'
+import { RecalculateEvolutionButton } from '../components/recalculate-button.js'
 import { Layout } from '../layout.js'
 
 /** Porte de src/main/resources/templates/dashboard.html. */
@@ -31,8 +33,17 @@ export type DividendChartData = {
   movingAverage: number[]
 }
 
+/** Consolidado de um tipo de ativo — a linha de subtotal depois do grupo na tabela. */
+export type TypeSubtotal = {
+  type: string
+  count: number
+  summary: PortfolioSummary
+}
+
 export type DashboardPageProps = {
+  /** Ordenadas por tipo e ticker — é a ordem que agrupa os subtotais. */
   positions: AssetPosition[]
+  subtotals: TypeSubtotal[]
   assetTypes: string[]
   netContribution: number
   totalInvested: number
@@ -85,7 +96,7 @@ export function DashboardPage(props: DashboardPageProps) {
 
         <CdiComparisonCards cdi={props.cdi} />
 
-        {chart !== null && (
+        {chart !== null ? (
           <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white">
               <span class="fw-semibold">
@@ -96,6 +107,8 @@ export function DashboardPage(props: DashboardPageProps) {
               <canvas id="evolutionChart" height={100} />
             </div>
           </div>
+        ) : (
+          <EvolutionPlaceholder />
         )}
 
         {dividendChart !== null && (
@@ -119,9 +132,9 @@ export function DashboardPage(props: DashboardPageProps) {
             <div class="row g-2 align-items-center">
               <div class="col-auto">
                 <select id="filterType" class="form-select form-select-sm">
-                  <option value="">Todos os tipos</option>
+                  <option value="">Tipo de ativo: Todos</option>
                   {props.assetTypes.map((t) => (
-                    <option value={t}>{t}</option>
+                    <option value={t}>{assetTypeLabel(t)}</option>
                   ))}
                 </select>
               </div>
@@ -130,6 +143,18 @@ export function DashboardPage(props: DashboardPageProps) {
                   <input id="filterPosition" type="checkbox" class="form-check-input" checked />
                   <label class="form-check-label small" for="filterPosition">
                     Apenas com posição
+                  </label>
+                </div>
+              </div>
+              <div class="col-auto">
+                <div class="form-check form-check-inline mb-0">
+                  <input id="toggleColumns" type="checkbox" class="form-check-input" />
+                  <label
+                    class="form-check-label small"
+                    for="toggleColumns"
+                    title="Mostra Moeda e TIR/mês"
+                  >
+                    Colunas extras
                   </label>
                 </div>
               </div>
@@ -174,6 +199,23 @@ export function DashboardPage(props: DashboardPageProps) {
       )}
       <script src="/js/dashboard.js" defer />
     </Layout>
+  )
+}
+
+/**
+ * Sem snapshot mensal o gráfico simplesmente não existia, e nada apontava para o botão na
+ * tela de Evolução. O card vazio diz o que falta e resolve ali mesmo.
+ */
+function EvolutionPlaceholder() {
+  return (
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body text-center py-4 text-muted">
+        <i class="bi bi-graph-up fs-1" />
+        <p class="mt-2 mb-1">O gráfico de evolução aparece depois do primeiro recálculo mensal.</p>
+        <p class="small mb-3">Leva cerca de um minuto e a página recarrega sozinha.</p>
+        <RecalculateEvolutionButton class="btn btn-primary btn-sm" />
+      </div>
+    </div>
   )
 }
 
@@ -295,7 +337,7 @@ function Card({
   valueClass?: string
 }) {
   return (
-    <div class="col-sm-6 col-xl">
+    <div class="col-6 col-xl">
       <div class="card border-0 shadow-sm h-100">
         <div class="card-body">
           <div class="text-muted small mb-1">{label}</div>
@@ -308,10 +350,11 @@ function Card({
   )
 }
 
+/** `secondary` começa escondida — ver `.col-secondary` em custom.css. */
 const COLUMNS = [
   { label: 'Ticker', sort: 'text', align: '' },
   { label: 'Tipo', sort: 'text', align: '' },
-  { label: 'Moeda', sort: 'text', align: '' },
+  { label: 'Moeda', sort: 'text', align: 'col-secondary' },
   { label: 'Qtd', sort: 'num', align: 'text-end' },
   { label: 'Preço Médio', sort: 'num', align: 'text-end' },
   { label: 'Cotação', sort: 'num', align: 'text-end' },
@@ -320,14 +363,17 @@ const COLUMNS = [
   { label: 'Lucro Não Real.', sort: 'num', align: 'text-end' },
   { label: 'Proventos', sort: 'num', align: 'text-end' },
   { label: 'Lucro Realizado', sort: 'num', align: 'text-end' },
-  { label: 'TIR/mês', sort: 'num', align: 'text-end' },
+  { label: 'TIR/mês', sort: 'num', align: 'text-end col-secondary' },
   { label: 'TIR/ano', sort: 'num', align: 'text-end' },
 ] as const
 
 function PositionsTable(props: DashboardPageProps) {
   return (
-    <div class="table-responsive">
-      <table id="positionsTable" class="table table-hover mb-0 align-middle">
+    <div class="table-responsive table-sticky-wrap">
+      <table
+        id="positionsTable"
+        class="table table-hover mb-0 align-middle positions-table table-sticky"
+      >
         <thead class="table-light">
           <tr>
             {COLUMNS.map((col) => (
@@ -339,13 +385,77 @@ function PositionsTable(props: DashboardPageProps) {
           </tr>
         </thead>
         <tbody>
-          {props.positions.map((p) => (
-            <PositionRow position={p} />
+          {groupByType(props.positions).map(([type, rows]) => (
+            <>
+              {rows.map((p) => (
+                <PositionRow position={p} />
+              ))}
+              <SubtotalRow subtotal={props.subtotals.find((s) => s.type === type)} />
+            </>
           ))}
         </tbody>
         <TotalsRow {...props} />
       </table>
     </div>
+  )
+}
+
+/** Mantém a ordem em que as posições vieram — o servidor já as ordena por tipo. */
+function groupByType(positions: readonly AssetPosition[]): Array<[string, AssetPosition[]]> {
+  const groups: Array<[string, AssetPosition[]]> = []
+  for (const p of positions) {
+    const type = p.type ?? ''
+    const last = groups[groups.length - 1]
+    if (last !== undefined && last[0] === type) last[1].push(p)
+    else groups.push([type, [p]])
+  }
+  return groups
+}
+
+/**
+ * Subtotal de um tipo: o que a carteira tem em ações, em FIIs, em Tesouro. É a pergunta
+ * que a tabela ordenada por tipo já sugere e obrigava a somar de cabeça.
+ *
+ * `data-type` deixa o filtro de tipo esconder e mostrar a linha junto com o grupo, e
+ * `data-subtotal` deixa a ordenação por coluna tirá-la do caminho — subtotal no meio de
+ * uma lista ordenada por TIR não faz sentido.
+ */
+function SubtotalRow({ subtotal }: { subtotal: TypeSubtotal | undefined }) {
+  if (subtotal === undefined) return null
+  const { summary: s, count, type } = subtotal
+  return (
+    <tr data-subtotal data-type={type} class="small">
+      <td colSpan={2}>
+        Subtotal {assetTypeLabel(type)}{' '}
+        <span class="text-muted fw-normal">
+          · {count} {count === 1 ? 'ativo' : 'ativos'}
+        </span>
+      </td>
+      <td class="col-secondary" />
+      <td colSpan={3} />
+      <td class="text-end">{money(s.totalInvested)}</td>
+      <td class="text-end">{s.currentValue === null ? '—' : money(s.currentValue)}</td>
+      <td class={`text-end ${s.unrealizedPnl === null ? '' : signClass(s.unrealizedPnl)}`}>
+        {s.unrealizedPnl === null ? (
+          '—'
+        ) : (
+          <>
+            {money(s.unrealizedPnl)}
+            {s.totalInvested !== 0 && (
+              <small class="ms-1">({percent(s.unrealizedPnl / s.totalInvested, 0)})</small>
+            )}
+          </>
+        )}
+      </td>
+      <td class="text-end text-success">{s.dividendPnl > 0 ? money(s.dividendPnl) : '—'}</td>
+      <td class={`text-end ${signClass(s.realizedPnl)}`}>{money(s.realizedPnl)}</td>
+      <td class={`text-end col-secondary ${s.irrMonthly === null ? '' : signClass(s.irrMonthly)}`}>
+        {s.irrMonthly === null ? '—' : percent(s.irrMonthly)}
+      </td>
+      <td class={`text-end ${s.irrAnnual === null ? '' : signClass(s.irrAnnual)}`}>
+        {s.irrAnnual === null ? '—' : percent(s.irrAnnual)}
+      </td>
+    </tr>
   )
 }
 
@@ -392,7 +502,7 @@ function PositionRow({ position: p }: { position: AssetPosition }) {
       <td>
         <AssetBadge type={p.type} />
       </td>
-      <td>
+      <td class="col-secondary">
         <span class="badge bg-light text-dark border">{p.currency}</span>
       </td>
       <td class="text-end">{hasQuantity ? quantity(p.quantity) : '—'}</td>
@@ -434,7 +544,7 @@ function PositionRow({ position: p }: { position: AssetPosition }) {
           </>
         )}
       </td>
-      <td class={`text-end ${p.irrMonthly === null ? '' : signClass(p.irrMonthly)}`}>
+      <td class={`text-end col-secondary ${p.irrMonthly === null ? '' : signClass(p.irrMonthly)}`}>
         {p.irrMonthly === null ? '—' : percent(p.irrMonthly)}
       </td>
       <td class={`text-end ${p.irrAnnual === null ? '' : signClass(p.irrAnnual)}`}>
@@ -457,7 +567,10 @@ function TotalsRow({
   return (
     <tfoot class="table-light fw-bold">
       <tr>
-        <td colSpan={6}>Total</td>
+        {/* Célula própria para a Moeda: `colSpan={6}` desalinharia tudo com a coluna oculta. */}
+        <td colSpan={2}>Total</td>
+        <td class="col-secondary" />
+        <td colSpan={3} />
         <td class="text-end">{money(totalInvested)}</td>
         <td class="text-end">{currentValue === null ? '—' : money(currentValue)}</td>
         <td class={`text-end ${unrealizedPnl === null ? '' : signClass(unrealizedPnl)}`}>
@@ -474,7 +587,7 @@ function TotalsRow({
         </td>
         <td class="text-end text-success">{dividendPnl > 0 ? money(dividendPnl) : '—'}</td>
         <td class={`text-end ${signClass(realizedPnl)}`}>{money(realizedPnl)}</td>
-        <td class={`text-end ${irrMonthly === null ? '' : signClass(irrMonthly)}`}>
+        <td class={`text-end col-secondary ${irrMonthly === null ? '' : signClass(irrMonthly)}`}>
           {irrMonthly === null ? '—' : percent(irrMonthly)}
         </td>
         <td class={`text-end ${irrAnnual === null ? '' : signClass(irrAnnual)}`}>
@@ -498,13 +611,17 @@ function CdiTotalsRow({ cdi }: { cdi: CdiComparison | null }) {
 
   return (
     <tr class="fw-normal text-muted">
-      <td colSpan={7}>
+      <td colSpan={2}>
         <i class="bi bi-arrow-return-right me-1" />
         Se fosse CDI
       </td>
+      <td class="col-secondary" />
+      <td colSpan={4} />
       <td class="text-end">{money(cdi.cdiValue)}</td>
       <td colSpan={3} />
-      <td class="text-end">{cdi.cdiIrrMonthly === null ? '—' : percent(cdi.cdiIrrMonthly)}</td>
+      <td class="text-end col-secondary">
+        {cdi.cdiIrrMonthly === null ? '—' : percent(cdi.cdiIrrMonthly)}
+      </td>
       <td class="text-end">{cdi.cdiIrrAnnual === null ? '—' : percent(cdi.cdiIrrAnnual)}</td>
     </tr>
   )

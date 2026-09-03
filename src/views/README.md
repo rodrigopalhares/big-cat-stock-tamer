@@ -3,16 +3,14 @@
 Componentes JSX renderizados no servidor (`preact-render-to-string`). Sem React no cliente:
 o HTML sai pronto e o HTMX cuida da interatividade.
 
-## `noLabelWithoutControl` desligada aqui
+## Rótulos e controles
 
-Os 41 `<label class="form-label">` desta pasta vieram dos templates Thymeleaf sem atributo
-`for`. É uma falha de acessibilidade real — leitor de tela não associa o rótulo ao campo —,
-mas **pré-existente**: o Biome só a enxerga porque agora o markup é JSX, e o linter nunca
-rodou sobre os `.html`.
+Todo `<label class="form-label">` tem `for` apontando para o `id` do controle — a regra
+`noLabelWithoutControl` do Biome está ligada nesta pasta e é quem garante isso. Os 41 rótulos
+sem `for` herdados dos templates Thymeleaf foram corrigidos de uma vez; o `id` segue o prefixo
+do formulário (`tx*` no de nova transação, `editTx*` no modal, `newDiv*`/`editDiv*` nos de
+provento, `asset*`/`edit*` nos de ativo), então dois formulários na mesma página nunca
+disputam o mesmo identificador.
 
-A regra está desligada em `biome.json` para esta pasta porque corrigir durante o porte
-significaria inventar `id` para 41 campos, com risco de duplicar identificador entre um
-formulário e o modal que repete os mesmos rótulos. Corrigir isso é uma tarefa separada,
-depois da migração fechar, quando dá para testar campo a campo.
-
-O resto das regras de acessibilidade continua ligado.
+Botão só com ícone leva `aria-label` além do `title`: o `title` some no toque e o leitor de
+tela não o anuncia com consistência.

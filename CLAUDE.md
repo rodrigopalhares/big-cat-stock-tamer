@@ -74,9 +74,18 @@ Verificadas pelo `dependency-cruiser` no CI, não só combinadas:
 - Arquivos em `kebab-case`, com sufixo `.service.ts`, `.routes.ts`, `.schema.ts`, `.test.ts`.
 - Sem `export default` — sempre nomeado.
 - `any` proibido; use `unknown` + validação Zod na fronteira externa.
-- Erros de aplicação via `HttpError`; um único `setErrorHandler` decide HTML ou JSON.
+- Erros de aplicação via `HttpError`; um único `setErrorHandler` (`src/plugins/errors.ts`) decide
+  JSON, fragmento HTMX ou a página de erro com layout. `ZodError` vira 400 ali mesmo, com uma frase
+  em português por campo (`src/shared/validation-message.ts`) — rota não precisa de `safeParse`.
+  Mensagem de `HttpError` é texto de tela: escreva em português.
+- Lista que cresce (Transações, Proventos, Evolução) carrega por **rolagem infinita**, nunca por
+  paginação: a tela traz a primeira página e a última linha é uma sentinela HTMX
+  (`views/components/load-more-row.tsx`, `hx-trigger="revealed"`) que busca `/<lista>/rows?offset=`
+  com os mesmos filtros. O service recebe `PageWindow` opcional e tem um `count` para o badge.
 - Cor de tipo de ativo sai de `src/shared/asset-colors.ts` — gráficos e badges leem do mesmo
-  mapa, então STOCK é o mesmo azul em toda a interface. Tipo novo entra lá, e só lá.
+  mapa, então STOCK é o mesmo azul em toda a interface. O rótulo em português sai de
+  `src/shared/asset-type-labels.ts` (STOCK é "Ação"); o código fica em `value`, `title` e na
+  chave de cor, nunca em texto de tela. Tipo novo entra nos dois mapas, e só neles.
 
 ## Decisões que valem conhecer antes de mexer
 
@@ -109,6 +118,16 @@ O mesmo mapa está escrito em SQL na migration `add_asset_classes`, que classifi
 existente: mexer num sem mexer no outro deixa histórico e ativo novo em classes diferentes.
 A FK é `ON DELETE SET NULL` e ativo sem classe aparece no balde "Sem classe" de `/allocation/`,
 em vez de sumir da conta.
+
+**Posição não fica negativa, e quem garante é o service.** Venda ou agrupamento que deixaria a
+quantidade abaixo de zero em *qualquer ponto* do histórico é recusado com 400 — refazendo a
+sequência inteira por data, porque a venda lançada com data antiga passa batido em quem olha só
+o saldo de hoje. A regra vive em `TransactionService.assertPositionStaysNonNegative`, e não na
+rota, porque formulário, API e lote do CSV escrevem pelo mesmo caminho; o lote a roda para todas
+as linhas de um ticker antes de gravar a primeira, senão parar no meio deixaria metade no banco
+para duplicar no reenvio. Só a linha nova acusa: histórico já furado não trava o ativo. No mesmo
+dia, o que soma conta antes do que reduz. Provento segue a mesma ideia com valor bruto positivo e
+IR entre zero e o bruto.
 
 **Nada de rede dentro de transação.** O SQLite tem escritor único; segurar o lock durante uma
 chamada HTTP trava a aplicação inteira. Busque primeiro, escreva depois.

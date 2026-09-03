@@ -17,6 +17,7 @@ import {
 import { readXlsxSheet } from '../../domain/xlsx/xlsx-reader.js'
 import type { AssetInfoLookup } from '../../integrations/asset-info.client.js'
 import { isoDate } from '../../shared/iso-date.js'
+import { transactionTypeMeta } from '../../shared/transaction-types.js'
 import type { AssetClassService } from '../allocation/asset-class.service.js'
 import type { DividendService } from '../dividend/dividend.service.js'
 import type { TransactionService } from '../transaction/transaction.service.js'
@@ -164,8 +165,31 @@ export class CsvImportService {
       }
     }
 
+    // Em ordem de data, e no mesmo dia o que soma antes do que reduz: o preview vem ordenado
+    // por status e ticker, e gravar a venda antes da compra do mesmo lote a faria estourar.
+    const ordered = [...rows].sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) ||
+        transactionTypeMeta(normalizeType(b.type)).sign -
+          transactionTypeMeta(normalizeType(a.type)).sign,
+    )
+
+    // Tudo validado antes de gravar qualquer linha: o lote não é transacional (cadastrar
+    // ativo pode ir à rede), e parar no meio deixaria metade no banco para duplicar no
+    // reenvio.
+    for (const [ticker, tickerRows] of groupByTicker(ordered)) {
+      await this.transactions.assertPositionStaysNonNegative(
+        ticker,
+        tickerRows.map((row) => ({
+          type: normalizeType(row.type),
+          quantity: row.quantity,
+          date: isoDate(row.date),
+        })),
+      )
+    }
+
     let inserted = 0
-    for (const row of rows) {
+    for (const row of ordered) {
       await this.transactions.createTransaction(row.ticker, {
         type: row.type,
         quantity: Math.abs(row.quantity),
@@ -255,3 +279,18 @@ export class CsvImportService {
 // Data ISO ordena como texto, então min/max de string bastam.
 const min = (a: string, b: string): string => (b < a ? b : a)
 const max = (a: string, b: string): string => (b > a ? b : a)
+
+function normalizeType(type: string): string {
+  return type.trim().toUpperCase()
+}
+
+function groupByTicker<T extends { ticker: string }>(rows: readonly T[]): Map<string, T[]> {
+  const groups = new Map<string, T[]>()
+  for (const row of rows) {
+    const ticker = row.ticker.trim().toUpperCase()
+    const group = groups.get(ticker)
+    if (group === undefined) groups.set(ticker, [row])
+    else group.push(row)
+  }
+  return groups
+}

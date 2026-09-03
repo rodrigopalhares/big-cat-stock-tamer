@@ -1,6 +1,7 @@
 import { ASSET_TYPES } from '../../domain/constants.js'
 import type { AssetClassView } from '../../modules/allocation/allocation.schema.js'
 import type { AssetView } from '../../modules/asset/asset.schema.js'
+import { assetTypeLabel } from '../../shared/asset-type-labels.js'
 import { AssetBadge } from '../components/badge.js'
 import { Layout } from '../layout.js'
 import { EditAssetModal, editAssetAttrs } from '../partials/edit-asset-modal.js'
@@ -30,18 +31,28 @@ export function AssetsPage({
   const hasFilters = selectedType !== '' || selectedPosition !== '' || selectedDelisted !== ''
 
   return (
-    <Layout title="Ativos" path="/assets/">
+    <Layout title="Ativos — Carteira" path="/assets/">
       <div class="container-fluid py-4 px-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
           <h2 class="mb-0">
             <i class="bi bi-building" /> Ativos
           </h2>
+          <button
+            type="button"
+            class="btn btn-primary d-lg-none"
+            data-bs-toggle="collapse"
+            data-bs-target="#newAssetForm"
+            aria-expanded="false"
+            aria-controls="newAssetForm"
+          >
+            <i class="bi bi-plus-lg" /> Novo
+          </button>
         </div>
 
         {error !== null && (
           <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <span>{error}</span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" />
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar" />
           </div>
         )}
 
@@ -49,7 +60,9 @@ export function AssetsPage({
 
         <div class="row g-4">
           <div class="col-lg-4">
-            <CreateAssetForm />
+            <div id="newAssetForm" class="collapse d-lg-block">
+              <CreateAssetForm />
+            </div>
           </div>
           <div class="col-lg-8">
             <div class="card border-0 shadow-sm">
@@ -99,7 +112,7 @@ function CreateAssetForm() {
       <div class="card-body">
         <form method="post" action="/assets/new">
           <div class="mb-3">
-            <label class="form-label">
+            <label class="form-label" for="assetTicker">
               Ticker <span class="text-danger">*</span>
             </label>
             <input
@@ -120,7 +133,9 @@ function CreateAssetForm() {
             <input type="hidden" id="assetYfTicker" name="yf_ticker" value="" />
           </div>
           <div class="mb-3">
-            <label class="form-label">Nome</label>
+            <label class="form-label" for="assetName">
+              Nome
+            </label>
             <input
               type="text"
               id="assetName"
@@ -130,15 +145,19 @@ function CreateAssetForm() {
             />
           </div>
           <div class="mb-3">
-            <label class="form-label">Tipo</label>
+            <label class="form-label" for="assetType">
+              Tipo
+            </label>
             <select id="assetType" name="type" class="form-select">
               {ASSET_TYPES.map((t) => (
-                <option value={t}>{t}</option>
+                <option value={t}>{assetTypeLabel(t)}</option>
               ))}
             </select>
           </div>
           <div class="mb-3">
-            <label class="form-label">Moeda</label>
+            <label class="form-label" for="assetCurrency">
+              Moeda
+            </label>
             <select id="assetCurrency" name="currency" class="form-select">
               <option value="BRL" selected>
                 BRL — Real
@@ -170,7 +189,7 @@ function Filters({
         <option value="">Tipo: Todos</option>
         {ASSET_TYPES.map((t) => (
           <option value={t} selected={t === selectedType}>
-            {t}
+            {assetTypeLabel(t)}
           </option>
         ))}
       </select>
@@ -233,32 +252,27 @@ function AssetTable({ assets }: { assets: AssetView[] }) {
                 <span class="badge bg-light text-dark border">{asset.currency}</span>
               </td>
               <td class="text-muted small">{asset.yfTicker ?? '—'}</td>
-              <td class="text-center">
-                <a
-                  href={`/transactions/?ticker=${encodeURIComponent(asset.ticker)}`}
-                  class="btn btn-sm btn-outline-secondary"
-                  title="Ver transações"
-                >
-                  <i class="bi bi-list-ul" />
-                </a>
-                <button
-                  type="button"
-                  class="btn btn-sm btn-outline-primary"
-                  title="Editar"
-                  {...editAssetAttrs(asset)}
-                >
-                  <i class="bi bi-pencil" />
-                </button>
-                <form
-                  method="post"
-                  action={`/assets/${asset.ticker}/delete`}
-                  class="d-inline"
-                  data-confirm={`Excluir ${asset.ticker}? As transações também serão removidas.`}
-                >
-                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
-                    <i class="bi bi-trash" />
+              <td class="text-center text-nowrap">
+                {/* Excluir mora no modal de edição, com a contagem do que some junto. */}
+                <div class="btn-group btn-group-sm">
+                  <a
+                    href={`/transactions/?ticker=${encodeURIComponent(asset.ticker)}`}
+                    class="btn btn-outline-secondary"
+                    title="Ver transações"
+                    aria-label={`Ver transações de ${asset.ticker}`}
+                  >
+                    <i class="bi bi-list-ul" />
+                  </a>
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary"
+                    title="Editar"
+                    aria-label={`Editar ${asset.ticker}`}
+                    {...editAssetAttrs(asset)}
+                  >
+                    <i class="bi bi-pencil" />
                   </button>
-                </form>
+                </div>
               </td>
             </tr>
           ))}
@@ -274,7 +288,7 @@ export function PriceWarning({ warning }: { warning: string | null }) {
   return (
     <div class="alert alert-warning alert-dismissible fade show" role="alert">
       <i class="bi bi-exclamation-triangle" /> <span>{warning}</span>
-      <button type="button" class="btn-close" data-bs-dismiss="alert" />
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar" />
     </div>
   )
 }

@@ -4,8 +4,9 @@ import type { Container } from '../../container.js'
 import { HttpError } from '../../shared/http-error.js'
 import { isoDate, today as todayIso } from '../../shared/iso-date.js'
 import { internalPath } from '../../shared/safe-redirect.js'
+import { pathWithQuery } from '../../shared/url.js'
 import { TransactionTickerInfo } from '../../views/components/ticker-info.js'
-import { DividendsPage } from '../../views/pages/dividends.js'
+import { DividendRows, DividendsPage } from '../../views/pages/dividends.js'
 import { DividendCsvPreview } from '../../views/partials/dividend-csv-preview.js'
 import type { DividendBatchRowRequest } from '../csv-import/csv-import.service.js'
 import {
@@ -15,14 +16,46 @@ import {
   toDividendResponse,
   toDividendView,
 } from './dividend.schema.js'
+import type { DividendFilters } from './dividend.service.js'
 
 /** Porte de src/main/kotlin/com/stocks/controller/DividendController.kt. */
 
 const ListQuery = z.object({
   ticker: z.string().nullish(),
+  q: z.string().nullish(),
   type: z.string().nullish(),
   assetType: z.string().nullish(),
+  year: z.coerce.number().int().nullish(),
+  offset: z.coerce.number().int().nonnegative().default(0),
 })
+type ListQuery = z.infer<typeof ListQuery>
+
+/** Linhas por página da rolagem infinita. */
+const PAGE_SIZE = 100
+
+function filtersOf(query: ListQuery): DividendFilters {
+  return {
+    ticker: query.ticker ? query.ticker.toUpperCase() : null,
+    search: query.q,
+    type: query.type,
+    assetType: query.assetType,
+    // `year=` vazio vira 0 na coerção; 0 não é ano.
+    year: query.year || null,
+  }
+}
+
+/** URL da página que começa em [offset], com os mesmos filtros; null quando não há mais. */
+function nextRowsUrl(query: ListQuery, offset: number, total: number): string | null {
+  if (offset >= total) return null
+  return pathWithQuery('/dividends/rows', {
+    ticker: query.ticker,
+    q: query.q,
+    type: query.type,
+    assetType: query.assetType,
+    year: query.year || null,
+    offset,
+  })
+}
 const CsvForm = z.object({ csv: z.string().default('') })
 const BatchBody = z.object({ rows: z.array(z.custom<DividendBatchRowRequest>()) })
 
@@ -37,23 +70,50 @@ export function dividendRoutes(c: Container): FastifyPluginAsync {
 
     app.get('/dividends/', async (req, reply) => {
       const query = ListQuery.parse(req.query)
-      const selectedTicker = query.ticker ? query.ticker.toUpperCase() : null
+      const filters = filtersOf(query)
 
-      const [dividends, assets, assetTypes] = await Promise.all([
-        c.dividends.listDividends(selectedTicker, query.type, query.assetType),
+      const [dividends, total, netTotalBrl, assets, assetTypes, years] = await Promise.all([
+        c.dividends.listDividends(filters, { limit: PAGE_SIZE, offset: 0 }),
+        c.dividends.countDividends(filters),
+        c.dividends.sumNetDividendsBrl(filters),
         c.db.asset.findMany({ select: { ticker: true, name: true }, orderBy: { ticker: 'asc' } }),
         c.dividends.listAssetTypesWithDividends(),
+        c.dividends.listYears(),
       ])
 
       return reply.html(
         DividendsPage({
           dividends: dividends.map(toDividendView),
+          total,
+          netTotalBrl,
+          nextUrl: nextRowsUrl(query, PAGE_SIZE, total),
           assets: assets.map((a) => ({ ticker: a.ticker, name: a.name ?? '' })),
           assetTypes,
-          selectedTicker,
+          selectedTicker: filters.ticker ?? null,
           selectedType: query.type ?? '',
           selectedAssetType: query.assetType ?? '',
+          search: query.q ?? '',
+          years,
+          selectedYear: filters.year ?? null,
           today: todayIso(),
+        }),
+      )
+    })
+
+    /** Próxima página da rolagem infinita: só as linhas, com a sentinela seguinte no fim. */
+    app.get('/dividends/rows', async (req, reply) => {
+      const query = ListQuery.parse(req.query)
+      const filters = filtersOf(query)
+
+      const [dividends, total] = await Promise.all([
+        c.dividends.listDividends(filters, { limit: PAGE_SIZE, offset: query.offset }),
+        c.dividends.countDividends(filters),
+      ])
+
+      return reply.partial(
+        DividendRows({
+          dividends: dividends.map(toDividendView),
+          nextUrl: nextRowsUrl(query, query.offset + PAGE_SIZE, total),
         }),
       )
     })
@@ -120,7 +180,7 @@ export function dividendRoutes(c: Container): FastifyPluginAsync {
 
     app.get('/dividends/api', async (req) => {
       const query = ListQuery.parse(req.query)
-      const dividends = await c.dividends.listDividends(query.ticker, query.type, query.assetType)
+      const dividends = await c.dividends.listDividends(filtersOf(query))
       return dividends.map(toDividendResponse)
     })
 

@@ -24,5 +24,11 @@ export type MonthlyEvolutionRow = {
 
 export type MonthlyEvolutionSummary = {
   months: MonthlyEvolutionRow[]
+  /** Todo ticker que já teve snapshot. */
   tickers: string[]
+  /**
+   * Só quem tem quantidade no mês mais recente — as colunas da tabela de Evolução. Papel
+   * vendido há anos continua nos totais, mas não ganha uma coluna de traços.
+   */
+  currentTickers: string[]
 }

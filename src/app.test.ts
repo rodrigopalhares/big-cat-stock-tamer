@@ -15,7 +15,7 @@ describe('app', () => {
     app = await buildApp({ env, db })
     // Rotas só podem ser registradas antes do primeiro inject().
     app.get('/api/boom', async () => {
-      throw HttpError.notFound('Asset not found')
+      throw HttpError.notFound('Ativo não encontrado')
     })
     await app.ready()
   })
@@ -40,7 +40,7 @@ describe('app', () => {
   it('traduz HttpError para JSON em rota de api', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/boom' })
     expect(res.statusCode).toBe(404)
-    expect(res.json()).toEqual({ error: 'Asset not found' })
+    expect(res.json()).toEqual({ error: 'Ativo não encontrado' })
   })
 
   it('responde 404 para rota inexistente', async () => {

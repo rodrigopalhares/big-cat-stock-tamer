@@ -171,7 +171,8 @@ describe('rotas de alocação', () => {
       })
 
       expect(res.statusCode).toBe(409)
-      expect(res.body).toContain('&lt;svg onload=alert(1)&gt;')
+      // A página de erro passa pelo JSX, que escapa `<` mas não `>`.
+      expect(res.body).toContain('&lt;svg onload=alert(1)')
       expect(res.body).not.toContain(xss)
     })
 

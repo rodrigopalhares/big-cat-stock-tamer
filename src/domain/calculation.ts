@@ -243,6 +243,60 @@ export function calculateXirr(
   return xirr(flows)
 }
 
+/** O mínimo que um lançamento precisa para mexer na quantidade em carteira. */
+export type QuantityEvent = {
+  readonly type: string
+  readonly quantity: number
+  readonly date: IsoDate
+}
+
+export type QuantityShortfall<T> = {
+  /** A candidata que deixaria a posição negativa. */
+  readonly candidate: T
+  /** Quantas ações havia na data dela, antes de aplicá-la. */
+  readonly available: number
+}
+
+/**
+ * Primeira candidata que deixaria a posição negativa, refazendo a sequência inteira em
+ * ordem de data — olhar só o saldo de hoje não pega a venda lançada com data antiga.
+ *
+ * Só candidata acusa. Histórico que já estava furado não bloqueia lançamento novo: a redução
+ * sem posição é ignorada, como `calculatePosition` faz, senão um erro antigo travaria o
+ * ativo para sempre. No mesmo dia, o que aumenta a posição conta antes do que reduz —
+ * comprar e vender no mesmo pregão é comum e a ordem intradiária não fica registrada.
+ */
+export function findQuantityShortfall<T extends QuantityEvent>(
+  existing: readonly QuantityEvent[],
+  candidates: readonly T[],
+): QuantityShortfall<T> | null {
+  const events = [
+    ...existing.map((event) => ({ event, candidate: null as T | null })),
+    ...candidates.map((candidate) => ({ event: candidate as QuantityEvent, candidate })),
+  ].sort(
+    (a, b) =>
+      compareDates(a.event.date, b.event.date) ||
+      Math.sign(quantityEffect(b.event)) - Math.sign(quantityEffect(a.event)),
+  )
+
+  let quantity = 0
+  for (const { event, candidate } of events) {
+    const next = quantity + quantityEffect(event)
+    if (next < -QUANTITY_EPSILON && candidate !== null) {
+      return { candidate, available: quantity }
+    }
+    quantity = Math.max(next, 0)
+  }
+  return null
+}
+
+/** Quanto o lançamento soma ou tira da quantidade. Redução de capital não mexe nela. */
+function quantityEffect(event: QuantityEvent): number {
+  const meta = transactionTypeMeta(event.type)
+  if (meta.costEffect === 'RETURN_OF_CAPITAL') return 0
+  return meta.sign * Math.abs(event.quantity)
+}
+
 function sortedByDate(transactions: readonly TransactionData[]): TransactionData[] {
   return [...transactions].sort((a, b) => compareDates(a.date, b.date))
 }

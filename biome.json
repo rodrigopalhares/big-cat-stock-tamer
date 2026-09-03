@@ -76,16 +76,6 @@
           }
         }
       }
-    },
-    {
-      "includes": ["src/views/**"],
-      "linter": {
-        "rules": {
-          "a11y": {
-            "noLabelWithoutControl": "off"
-          }
-        }
-      }
     }
   ]
 }

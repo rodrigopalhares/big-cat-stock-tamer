@@ -1,9 +1,10 @@
 import type { Db } from '../../config/db.js'
 import type { DividendFlow } from '../../domain/chart.js'
 import type { CashFlow } from '../../domain/xirr.js'
-import type { Dividend } from '../../generated/prisma/client.js'
+import type { Dividend, Prisma } from '../../generated/prisma/client.js'
 import { HttpError } from '../../shared/http-error.js'
 import type { IsoDate } from '../../shared/iso-date.js'
+import type { PageWindow } from '../../shared/page-window.js'
 import type { ExchangeRateService } from '../exchange-rate/exchange-rate.service.js'
 import type { TransactionService } from '../transaction/transaction.service.js'
 
@@ -19,6 +20,18 @@ export type DividendInput = {
   currency?: string
 }
 
+export type DividendFilters = {
+  /** Ticker exato — a tela do ativo. */
+  ticker?: string | null | undefined
+  /** Trecho do ticker — a busca da lista. */
+  search?: string | null | undefined
+  /** Tipo do provento (DIVIDENDO, JCP…). */
+  type?: string | null | undefined
+  /** Tipo do papel que pagou (STOCK, REIT…) — filtra pela relação, não por coluna daqui. */
+  assetType?: string | null | undefined
+  year?: number | null | undefined
+}
+
 export class DividendService {
   constructor(
     private readonly db: Db,
@@ -27,6 +40,7 @@ export class DividendService {
   ) {}
 
   async createDividend(ticker: string, input: DividendInput): Promise<Dividend> {
+    assertAmounts(input)
     const normalized = ticker.trim().toUpperCase()
     const currency = input.currency || 'BRL'
     const converted = await this.convertToBrl(
@@ -55,23 +69,34 @@ export class DividendService {
     })
   }
 
-  /**
-   * [type] é o tipo do provento (DIVIDENDO, JCP…); [assetType] é o tipo do papel que pagou
-   * (STOCK, REIT…) e filtra pela relação, não por coluna de `dividends`.
-   */
-  async listDividends(
-    ticker?: string | null,
-    type?: string | null,
-    assetType?: string | null,
-  ): Promise<Dividend[]> {
+  /** Sem [page] traz tudo; com ela, a janela que a rolagem infinita pediu. */
+  async listDividends(filters: DividendFilters = {}, page?: PageWindow): Promise<Dividend[]> {
     return this.db.dividend.findMany({
-      where: {
-        ...(ticker ? { assetId: ticker.toUpperCase() } : {}),
-        ...(type ? { type: type.toUpperCase() } : {}),
-        ...(assetType ? { asset: { type: assetType.toUpperCase() } } : {}),
-      },
-      orderBy: { date: 'desc' },
+      where: whereFor(filters),
+      orderBy: [{ date: 'desc' }, { id: 'desc' }],
+      ...(page === undefined ? {} : { take: page.limit, skip: page.offset }),
     })
+  }
+
+  async countDividends(filters: DividendFilters = {}): Promise<number> {
+    return this.db.dividend.count({ where: whereFor(filters) })
+  }
+
+  /** Líquido em reais de tudo que o filtro pegou — o total da lista, não só da página. */
+  async sumNetDividendsBrl(filters: DividendFilters = {}): Promise<number> {
+    const sums = await this.db.dividend.aggregate({
+      where: whereFor(filters),
+      _sum: { totalAmountBrl: true, taxWithheldBrl: true },
+    })
+    return (sums._sum.totalAmountBrl ?? 0) - (sums._sum.taxWithheldBrl ?? 0)
+  }
+
+  /** Anos com provento, do mais recente ao mais antigo — as opções do filtro de ano. */
+  async listYears(): Promise<number[]> {
+    const rows = await this.db.$queryRaw<
+      Array<{ year: string }>
+    >`SELECT DISTINCT substr(date, 1, 4) AS year FROM dividends ORDER BY year DESC`
+    return rows.map((row) => Number(row.year))
   }
 
   /**
@@ -91,8 +116,9 @@ export class DividendService {
 
   async updateDividend(id: number, input: DividendInput): Promise<void> {
     const existing = await this.db.dividend.findUnique({ where: { id } })
-    if (existing === null) throw HttpError.notFound('Dividend not found')
+    if (existing === null) throw HttpError.notFound('Provento não encontrado')
 
+    assertAmounts(input)
     const currency = input.currency || 'BRL'
     const converted = await this.convertToBrl(
       input.totalAmount,
@@ -119,7 +145,7 @@ export class DividendService {
 
   async deleteDividend(id: number): Promise<void> {
     const existing = await this.db.dividend.findUnique({ where: { id } })
-    if (existing === null) throw HttpError.notFound('Dividend not found')
+    if (existing === null) throw HttpError.notFound('Provento não encontrado')
     await this.db.dividend.delete({ where: { id } })
   }
 
@@ -191,4 +217,30 @@ export class DividendService {
 
 function blankToNull(value: string | null | undefined): string | null {
   return value === undefined || value === null || value.trim() === '' ? null : value
+}
+
+function whereFor(filters: DividendFilters): Prisma.DividendWhereInput {
+  const search = filters.search?.trim().toUpperCase() ?? ''
+  const clauses: Prisma.DividendWhereInput[] = []
+  if (filters.ticker) clauses.push({ assetId: filters.ticker.toUpperCase() })
+  if (search !== '') clauses.push({ assetId: { contains: search } })
+  if (filters.type) clauses.push({ type: filters.type.toUpperCase() })
+  if (filters.assetType) clauses.push({ asset: { type: filters.assetType.toUpperCase() } })
+  if (filters.year) {
+    clauses.push({ date: { gte: `${filters.year}-01-01`, lte: `${filters.year}-12-31` } })
+  }
+  return clauses.length === 0 ? {} : { AND: clauses }
+}
+
+/**
+ * Valor negativo passava pelo formulário e pelo lote (o `min` do HTML não vale para quem
+ * edita o preview) e entrava calado no total de proventos. A API já exigia positivo — aqui
+ * a regra vale para os três caminhos.
+ */
+function assertAmounts(input: DividendInput): void {
+  if (!(input.totalAmount > 0)) throw HttpError.badRequest('Valor bruto deve ser maior que zero')
+  if (!(input.taxWithheld >= 0)) throw HttpError.badRequest('IR retido não pode ser negativo')
+  if (input.taxWithheld > input.totalAmount) {
+    throw HttpError.badRequest('IR retido não pode superar o valor bruto')
+  }
 }
