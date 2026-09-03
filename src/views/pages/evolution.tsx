@@ -2,33 +2,56 @@ import type {
   MonthlyEvolutionRow,
   MonthlySnapshotView,
 } from '../../modules/evolution/evolution.schema.js'
-import { decimal, money, monthLabel, quantity, signClass } from '../../shared/format.js'
+import { money, monthLabel, quantity } from '../../shared/format.js'
+import { LoadMoreRow } from '../components/load-more-row.js'
 import { Layout } from '../layout.js'
+import type { ChartData } from './dashboard.js'
 
-/** Porte de src/main/resources/templates/evolution.html. */
+/**
+ * Porte de src/main/resources/templates/evolution.html.
+ *
+ * Do mês mais recente para o mais antigo, em páginas de rolagem infinita: a tabela tinha 18
+ * anos de linhas em ordem crescente, e o mês atual ficava 200 linhas abaixo. As colunas são
+ * só dos ativos com posição hoje — papel vendido há anos continua nos totais, mas não ganha
+ * uma coluna de traços. O gráfico é o mesmo do dashboard, em cima da tabela.
+ */
 
 export type EvolutionPageProps = {
+  /** Primeira página, do mês mais recente para o mais antigo. */
   months: MonthlyEvolutionRow[]
+  /** Ativos com posição no último mês — as colunas da tabela. */
   tickers: string[]
+  /** Quantos meses existem no total. */
+  total: number
+  /** URL da próxima página; null quando tudo já está na tela. */
+  nextUrl: string | null
+  chart: ChartData | null
 }
 
-export function EvolutionPage({ months, tickers }: EvolutionPageProps) {
+export function EvolutionPage({ months, tickers, total, nextUrl, chart }: EvolutionPageProps) {
   return (
     <Layout title="Evolução — Carteira" path="/evolution/">
       <div class="container-fluid py-4 px-4">
-        <h2 class="mb-4">
-          <i class="bi bi-graph-up" /> Evolução Patrimonial
-        </h2>
-
-        <div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h2 class="mb-0">
+            <i class="bi bi-graph-up" /> Evolução Patrimonial
+          </h2>
           <form method="post" action="/evolution/recalculate" class="d-inline">
-            <button type="submit" class="btn btn-primary">
-              <i class="bi bi-arrow-clockwise" /> Recalcular
+            <button type="submit" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-arrow-clockwise me-1" /> Recalcular
             </button>
           </form>
         </div>
 
-        {months.length === 0 ? (
+        {chart !== null && (
+          <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+              <canvas id="evolutionChart" height={100} />
+            </div>
+          </div>
+        )}
+
+        {total === 0 ? (
           <div class="card border-0 shadow-sm">
             <div class="card-body text-center py-5 text-muted">
               <i class="bi bi-inbox fs-1" />
@@ -38,6 +61,11 @@ export function EvolutionPage({ months, tickers }: EvolutionPageProps) {
           </div>
         ) : (
           <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white">
+              <span class="fw-semibold">
+                Mês a mês <span class="badge bg-secondary ms-1">{total}</span>
+              </span>
+            </div>
             <div class="card-body p-0">
               <div class="table-responsive">
                 <table class="table table-hover table-sm mb-0 align-middle">
@@ -55,9 +83,7 @@ export function EvolutionPage({ months, tickers }: EvolutionPageProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {months.map((row) => (
-                      <MonthRow row={row} tickers={tickers} />
-                    ))}
+                    <EvolutionRows months={months} tickers={tickers} nextUrl={nextUrl} />
                   </tbody>
                 </table>
               </div>
@@ -65,7 +91,42 @@ export function EvolutionPage({ months, tickers }: EvolutionPageProps) {
           </div>
         )}
       </div>
+
+      {chart !== null && (
+        <div
+          id="evolution-data"
+          hidden
+          data-labels={JSON.stringify(chart.labels)}
+          data-datasets={JSON.stringify(chart.datasets)}
+          data-invested={JSON.stringify(chart.invested)}
+          data-net-contribution={JSON.stringify(chart.netContribution)}
+          data-ibov={JSON.stringify(chart.ibov)}
+          data-cdi={JSON.stringify(chart.cdi)}
+        />
+      )}
+      {/* O mesmo script do dashboard: ele só desenha o que encontra na página. */}
+      <script src="/js/dashboard.js" defer />
     </Layout>
+  )
+}
+
+/** As linhas de uma página mais a sentinela da seguinte — o que `/evolution/rows` devolve. */
+export function EvolutionRows({
+  months,
+  tickers,
+  nextUrl,
+}: {
+  months: MonthlyEvolutionRow[]
+  tickers: string[]
+  nextUrl: string | null
+}) {
+  return (
+    <>
+      {months.map((row) => (
+        <MonthRow row={row} tickers={tickers} />
+      ))}
+      {nextUrl !== null && <LoadMoreRow href={nextUrl} colSpan={6 + tickers.length} />}
+    </>
   )
 }
 
@@ -106,5 +167,3 @@ function MonthRow({ row, tickers }: { row: MonthlyEvolutionRow; tickers: string[
     </tr>
   )
 }
-
-export { decimal, signClass }

@@ -149,9 +149,14 @@ class DividendService {
   // taxWithheld > totalAmount — `assertAmounts()`, shared with updateDividend(). The HTML
   // `min` does not protect the batch or an edited preview, so the rule lives here.
 
-  listDividends(ticker?, type?, assetType?): Promise<Dividend[]>     // date DESC
-  // `type` é o tipo do PROVENTO (DIVIDENDO, JCP…); `assetType` é o do PAPEL (STOCK, REIT…)
-  // e filtra pela relação — `where: { asset: { type } }` —, não por coluna de `dividends`.
+  listDividends(filters?: DividendFilters, page?: PageWindow): Promise<Dividend[]>  // date DESC
+  // DividendFilters = { ticker?, search?, type?, assetType?, year? }. `ticker` é exato (tela do
+  // ativo); `search` é trecho (caixa de busca). `type` é o tipo do PROVENTO (DIVIDENDO, JCP…);
+  // `assetType` é o do PAPEL (STOCK, REIT…) e filtra pela relação — `where: { asset: { type } }`.
+  // `page` ({ limit, offset }) é a janela da rolagem infinita; sem ela vem tudo.
+  countDividends(filters?): Promise<number>          // total do filtro, para o badge
+  sumNetDividendsBrl(filters?): Promise<number>      // líquido em BRL do filtro, para o cabeçalho
+  listYears(): Promise<number[]>                     // anos com provento, desc — opções do filtro
 
   listAssetTypesWithDividends(): Promise<string[]>                   // distinct, ordenado
   // Insumo do filtro da tela. Sai da relação em vez de `ASSET_TYPES` porque metade dos tipos
@@ -175,7 +180,8 @@ All registered by `dividendRoutes(container)` in `dividend.routes.ts`.
 
 | Method | Path | Type | Behaviour |
 |--------|------|------|-----------|
-| GET | `/dividends/` | HTML | Page with form, filters (`ticker`, `type`, `assetType`) and table |
+| GET | `/dividends/` | HTML | Page with form, filters (`q`, `year`, `type`, `assetType`; `ticker` exact) and the first 100 rows |
+| GET | `/dividends/rows?offset=N` | HTMX | Next 100 `<tr>` for the infinite scroll, same filters, ending in a new sentinel row while there is more |
 | POST | `/dividends/new` | HTML | Creates, redirects to a valid `returnTo` or `/dividends/` |
 | POST | `/dividends/:id/edit` | HTML | Updates, redirects to a valid `returnTo` or `/dividends/` |
 | POST | `/dividends/:id/delete` | HTML | Deletes, redirects to a valid `returnTo` or `/dividends/` |

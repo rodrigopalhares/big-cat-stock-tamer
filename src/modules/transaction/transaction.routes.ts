@@ -4,8 +4,9 @@ import type { Container } from '../../container.js'
 import { HttpError } from '../../shared/http-error.js'
 import { isoDate, today as todayIso } from '../../shared/iso-date.js'
 import { internalPath } from '../../shared/safe-redirect.js'
+import { pathWithQuery } from '../../shared/url.js'
 import { TransactionTickerInfo } from '../../views/components/ticker-info.js'
-import { TransactionsPage } from '../../views/pages/transactions.js'
+import { TransactionRows, TransactionsPage } from '../../views/pages/transactions.js'
 import { BrokerNotePreview } from '../../views/partials/broker-note-preview.js'
 import { CsvAssetReview } from '../../views/partials/csv-asset-review.js'
 import { CsvPreview } from '../../views/partials/csv-preview.js'
@@ -18,14 +19,46 @@ import {
   toTransactionResponse,
   toTransactionView,
 } from './transaction.schema.js'
+import type { TransactionFilters } from './transaction.service.js'
 
 /** Porte de src/main/kotlin/com/stocks/controller/TransactionController.kt. */
 
 const ListQuery = z.object({
   ticker: z.string().nullish(),
+  q: z.string().nullish(),
   type: z.string().nullish(),
   position: z.string().nullish(),
+  year: z.coerce.number().int().nullish(),
+  offset: z.coerce.number().int().nonnegative().default(0),
 })
+type ListQuery = z.infer<typeof ListQuery>
+
+/** Linhas por página da rolagem infinita. */
+const PAGE_SIZE = 100
+
+function filtersOf(query: ListQuery): TransactionFilters {
+  return {
+    ticker: query.ticker ? query.ticker.toUpperCase() : null,
+    search: query.q,
+    type: query.type,
+    position: query.position,
+    // `year=` vazio vira 0 na coerção; 0 não é ano.
+    year: query.year || null,
+  }
+}
+
+/** URL da página que começa em [offset], com os mesmos filtros; null quando não há mais. */
+function nextRowsUrl(query: ListQuery, offset: number, total: number): string | null {
+  if (offset >= total) return null
+  return pathWithQuery('/transactions/rows', {
+    ticker: query.ticker,
+    q: query.q,
+    type: query.type,
+    position: query.position,
+    year: query.year || null,
+    offset,
+  })
+}
 
 const CsvForm = z.object({ csv: z.string().default('') })
 
@@ -86,26 +119,47 @@ export function transactionRoutes(c: Container): FastifyPluginAsync {
 
     app.get('/transactions/', async (req, reply) => {
       const query = ListQuery.parse(req.query)
-      const selectedTicker = query.ticker ? query.ticker.toUpperCase() : null
+      const filters = filtersOf(query)
 
-      const [transactions, assets] = await Promise.all([
-        c.transactions.listTransactions({
-          ticker: selectedTicker,
-          type: query.type,
-          position: query.position,
-        }),
+      const [transactions, total, assets, years] = await Promise.all([
+        c.transactions.listTransactions(filters, { limit: PAGE_SIZE, offset: 0 }),
+        c.transactions.countTransactions(filters),
         c.db.asset.findMany({ select: { ticker: true, name: true }, orderBy: { ticker: 'asc' } }),
+        c.transactions.listYears(),
       ])
 
       return reply.html(
         TransactionsPage({
           transactions: transactions.map(toTransactionView),
+          total,
+          nextUrl: nextRowsUrl(query, PAGE_SIZE, total),
           assets: assets.map((a) => ({ ticker: a.ticker, name: a.name ?? '' })),
-          selectedTicker,
+          selectedTicker: filters.ticker ?? null,
           selectedType: query.type ?? '',
           selectedPosition: query.position ?? '',
+          search: query.q ?? '',
+          years,
+          selectedYear: filters.year ?? null,
           today: todayIso(),
           noteImportEnabled: c.brokerNotes.enabled,
+        }),
+      )
+    })
+
+    /** Próxima página da rolagem infinita: só as linhas, com a sentinela seguinte no fim. */
+    app.get('/transactions/rows', async (req, reply) => {
+      const query = ListQuery.parse(req.query)
+      const filters = filtersOf(query)
+
+      const [transactions, total] = await Promise.all([
+        c.transactions.listTransactions(filters, { limit: PAGE_SIZE, offset: query.offset }),
+        c.transactions.countTransactions(filters),
+      ])
+
+      return reply.partial(
+        TransactionRows({
+          transactions: transactions.map(toTransactionView),
+          nextUrl: nextRowsUrl(query, query.offset + PAGE_SIZE, total),
         }),
       )
     })

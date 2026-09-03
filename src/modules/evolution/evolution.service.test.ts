@@ -165,7 +165,7 @@ describe('EvolutionService', () => {
 
   describe('getEvolution', () => {
     it('sem snapshots devolve vazio', async () => {
-      expect(await service.getEvolution()).toEqual({ months: [], tickers: [] })
+      expect(await service.getEvolution()).toEqual({ months: [], tickers: [], currentTickers: [] })
     })
 
     it('preenche meses sem posição com zero', async () => {

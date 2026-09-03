@@ -1,11 +1,12 @@
 import type { Db } from '../../config/db.js'
 import { findQuantityShortfall, type QuantityEvent } from '../../domain/calculation.js'
 import type { Currency } from '../../domain/constants.js'
-import type { Asset, Transaction } from '../../generated/prisma/client.js'
+import type { Asset, Prisma, Transaction } from '../../generated/prisma/client.js'
 import type { AssetInfoLookup } from '../../integrations/asset-info.client.js'
 import { quantity as fmtQuantity } from '../../shared/format.js'
 import { HttpError } from '../../shared/http-error.js'
 import { type IsoDate, toBrazilianDate } from '../../shared/iso-date.js'
+import type { PageWindow } from '../../shared/page-window.js'
 import { transactionTypeMeta } from '../../shared/transaction-types.js'
 import type { AssetClassService } from '../allocation/asset-class.service.js'
 import type { ExchangeRateService } from '../exchange-rate/exchange-rate.service.js'
@@ -44,9 +45,13 @@ export type TransactionInput = {
 }
 
 export type TransactionFilters = {
+  /** Ticker exato — a tela do ativo. */
   ticker?: string | null | undefined
+  /** Trecho do ticker — a busca da lista. `ITUB` acha ITUB3 e ITUB4. */
+  search?: string | null | undefined
   type?: string | null | undefined
   position?: string | null | undefined
+  year?: number | null | undefined
 }
 
 export class TransactionService {
@@ -133,16 +138,42 @@ export class TransactionService {
     return this.insert(asset, asset.ticker, input)
   }
 
-  async listTransactions(filters: TransactionFilters = {}): Promise<Transaction[]> {
-    const eligible = await this.resolveEligibleTickers(filters.type, filters.position)
-
+  /** Sem [page] traz tudo; com ela, a janela que a rolagem infinita pediu. */
+  async listTransactions(
+    filters: TransactionFilters = {},
+    page?: PageWindow,
+  ): Promise<Transaction[]> {
     return this.db.transaction.findMany({
-      where: {
-        ...(filters.ticker ? { assetId: filters.ticker.toUpperCase() } : {}),
-        ...(eligible === null ? {} : { assetId: { in: [...eligible] } }),
-      },
+      where: await this.whereFor(filters),
       orderBy: [{ date: 'desc' }, { id: 'desc' }],
+      ...(page === undefined ? {} : { take: page.limit, skip: page.offset }),
     })
+  }
+
+  async countTransactions(filters: TransactionFilters = {}): Promise<number> {
+    return this.db.transaction.count({ where: await this.whereFor(filters) })
+  }
+
+  /** Anos com transação, do mais recente ao mais antigo — as opções do filtro de ano. */
+  async listYears(): Promise<number[]> {
+    const rows = await this.db.$queryRaw<
+      Array<{ year: string }>
+    >`SELECT DISTINCT substr(date, 1, 4) AS year FROM transactions ORDER BY year DESC`
+    return rows.map((row) => Number(row.year))
+  }
+
+  private async whereFor(filters: TransactionFilters): Promise<Prisma.TransactionWhereInput> {
+    const eligible = await this.resolveEligibleTickers(filters.type, filters.position)
+    const search = filters.search?.trim().toUpperCase() ?? ''
+
+    const clauses: Prisma.TransactionWhereInput[] = []
+    if (filters.ticker) clauses.push({ assetId: filters.ticker.toUpperCase() })
+    if (search !== '') clauses.push({ assetId: { contains: search } })
+    if (eligible !== null) clauses.push({ assetId: { in: [...eligible] } })
+    if (filters.year) {
+      clauses.push({ date: { gte: `${filters.year}-01-01`, lte: `${filters.year}-12-31` } })
+    }
+    return clauses.length === 0 ? {} : { AND: clauses }
   }
 
   async updateTransaction(id: number, input: TransactionInput): Promise<string> {

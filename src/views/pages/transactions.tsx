@@ -4,6 +4,7 @@ import { date as fmtDate, money, quantity } from '../../shared/format.js'
 import type { IsoDate } from '../../shared/iso-date.js'
 import { TRANSACTION_TYPE_LIST } from '../../shared/transaction-types.js'
 import { TransactionBadge } from '../components/badge.js'
+import { LoadMoreRow } from '../components/load-more-row.js'
 import { Layout } from '../layout.js'
 
 /** Porte de src/main/resources/templates/transactions.html. */
@@ -12,11 +13,20 @@ const NOTE_DISABLED_REASON =
   'Leitura de nota desativada: configure APP_ANTHROPIC_API_KEY para habilitar.'
 
 export type TransactionsPageProps = {
+  /** Primeira página do histórico — o resto chega pela rolagem infinita. */
   transactions: TransactionView[]
+  /** Quantas transações os filtros atuais pegam, no total. */
+  total: number
+  /** URL da próxima página; null quando tudo já está na tela. */
+  nextUrl: string | null
   assets: Array<{ ticker: string; name: string }>
   selectedTicker: string | null
   selectedType: string
   selectedPosition: string
+  /** Trecho de ticker da caixa de busca. */
+  search: string
+  years: number[]
+  selectedYear: number | null
   today: IsoDate
   /** Falso sem APP_ANTHROPIC_API_KEY — a aba de nota aparece desativada, com o motivo. */
   noteImportEnabled: boolean
@@ -52,13 +62,13 @@ export function TransactionsPage(props: TransactionsPageProps) {
             <div class="card border-0 shadow-sm">
               <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <span class="fw-semibold">
-                  Histórico <span class="badge bg-secondary ms-1">{transactions.length}</span>
+                  Histórico <span class="badge bg-secondary ms-1">{props.total}</span>
                 </span>
                 <HistoryFilters {...props} />
               </div>
               <div class="card-body p-0">
-                {transactions.length > 0 ? (
-                  <HistoryTable transactions={transactions} />
+                {props.total > 0 ? (
+                  <HistoryTable transactions={transactions} nextUrl={props.nextUrl} />
                 ) : (
                   <div class="text-center py-5 text-muted">
                     <i class="bi bi-inbox fs-1" />
@@ -413,12 +423,51 @@ function TransactionTypeSelect({
   )
 }
 
-function HistoryFilters({ selectedTicker, selectedType, selectedPosition }: TransactionsPageProps) {
-  const hasFilters = selectedTicker !== null || selectedType !== '' || selectedPosition !== ''
+function HistoryFilters({
+  selectedTicker,
+  selectedType,
+  selectedPosition,
+  search,
+  years,
+  selectedYear,
+}: TransactionsPageProps) {
+  const hasFilters =
+    selectedTicker !== null ||
+    search !== '' ||
+    selectedType !== '' ||
+    selectedPosition !== '' ||
+    selectedYear !== null
   return (
-    <div class="d-flex align-items-center gap-2">
-      <form method="get" action="/transactions/" class="d-flex align-items-center gap-2 mb-0">
-        {selectedTicker !== null && <input type="hidden" name="ticker" value={selectedTicker} />}
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <form
+        method="get"
+        action="/transactions/"
+        class="d-flex align-items-center gap-2 mb-0 flex-wrap"
+      >
+        {/* A busca é por trecho: "ITUB" acha ITUB3 e ITUB4. Enter ou a lupa enviam. */}
+        <div class="input-group input-group-sm" style="width: 11rem">
+          <input
+            type="search"
+            name="q"
+            class="form-control"
+            placeholder="Ticker"
+            list="ticker-list"
+            value={search !== '' ? search : (selectedTicker ?? '')}
+            data-uppercase
+            aria-label="Buscar por ticker"
+          />
+          <button type="submit" class="btn btn-outline-secondary" aria-label="Buscar">
+            <i class="bi bi-search" />
+          </button>
+        </div>
+        <select name="year" class="form-select form-select-sm" style="width:auto" data-autosubmit>
+          <option value="">Ano: Todos</option>
+          {years.map((year) => (
+            <option value={String(year)} selected={year === selectedYear}>
+              {year}
+            </option>
+          ))}
+        </select>
         <select name="type" class="form-select form-select-sm" style="width:auto" data-autosubmit>
           <option value="">Tipo: Todos</option>
           {ASSET_TYPES.map((t) => (
@@ -443,7 +492,12 @@ function HistoryFilters({ selectedTicker, selectedType, selectedPosition }: Tran
         </select>
       </form>
       {hasFilters && (
-        <a href="/transactions/" class="btn btn-sm btn-outline-secondary">
+        <a
+          href="/transactions/"
+          class="btn btn-sm btn-outline-secondary"
+          title="Limpar filtros"
+          aria-label="Limpar filtros"
+        >
           <i class="bi bi-x-lg" />
         </a>
       )}
@@ -451,7 +505,13 @@ function HistoryFilters({ selectedTicker, selectedType, selectedPosition }: Tran
   )
 }
 
-function HistoryTable({ transactions }: { transactions: TransactionView[] }) {
+function HistoryTable({
+  transactions,
+  nextUrl,
+}: {
+  transactions: TransactionView[]
+  nextUrl: string | null
+}) {
   return (
     <div class="table-responsive">
       <table class="table table-hover mb-0 align-middle small">
@@ -471,12 +531,31 @@ function HistoryTable({ transactions }: { transactions: TransactionView[] }) {
           </tr>
         </thead>
         <tbody>
-          {transactions.map((t) => (
-            <TransactionRow transaction={t} />
-          ))}
+          <TransactionRows transactions={transactions} nextUrl={nextUrl} />
         </tbody>
       </table>
     </div>
+  )
+}
+
+/**
+ * As linhas de uma página mais a sentinela da seguinte — é também o que `/transactions/rows`
+ * devolve ao HTMX, que troca a sentinela antiga por este bloco.
+ */
+export function TransactionRows({
+  transactions,
+  nextUrl,
+}: {
+  transactions: TransactionView[]
+  nextUrl: string | null
+}) {
+  return (
+    <>
+      {transactions.map((t) => (
+        <TransactionRow transaction={t} />
+      ))}
+      {nextUrl !== null && <LoadMoreRow href={nextUrl} colSpan={9} />}
+    </>
   )
 }
 

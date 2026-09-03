@@ -96,7 +96,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
       const [entity, transactions, dividends, classes] = await Promise.all([
         c.db.asset.findUniqueOrThrow({ where: { ticker } }),
         c.transactions.listTransactions({ ticker }),
-        c.dividends.listDividends(ticker),
+        c.dividends.listDividends({ ticker }),
         c.assetClasses.listViews(),
       ])
       const positions = await c.portfolio.buildPositions([entity], false)

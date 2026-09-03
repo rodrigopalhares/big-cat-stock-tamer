@@ -3,18 +3,30 @@ import type { DividendView } from '../../modules/dividend/dividend.schema.js'
 import { date as fmtDate, money } from '../../shared/format.js'
 import type { IsoDate } from '../../shared/iso-date.js'
 import { DividendBadge } from '../components/badge.js'
+import { LoadMoreRow } from '../components/load-more-row.js'
 import { Layout } from '../layout.js'
 
 /** Porte de src/main/resources/templates/dividends.html. */
 
 export type DividendsPageProps = {
+  /** Primeira página do histórico — o resto chega pela rolagem infinita. */
   dividends: DividendView[]
+  /** Quantos proventos os filtros atuais pegam, no total. */
+  total: number
+  /** Líquido em reais de tudo que o filtro pegou, não só da página. */
+  netTotalBrl: number
+  /** URL da próxima página; null quando tudo já está na tela. */
+  nextUrl: string | null
   assets: Array<{ ticker: string; name: string }>
   /** Tipos de ativo que aparecem no histórico — só eles entram no filtro. */
   assetTypes: string[]
   selectedTicker: string | null
   selectedType: string
   selectedAssetType: string
+  /** Trecho de ticker da caixa de busca. */
+  search: string
+  years: number[]
+  selectedYear: number | null
   today: IsoDate
 }
 
@@ -46,13 +58,21 @@ export function DividendsPage(props: DividendsPageProps) {
             <div class="card border-0 shadow-sm">
               <div class="card-header bg-white d-flex justify-content-between align-items-center">
                 <span class="fw-semibold">
-                  Histórico <span class="badge bg-secondary ms-1">{dividends.length}</span>
+                  Histórico <span class="badge bg-secondary ms-1">{props.total}</span>
+                  {props.total > 0 && (
+                    <span
+                      class="num text-success small fw-normal ms-2"
+                      title="Líquido de IR, em reais, de tudo que o filtro pegou"
+                    >
+                      {money(props.netTotalBrl)} líquidos
+                    </span>
+                  )}
                 </span>
                 <Filters {...props} />
               </div>
               <div class="card-body p-0">
-                {dividends.length > 0 ? (
-                  <DividendTable dividends={dividends} />
+                {props.total > 0 ? (
+                  <DividendTable dividends={dividends} nextUrl={props.nextUrl} />
                 ) : (
                   <div class="text-center py-5 text-muted">
                     <i class="bi bi-inbox fs-1" />
@@ -170,20 +190,54 @@ function NewDividendForm({ assets, today }: DividendsPageProps) {
 }
 
 /**
- * Os dois selects moram no mesmo `form`: submeter um manda o outro junto, então trocar o
- * tipo de provento não apaga o filtro de ativo. O `ticker` vem escondido pelo mesmo motivo.
+ * Tudo mora no mesmo `form`: submeter um select manda os outros junto, então trocar o tipo de
+ * provento não apaga a busca nem o ano.
  */
 function Filters({
   assetTypes,
   selectedTicker,
   selectedType,
   selectedAssetType,
+  search,
+  years,
+  selectedYear,
 }: DividendsPageProps) {
-  const hasFilters = selectedTicker !== null || selectedType !== '' || selectedAssetType !== ''
+  const hasFilters =
+    selectedTicker !== null ||
+    search !== '' ||
+    selectedType !== '' ||
+    selectedAssetType !== '' ||
+    selectedYear !== null
   return (
-    <div class="d-flex align-items-center gap-2">
-      <form method="get" action="/dividends/" class="d-flex align-items-center gap-2 mb-0">
-        {selectedTicker !== null && <input type="hidden" name="ticker" value={selectedTicker} />}
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <form
+        method="get"
+        action="/dividends/"
+        class="d-flex align-items-center gap-2 mb-0 flex-wrap"
+      >
+        <div class="input-group input-group-sm" style="width: 11rem">
+          <input
+            type="search"
+            name="q"
+            class="form-control"
+            placeholder="Ticker"
+            list="ticker-list"
+            value={search !== '' ? search : (selectedTicker ?? '')}
+            data-uppercase
+            aria-label="Buscar por ticker"
+          />
+          <button type="submit" class="btn btn-outline-secondary" aria-label="Buscar">
+            <i class="bi bi-search" />
+          </button>
+        </div>
+        <select name="year" class="form-select form-select-sm" style="width:auto" data-autosubmit>
+          <option value="">Ano: Todos</option>
+          {years.map((year) => (
+            <option value={String(year)} selected={year === selectedYear}>
+              {year}
+            </option>
+          ))}
+        </select>
         <select
           name="assetType"
           class="form-select form-select-sm"
@@ -207,7 +261,12 @@ function Filters({
         </select>
       </form>
       {hasFilters && (
-        <a href="/dividends/" class="btn btn-sm btn-outline-secondary">
+        <a
+          href="/dividends/"
+          class="btn btn-sm btn-outline-secondary"
+          title="Limpar filtros"
+          aria-label="Limpar filtros"
+        >
           <i class="bi bi-x-lg" />
         </a>
       )}
@@ -215,7 +274,13 @@ function Filters({
   )
 }
 
-function DividendTable({ dividends }: { dividends: DividendView[] }) {
+function DividendTable({
+  dividends,
+  nextUrl,
+}: {
+  dividends: DividendView[]
+  nextUrl: string | null
+}) {
   return (
     <div class="table-responsive">
       <table class="table table-hover mb-0 align-middle small">
@@ -231,12 +296,28 @@ function DividendTable({ dividends }: { dividends: DividendView[] }) {
           </tr>
         </thead>
         <tbody>
-          {dividends.map((d) => (
-            <DividendRow dividend={d} />
-          ))}
+          <DividendRows dividends={dividends} nextUrl={nextUrl} />
         </tbody>
       </table>
     </div>
+  )
+}
+
+/** As linhas de uma página mais a sentinela da seguinte — o que `/dividends/rows` devolve. */
+export function DividendRows({
+  dividends,
+  nextUrl,
+}: {
+  dividends: DividendView[]
+  nextUrl: string | null
+}) {
+  return (
+    <>
+      {dividends.map((d) => (
+        <DividendRow dividend={d} />
+      ))}
+      {nextUrl !== null && <LoadMoreRow href={nextUrl} colSpan={7} />}
+    </>
   )
 }
 

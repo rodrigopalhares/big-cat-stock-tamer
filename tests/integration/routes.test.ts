@@ -415,6 +415,59 @@ describe('rotas da aplicação', () => {
       expect(res.body).toContain('Nenhuma transação registrada')
     })
 
+    it('a primeira página traz 100 linhas e a sentinela da próxima, com os filtros', async () => {
+      await createAsset(h.db, 'PETR4', { type: 'STOCK' })
+      for (let i = 0; i < 101; i++) {
+        await createTransaction(h.db, 'PETR4', {
+          date: `2024-01-${String((i % 28) + 1).padStart(2, '0')}`,
+        })
+      }
+
+      const res = await h.app.inject({ method: 'GET', url: '/transactions/?type=STOCK' })
+
+      expect(res.body.match(/data-edit-tx/g)).toHaveLength(100)
+      expect(res.body).toContain('hx-trigger="revealed"')
+      expect(res.body).toContain('hx-get="/transactions/rows?type=STOCK&amp;offset=100"')
+      // O contador é do total, não da página.
+      expect(res.body).toContain('<span class="badge bg-secondary ms-1">101</span>')
+    })
+
+    it('/transactions/rows devolve a página seguinte e, na última, nenhuma sentinela', async () => {
+      await createAsset(h.db, 'PETR4')
+      for (let i = 0; i < 101; i++) await createTransaction(h.db, 'PETR4')
+
+      const res = await h.app.inject({ method: 'GET', url: '/transactions/rows?offset=100' })
+
+      expect(res.statusCode).toBe(200)
+      expect(res.body.match(/data-edit-tx/g)).toHaveLength(1)
+      expect(res.body).not.toContain('hx-trigger="revealed"')
+      expect(res.body).not.toContain('<!DOCTYPE')
+    })
+
+    it('lista curta não tem sentinela', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4')
+
+      const res = await h.app.inject({ method: 'GET', url: '/transactions/' })
+      expect(res.body).not.toContain('hx-trigger="revealed"')
+    })
+
+    it('busca por trecho do ticker e filtro por ano', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createAsset(h.db, 'VALE3')
+      await createTransaction(h.db, 'PETR4', { date: '2024-01-15' })
+      await createTransaction(h.db, 'VALE3', { date: '2023-01-15' })
+
+      const search = await h.app.inject({ method: 'GET', url: '/transactions/?q=val' })
+      expect(search.body).toContain('/assets/VALE3')
+      expect(search.body).not.toContain('/assets/PETR4')
+
+      const year = await h.app.inject({ method: 'GET', url: '/transactions/?year=2024' })
+      expect(year.body).toContain('/assets/PETR4')
+      expect(year.body).not.toContain('/assets/VALE3')
+      expect(year.body).toContain('<option value="2024" selected>')
+    })
+
     it('a lista renderiza a linha da transação', async () => {
       await createAsset(h.db, 'PETR4', { name: 'Petrobras' })
       await createTransaction(h.db, 'PETR4', {
@@ -962,6 +1015,28 @@ describe('rotas da aplicação', () => {
       expect(res.body).toContain('85,00')
     })
 
+    it('cabeçalho mostra o líquido de tudo que o filtro pegou, e a sentinela leva o filtro', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createAsset(h.db, 'MXRF11', { type: 'REIT' })
+      for (let i = 0; i < 101; i++) {
+        await createDividend(h.db, 'PETR4', { totalAmount: 10, taxWithheld: 1 })
+      }
+      await createDividend(h.db, 'MXRF11', { totalAmount: 1000 })
+
+      const res = await h.app.inject({ method: 'GET', url: '/dividends/?assetType=STOCK' })
+
+      // 101 × 9 líquidos — o MXRF11 fica fora pelo filtro, e a soma passa da página de 100.
+      expect(res.body).toContain('R$ 909,00 líquidos')
+      expect(res.body).toContain('hx-get="/dividends/rows?assetType=STOCK&amp;offset=100"')
+
+      const rows = await h.app.inject({
+        method: 'GET',
+        url: '/dividends/rows?assetType=STOCK&offset=100',
+      })
+      expect(rows.body.match(/data-edit-div/g)).toHaveLength(1)
+      expect(rows.body).not.toContain('hx-trigger="revealed"')
+    })
+
     it('filtra a lista pelo tipo do ativo', async () => {
       await createAsset(h.db, 'PETR4')
       await createAsset(h.db, 'MXRF11', { type: 'REIT' })
@@ -1094,7 +1169,46 @@ describe('rotas da aplicação', () => {
 
     it('API devolve meses e tickers', async () => {
       const res = await h.app.inject({ method: 'GET', url: '/evolution/api' })
-      expect(res.json()).toEqual({ months: [], tickers: [] })
+      expect(res.json()).toEqual({ months: [], tickers: [], currentTickers: [] })
+    })
+
+    it('do mês mais recente para o mais antigo, em páginas de 36, só com colunas de quem tem posição', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createAsset(h.db, 'VALE3')
+      const snapshot = (assetId: string, month: string, quantity: number) => ({
+        assetId,
+        month,
+        quantity,
+        avgPrice: 10,
+        marketPrice: 12,
+        totalCost: quantity * 10,
+        marketValue: quantity * 12,
+      })
+      const months: string[] = []
+      for (let i = 0; i < 40; i++) {
+        const year = 2021 + Math.floor(i / 12)
+        months.push(`${year}-${String((i % 12) + 1).padStart(2, '0')}-01`)
+      }
+      await h.db.monthlySnapshot.createMany({
+        data: [
+          ...months.map((month) => snapshot('PETR4', month, 10)),
+          // VALE3 foi vendida: aparece nos meses antigos e zerada no último.
+          snapshot('VALE3', months[0] as string, 5),
+          snapshot('VALE3', months[39] as string, 0),
+        ],
+      })
+
+      const page = await h.app.inject({ method: 'GET', url: '/evolution/' })
+      const body = page.body.slice(page.body.indexOf('<tbody>'))
+      expect(body.indexOf('04/2024')).toBeLessThan(body.indexOf('03/2024'))
+      expect(page.body).toContain('<th class="text-end">PETR4</th>')
+      expect(page.body).not.toContain('<th class="text-end">VALE3</th>')
+      expect(page.body).toContain('hx-get="/evolution/rows?offset=36"')
+
+      const rest = await h.app.inject({ method: 'GET', url: '/evolution/rows?offset=36' })
+      expect(rest.body).toContain('04/2021')
+      expect(rest.body).toContain('01/2021')
+      expect(rest.body).not.toContain('hx-trigger="revealed"')
     })
 
     it('API de recalcular devolve status ok', async () => {

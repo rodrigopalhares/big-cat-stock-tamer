@@ -368,6 +368,38 @@ describe('TransactionService', () => {
       expect(result.every((t) => t.assetId === 'PETR4')).toBe(true)
     })
 
+    it('pagina com limit e offset, mantendo a ordem', async () => {
+      const first = await service.listTransactions({}, { limit: 2, offset: 0 })
+      const second = await service.listTransactions({}, { limit: 2, offset: 2 })
+
+      expect(first.map((t) => t.date)).toEqual(['2024-03-20', '2024-02-15'])
+      expect(second.map((t) => t.date)).toEqual(['2024-01-10'])
+    })
+
+    it('countTransactions conta o total do filtro, não da página', async () => {
+      expect(await service.countTransactions()).toBe(3)
+      expect(await service.countTransactions({ type: 'REIT' })).toBe(1)
+    })
+
+    it('busca por trecho do ticker, sem diferenciar caixa', async () => {
+      expect(await service.listTransactions({ search: 'petr' })).toHaveLength(2)
+      expect(await service.listTransactions({ search: 'LG1' })).toHaveLength(1)
+      expect(await service.listTransactions({ search: 'xyz' })).toEqual([])
+    })
+
+    it('filtra por ano', async () => {
+      await createTransaction(db, 'PETR4', { date: '2023-12-31' })
+
+      expect(await service.listTransactions({ year: 2024 })).toHaveLength(3)
+      expect(await service.listTransactions({ year: 2023 })).toHaveLength(1)
+    })
+
+    it('listYears devolve os anos com transação, do mais recente ao mais antigo', async () => {
+      await createTransaction(db, 'PETR4', { date: '2022-05-05' })
+
+      expect(await service.listYears()).toEqual([2024, 2022])
+    })
+
     it('position=all não filtra', async () => {
       expect(await service.listTransactions({ position: 'all' })).toHaveLength(3)
     })

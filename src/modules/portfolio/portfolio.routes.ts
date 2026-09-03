@@ -1,19 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { Container } from '../../container.js'
-import { buildCdiChartLine } from '../../domain/cdi.js'
-import {
-  buildIbovChartLine,
-  buildMonthlyDividendSeries,
-  buildNetContributionChartLine,
-} from '../../domain/chart.js'
+import { buildMonthlyDividendSeries } from '../../domain/chart.js'
 import { monthLabel } from '../../shared/format.js'
 import { HttpError } from '../../shared/http-error.js'
-import { firstDayOf, type IsoDate, today, yearMonth } from '../../shared/iso-date.js'
-import {
-  type ChartData,
-  DashboardPage,
-  type DividendChartData,
-} from '../../views/pages/dashboard.js'
+import { firstDayOf, today, yearMonth } from '../../shared/iso-date.js'
+import { DashboardPage, type DividendChartData } from '../../views/pages/dashboard.js'
+import { buildEvolutionChart } from '../evolution/evolution-chart.js'
 import type { AssetPosition } from './portfolio.schema.js'
 
 /** Porte de src/main/kotlin/com/stocks/controller/PortfolioController.kt. */
@@ -41,7 +33,7 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
           hasUsd: positions.some((p) => p.currency === 'USD'),
           usdRate: usdPosition?.exchangeRate ?? null,
           cdi: await c.cdi.compare(summary),
-          chart: await buildChart(c, positions),
+          chart: await buildEvolutionChart(c, positions, await c.evolution.getEvolution()),
           dividendChart: await buildDividendChart(c),
         }),
       )
@@ -74,52 +66,6 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
       }
       return position
     })
-  }
-}
-
-/**
- * Dados do gráfico: uma série por tipo de ativo, mais as linhas de referência.
- * Null quando não há snapshot nenhum — aí a página nem desenha o gráfico.
- */
-async function buildChart(
-  c: Container,
-  positions: readonly AssetPosition[],
-): Promise<ChartData | null> {
-  const evolution = await c.evolution.getEvolution()
-  if (evolution.months.length === 0) return null
-
-  const assets = await c.db.asset.findMany({ select: { ticker: true, type: true } })
-  const typeByTicker = new Map(assets.map((a) => [a.ticker, a.type ?? 'STOCK']))
-  const types = [...new Set(typeByTicker.values())].sort()
-
-  const invested = evolution.months.map((row) => row.totalInvested)
-  const months = evolution.months.map((row) => row.month)
-
-  const ibovPrices = await c.benchmarks.getMonthlyPricesMap()
-
-  return {
-    labels: months.map((month) => monthLabel(month)),
-    datasets: types.map((type) => ({
-      label: type,
-      data: evolution.months.map((row) =>
-        row.snapshots
-          .filter((s) => typeByTicker.get(s.assetId) === type)
-          .reduce((total, s) => total + s.marketValue, 0),
-      ),
-    })),
-    invested,
-    // Os fluxos da carteira inteira em ordem, como no card: provento de um papel pagando a
-    // compra de outro só aparece com eles juntos.
-    netContribution: buildNetContributionChartLine(
-      months as IsoDate[],
-      positions.flatMap((p) => p.allCashFlowsBrl),
-    ),
-    ibov: buildIbovChartLine(months as IsoDate[], invested, ibovPrices),
-    cdi: buildCdiChartLine(
-      months as IsoDate[],
-      positions.flatMap((p) => p.allCashFlowsBrl),
-      await c.cdi.getRates(),
-    ),
   }
 }
 

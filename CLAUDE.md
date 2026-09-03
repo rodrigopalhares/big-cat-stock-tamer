@@ -78,6 +78,10 @@ Verificadas pelo `dependency-cruiser` no CI, não só combinadas:
   JSON, fragmento HTMX ou a página de erro com layout. `ZodError` vira 400 ali mesmo, com uma frase
   em português por campo (`src/shared/validation-message.ts`) — rota não precisa de `safeParse`.
   Mensagem de `HttpError` é texto de tela: escreva em português.
+- Lista que cresce (Transações, Proventos, Evolução) carrega por **rolagem infinita**, nunca por
+  paginação: a tela traz a primeira página e a última linha é uma sentinela HTMX
+  (`views/components/load-more-row.tsx`, `hx-trigger="revealed"`) que busca `/<lista>/rows?offset=`
+  com os mesmos filtros. O service recebe `PageWindow` opcional e tem um `count` para o badge.
 - Cor de tipo de ativo sai de `src/shared/asset-colors.ts` — gráficos e badges leem do mesmo
   mapa, então STOCK é o mesmo azul em toda a interface. Tipo novo entra lá, e só lá.
 

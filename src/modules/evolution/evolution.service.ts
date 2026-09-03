@@ -114,7 +114,7 @@ export class EvolutionService {
   /** Evolução mês a mês, com os meses sem posição preenchidos com zero. */
   async getEvolution(): Promise<MonthlyEvolutionSummary> {
     const snapshots = await this.db.monthlySnapshot.findMany({ orderBy: { month: 'asc' } })
-    if (snapshots.length === 0) return { months: [], tickers: [] }
+    if (snapshots.length === 0) return { months: [], tickers: [], currentTickers: [] }
 
     const dividends = await this.db.dividend.findMany({
       select: { date: true, totalAmountBrl: true, taxWithheldBrl: true },
@@ -126,6 +126,11 @@ export class EvolutionService {
 
     const tickers = [...new Set(snapshots.map((s) => s.assetId))].sort()
     const byMonth = groupBy(snapshots, (s) => s.month)
+    const latestMonth = snapshots[snapshots.length - 1]?.month
+    const currentTickers = snapshots
+      .filter((s) => s.month === latestMonth && s.quantity > 0)
+      .map((s) => s.assetId)
+      .sort()
 
     const first = snapshots[0] as (typeof snapshots)[number]
     const last = snapshots[snapshots.length - 1] as (typeof snapshots)[number]
@@ -168,7 +173,7 @@ export class EvolutionService {
       }
     })
 
-    return { months, tickers }
+    return { months, tickers, currentTickers }
   }
 
   async findFirstTransactionMonth(): Promise<YearMonth | null> {

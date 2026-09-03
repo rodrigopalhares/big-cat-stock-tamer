@@ -206,31 +206,53 @@ describe('DividendService', () => {
     })
 
     it('filtra por ticker', async () => {
-      expect(await service.listDividends('petr4')).toHaveLength(2)
+      expect(await service.listDividends({ ticker: 'petr4' })).toHaveLength(2)
     })
 
     it('filtra por tipo', async () => {
-      const result = await service.listDividends(null, 'jcp')
+      const result = await service.listDividends({ type: 'jcp' })
       expect(result.map((d) => d.assetId)).toEqual(['PETR4'])
     })
 
     it('combina ticker e tipo', async () => {
-      expect(await service.listDividends('PETR4', 'DIVIDENDO')).toHaveLength(1)
+      expect(await service.listDividends({ ticker: 'PETR4', type: 'DIVIDENDO' })).toHaveLength(1)
     })
 
     it('filtra por tipo do ativo, que é do papel e não do provento', async () => {
-      const result = await service.listDividends(null, null, 'reit')
+      const result = await service.listDividends({ assetType: 'reit' })
       expect(result.map((d) => d.assetId)).toEqual(['MXRF11'])
     })
 
     it('combina tipo do ativo com tipo do provento', async () => {
       // STOCK tem DIVIDENDO e JCP; só os dois DIVIDENDO de ação devem sobrar.
-      const result = await service.listDividends(null, 'DIVIDENDO', 'STOCK')
+      const result = await service.listDividends({ type: 'DIVIDENDO', assetType: 'STOCK' })
       expect(result.map((d) => d.assetId)).toEqual(['VALE3', 'PETR4'])
     })
 
     it('tipo de ativo sem provento devolve vazio', async () => {
-      expect(await service.listDividends(null, null, 'ETF')).toEqual([])
+      expect(await service.listDividends({ assetType: 'ETF' })).toEqual([])
+    })
+
+    it('pagina com limit e offset', async () => {
+      const page = await service.listDividends({}, { limit: 2, offset: 1 })
+      expect(page.map((d) => d.date)).toEqual(['2024-02-20', '2024-02-15'])
+    })
+
+    it('countDividends e sumNetDividendsBrl seguem o filtro, não a página', async () => {
+      await createDividend(db, 'PETR4', { date: '2024-04-01', totalAmount: 50, taxWithheld: 10 })
+
+      expect(await service.countDividends()).toBe(5)
+      expect(await service.countDividends({ ticker: 'PETR4' })).toBe(3)
+      // Três de PETR4: 100 + 100 do fixture (IR 0) + 50 − 10.
+      expect(await service.sumNetDividendsBrl({ ticker: 'PETR4' })).toBe(240)
+    })
+
+    it('busca por trecho do ticker e filtra por ano', async () => {
+      await createDividend(db, 'PETR4', { date: '2023-06-01' })
+
+      expect(await service.listDividends({ search: 'rf1' })).toHaveLength(1)
+      expect(await service.listDividends({ year: 2023 })).toHaveLength(1)
+      expect(await service.listYears()).toEqual([2024, 2023])
     })
   })
 
