@@ -46,21 +46,36 @@ export function TransactionsPage(props: TransactionsPageProps) {
           <h2 class="mb-0">
             <i class="bi bi-arrow-left-right" /> Transações
           </h2>
-          <button
-            type="button"
-            class="btn btn-outline-primary"
-            data-bs-toggle="modal"
-            data-bs-target="#csvImportModal"
-          >
-            <i class="bi bi-file-earmark-spreadsheet" /> Importar
-          </button>
+          <div class="d-flex gap-2">
+            {/* No celular o formulário começa recolhido: senão o histórico ficava uma tela abaixo. */}
+            <button
+              type="button"
+              class="btn btn-primary d-lg-none"
+              data-bs-toggle="collapse"
+              data-bs-target="#newTransactionForm"
+              aria-expanded="false"
+              aria-controls="newTransactionForm"
+            >
+              <i class="bi bi-plus-lg" /> Nova
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline-primary"
+              data-bs-toggle="modal"
+              data-bs-target="#csvImportModal"
+            >
+              <i class="bi bi-file-earmark-spreadsheet" /> Importar
+            </button>
+          </div>
         </div>
 
         <CsvImportModal noteImportEnabled={props.noteImportEnabled} />
 
         <div class="row g-4">
           <div class="col-lg-4">
-            <NewTransactionForm {...props} />
+            <div id="newTransactionForm" class="collapse d-lg-block">
+              <NewTransactionForm {...props} />
+            </div>
           </div>
           <div class="col-lg-8">
             <div class="card border-0 shadow-sm">

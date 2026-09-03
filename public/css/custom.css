@@ -122,3 +122,63 @@ body {
 [aria-expanded="true"] .json-caret {
     transform: rotate(90deg);
 }
+
+/*
+ * Tabela de posições: 13 colunas e ~70 linhas. O cabeçalho e a coluna do ticker ficam
+ * fixos dentro de um contêiner com rolagem própria — `position: sticky` só funciona em
+ * relação ao ancestral que rola, e a `.table-responsive` só rola na horizontal. Daí o
+ * `max-height`: ele cria a rolagem vertical de que o cabeçalho precisa para grudar.
+ * O total gruda embaixo pelo mesmo mecanismo.
+ */
+.table-sticky-wrap {
+    max-height: 72vh;
+    overflow: auto;
+}
+
+.table-sticky thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background-color: var(--bs-tertiary-bg);
+}
+
+.table-sticky tfoot td {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background-color: var(--bs-tertiary-bg);
+}
+
+.table-sticky th:first-child,
+.table-sticky td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background-color: var(--bs-card-bg);
+}
+
+.table-sticky thead th:first-child,
+.table-sticky tfoot td:first-child {
+    z-index: 3;
+    background-color: var(--bs-tertiary-bg);
+}
+
+/* Sem fundo próprio, a célula fixa deixaria o texto das outras passar por baixo dela. */
+.table-sticky tbody tr:hover td:first-child {
+    background-color: var(--bs-tertiary-bg);
+}
+
+/*
+ * Colunas secundárias (Moeda, TIR/mês) começam escondidas: a tabela não cabia em 1440px e
+ * essas duas são as que menos se leem — a moeda já aparece no valor ("US$"), e a TIR anual
+ * responde a mesma pergunta. O checkbox "Colunas extras" liga o `.show-secondary`.
+ */
+.positions-table:not(.show-secondary) .col-secondary {
+    display: none;
+}
+
+/* Subtotal por tipo de ativo: a linha destaca sem virar cabeçalho. */
+.positions-table tr[data-subtotal] td {
+    background-color: var(--bs-tertiary-bg);
+    font-weight: 600;
+}

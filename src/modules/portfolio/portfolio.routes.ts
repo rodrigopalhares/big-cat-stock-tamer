@@ -4,7 +4,11 @@ import { buildMonthlyDividendSeries } from '../../domain/chart.js'
 import { monthLabel } from '../../shared/format.js'
 import { HttpError } from '../../shared/http-error.js'
 import { firstDayOf, today, yearMonth } from '../../shared/iso-date.js'
-import { DashboardPage, type DividendChartData } from '../../views/pages/dashboard.js'
+import {
+  DashboardPage,
+  type DividendChartData,
+  type TypeSubtotal,
+} from '../../views/pages/dashboard.js'
 import { buildEvolutionChart } from '../evolution/evolution-chart.js'
 import type { AssetPosition } from './portfolio.schema.js'
 
@@ -21,6 +25,7 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
       return reply.html(
         DashboardPage({
           positions,
+          subtotals: subtotalsByType(c, positions),
           assetTypes: [...new Set(positions.map((p) => p.type).filter(isString))].sort(),
           netContribution: summary.netContribution,
           totalInvested: summary.totalInvested,
@@ -83,6 +88,18 @@ async function buildDividendChart(c: Container): Promise<DividendChartData | nul
     datasets: series.datasets,
     movingAverage: series.movingAverage,
   }
+}
+
+/**
+ * Um resumo por tipo de ativo, pela mesma conta do total da carteira — inclusive a TIR,
+ * que sai dos fluxos do grupo e não da média das TIRs individuais.
+ */
+function subtotalsByType(c: Container, positions: readonly AssetPosition[]): TypeSubtotal[] {
+  const types = [...new Set(positions.map((p) => p.type ?? ''))]
+  return types.map((type) => {
+    const group = positions.filter((p) => (p.type ?? '') === type)
+    return { type, count: group.length, summary: c.portfolio.aggregatePositions(group) }
+  })
 }
 
 function sortPositions(positions: AssetPosition[]): AssetPosition[] {

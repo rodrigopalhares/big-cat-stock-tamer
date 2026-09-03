@@ -41,19 +41,33 @@ export function DividendsPage(props: DividendsPageProps) {
           <h2 class="mb-0">
             <i class="bi bi-cash-coin" /> Proventos
           </h2>
-          <button
-            type="button"
-            class="btn btn-outline-primary"
-            data-bs-toggle="modal"
-            data-bs-target="#csvDivImportModal"
-          >
-            <i class="bi bi-file-earmark-spreadsheet" /> Importar CSV
-          </button>
+          <div class="d-flex gap-2">
+            <button
+              type="button"
+              class="btn btn-primary d-lg-none"
+              data-bs-toggle="collapse"
+              data-bs-target="#newDividendForm"
+              aria-expanded="false"
+              aria-controls="newDividendForm"
+            >
+              <i class="bi bi-plus-lg" /> Novo
+            </button>
+            <button
+              type="button"
+              class="btn btn-outline-primary"
+              data-bs-toggle="modal"
+              data-bs-target="#csvDivImportModal"
+            >
+              <i class="bi bi-file-earmark-spreadsheet" /> Importar CSV
+            </button>
+          </div>
         </div>
 
         <div class="row g-4">
           <div class="col-lg-4">
-            <NewDividendForm {...props} />
+            <div id="newDividendForm" class="collapse d-lg-block">
+              <NewDividendForm {...props} />
+            </div>
           </div>
           <div class="col-lg-8">
             <div class="card border-0 shadow-sm">

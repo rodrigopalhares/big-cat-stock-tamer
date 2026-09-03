@@ -37,6 +37,16 @@ export function AssetsPage({
           <h2 class="mb-0">
             <i class="bi bi-building" /> Ativos
           </h2>
+          <button
+            type="button"
+            class="btn btn-primary d-lg-none"
+            data-bs-toggle="collapse"
+            data-bs-target="#newAssetForm"
+            aria-expanded="false"
+            aria-controls="newAssetForm"
+          >
+            <i class="bi bi-plus-lg" /> Novo
+          </button>
         </div>
 
         {error !== null && (
@@ -50,7 +60,9 @@ export function AssetsPage({
 
         <div class="row g-4">
           <div class="col-lg-4">
-            <CreateAssetForm />
+            <div id="newAssetForm" class="collapse d-lg-block">
+              <CreateAssetForm />
+            </div>
           </div>
           <div class="col-lg-8">
             <div class="card border-0 shadow-sm">

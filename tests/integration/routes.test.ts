@@ -1260,6 +1260,33 @@ describe('rotas da aplicação', () => {
     })
   })
 
+  describe('tabela de posições', () => {
+    it('fecha um subtotal por tipo, com a TIR do grupo, e marca as colunas secundárias', async () => {
+      await createAsset(h.db, 'PETR4', { type: 'STOCK', hasPosition: true })
+      await createAsset(h.db, 'VALE3', { type: 'STOCK', hasPosition: true })
+      await createAsset(h.db, 'HGLG11', { type: 'REIT', hasPosition: true })
+      await createTransaction(h.db, 'PETR4', { quantity: 10, price: 10, date: '2024-01-15' })
+      await createTransaction(h.db, 'VALE3', { quantity: 10, price: 20, date: '2024-01-15' })
+      await createTransaction(h.db, 'HGLG11', { quantity: 1, price: 100, date: '2024-01-15' })
+      for (const ticker of ['PETR4', 'VALE3', 'HGLG11']) {
+        await h.container.assets.refreshPositionFields(ticker)
+      }
+
+      const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+      expect(res.body.match(/data-subtotal/g)).toHaveLength(2)
+      expect(res.body).toContain('Subtotal Ação')
+      expect(res.body).toContain('· 2 ativos')
+      expect(res.body).toContain('Subtotal FII')
+      expect(res.body).toContain('· 1 ativo')
+      // Custo total das duas ações: 100 + 200.
+      expect(res.body).toContain('R$ 300,00')
+      expect(res.body).toContain('positions-table table-sticky"')
+      expect(res.body).toContain('<th class="col-secondary" data-sort="text">Moeda')
+      expect(res.body).toContain('id="toggleColumns"')
+    })
+  })
+
   describe('rótulos da interface', () => {
     it('o menu diz Risco, a página diz Métricas de Risco e a navbar não expõe a stack', async () => {
       const res = await h.app.inject({ method: 'GET', url: '/risk-metrics/' })
@@ -1286,6 +1313,18 @@ describe('rotas da aplicação', () => {
       expect(res.body).toContain('aparece depois do primeiro recálculo')
       expect(res.body).toContain('hx-post="/evolution/recalculate"')
       expect(res.body).not.toContain('id="evolutionChart"')
+    })
+
+    it('os formulários de lançamento começam recolhidos abaixo de lg', async () => {
+      for (const [url, id] of [
+        ['/transactions/', 'newTransactionForm'],
+        ['/dividends/', 'newDividendForm'],
+        ['/assets/', 'newAssetForm'],
+      ]) {
+        const res = await h.app.inject({ method: 'GET', url: url as string })
+        expect(res.body).toContain(`id="${id}" class="collapse d-lg-block"`)
+        expect(res.body).toContain(`data-bs-target="#${id}"`)
+      }
     })
 
     it('os filtros de Proventos separam tipo de ativo de tipo de provento', async () => {
