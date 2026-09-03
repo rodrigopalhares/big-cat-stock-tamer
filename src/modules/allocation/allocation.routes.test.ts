@@ -156,6 +156,25 @@ describe('rotas de alocação', () => {
       expect(res.statusCode).toBe(409)
     })
 
+    /**
+     * O nome da classe volta na mensagem de conflito, e essa mensagem é servida como HTML.
+     * Sem escape, um payload aqui é XSS refletido — era o achado F2 da auditoria.
+     */
+    it('nome duplicado com marcação volta escapado, não executável', async () => {
+      const xss = '<svg onload=alert(1)>'
+      await createAssetClass(h.db, xss)
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/allocation/classes/new',
+        payload: { name: xss, target_percent: '10', color: '#ff6384' },
+      })
+
+      expect(res.statusCode).toBe(409)
+      expect(res.body).toContain('&lt;svg onload=alert(1)&gt;')
+      expect(res.body).not.toContain(xss)
+    })
+
     it('meta fora de faixa responde 400, não 500', async () => {
       const res = await h.app.inject({
         method: 'POST',

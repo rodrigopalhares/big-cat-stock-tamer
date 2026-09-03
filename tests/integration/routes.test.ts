@@ -479,6 +479,33 @@ describe('rotas da aplicação', () => {
       expect(res.headers.location).toBe('/assets/PETR4')
     })
 
+    /**
+     * `returnTo` ia direto para o Location — era o achado F3 da auditoria. O redirect acontece
+     * depois da escrita, então o usuário chega ao site do atacante logo após uma operação que
+     * deu certo, que é o contexto de maior confiança para pedir a senha de novo.
+     */
+    it('destino externo em returnTo é ignorado', async () => {
+      await createAsset(h.db, 'PETR4')
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/transactions/new',
+        payload: {
+          ticker: 'PETR4',
+          type: 'BUY',
+          quantity: '100',
+          price: '25.50',
+          fees: '0',
+          date: '2024-06-01',
+          currency: 'BRL',
+          returnTo: 'https://evil.example.com/phish',
+        },
+      })
+
+      expect(res.statusCode).toBe(302)
+      expect(res.headers.location).toBe('/transactions/')
+    })
+
     it('valor bruto sem preço deduz o preço unitário', async () => {
       await createAsset(h.db, 'PETR4')
 
@@ -846,6 +873,27 @@ describe('rotas da aplicação', () => {
       })
 
       expect(res.headers.location).toBe('/assets/PETR4')
+    })
+
+    it('destino externo em returnTo é ignorado', async () => {
+      await createAsset(h.db, 'PETR4')
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/dividends/new',
+        payload: {
+          ticker: 'PETR4',
+          type: 'DIVIDENDO',
+          total_amount: '150',
+          tax_withheld: '0',
+          date: '2024-06-01',
+          currency: 'BRL',
+          returnTo: '//evil.example.com/',
+        },
+      })
+
+      expect(res.statusCode).toBe(302)
+      expect(res.headers.location).toBe('/dividends/')
     })
 
     it('lista mostra o valor líquido', async () => {

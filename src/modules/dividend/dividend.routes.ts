@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { Container } from '../../container.js'
 import { HttpError } from '../../shared/http-error.js'
 import { isoDate, today as todayIso } from '../../shared/iso-date.js'
+import { internalPath } from '../../shared/safe-redirect.js'
 import { TransactionTickerInfo } from '../../views/components/ticker-info.js'
 import { DividendsPage } from '../../views/pages/dividends.js'
 import { DividendCsvPreview } from '../../views/partials/dividend-csv-preview.js'
@@ -68,7 +69,7 @@ export function dividendRoutes(c: Container): FastifyPluginAsync {
         broker: form.broker,
         currency: form.currency,
       })
-      return reply.redirect(form.returnTo ?? '/dividends/', 302)
+      return reply.redirect(internalPath(form.returnTo, '/dividends/'), 302)
     })
 
     app.post<{ Params: { id: string } }>('/dividends/:id/edit', async (req, reply) => {
@@ -82,13 +83,13 @@ export function dividendRoutes(c: Container): FastifyPluginAsync {
         broker: form.broker,
         currency: form.currency,
       })
-      return reply.redirect(form.returnTo ?? '/dividends/', 302)
+      return reply.redirect(internalPath(form.returnTo, '/dividends/'), 302)
     })
 
     app.post<{ Params: { id: string } }>('/dividends/:id/delete', async (req, reply) => {
       const { returnTo } = z.object({ returnTo: z.string().optional() }).parse(req.body ?? {})
       await c.dividends.deleteDividend(Number(req.params.id))
-      return reply.redirect(returnTo ?? '/dividends/', 302)
+      return reply.redirect(internalPath(returnTo, '/dividends/'), 302)
     })
 
     app.post('/dividends/parse-csv', async (req, reply) => {

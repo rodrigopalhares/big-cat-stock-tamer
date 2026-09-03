@@ -6,6 +6,7 @@ import { server } from './msw.js'
 // — ou pior, escrever no diretório de produção.
 for (const key of [
   'APP_AUTH_PASSWORD',
+  'APP_AUTH_DISABLED',
   'APP_AUTH_KEY_FILE',
   'APP_DATA_DIR',
   'APP_BACKUP_DIR',
@@ -20,6 +21,9 @@ for (const key of [
 process.env['NODE_ENV'] = 'test'
 process.env['DATABASE_URL'] ??= 'file::memory:'
 process.env['LOG_LEVEL'] ??= 'silent'
+// `loadEnv` recusa senha vazia sem esta flag. A suíte roda sem autenticação de propósito —
+// quem precisa dela liga passando APP_AUTH_PASSWORD explicitamente, como faz auth.test.ts.
+process.env['APP_AUTH_DISABLED'] = 'true'
 
 // `error` garante que uma chamada HTTP não prevista quebre o teste em vez de
 // vazar para a rede de verdade.

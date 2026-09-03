@@ -180,9 +180,18 @@ ou desconhecido fica em branco e vai para a revisão manual.
 
 ## Autenticação
 
-Usuário único, senha em `APP_AUTH_PASSWORD`. Em branco, autenticação desabilitada.
+Usuário único, senha em `APP_AUTH_PASSWORD` — **obrigatória**, mínimo 12 caracteres. Campo
+em branco derruba o boot: desligar a autenticação exige `APP_AUTH_DISABLED=true` explícito, e
+essa flag não é aceita com `NODE_ENV=production`. Com senha configurada a flag é ignorada — a
+assimetria é de propósito, porque errar para o lado "ligado" nunca abre a aplicação sem querer.
 As sessões são persistidas em `${APP_DATA_DIR}/auth.key` como *hashes* de token — o arquivo
 nunca guarda o token em claro, então vazá-lo não dá acesso a ninguém.
+
+Tentativas erradas são contadas por IP, em memória: cinco numa janela de um minuto bloqueiam, e
+o bloqueio cresce (1 min, 5, 15). Comparar em tempo constante defende de ataque por temporização,
+não de volume — e com um segredo só protegendo tudo, num processo que escuta em `0.0.0.0`, é o
+volume que importa. O `level` do cliente sobrevive uma hora ao fim do bloqueio; sem isso bastaria
+esperar um minuto para ganhar cinco tentativas novas, para sempre.
 
 ## Histórico
 

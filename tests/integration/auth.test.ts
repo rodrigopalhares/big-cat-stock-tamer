@@ -48,7 +48,7 @@ describe('autenticação', () => {
 
   describe('com senha configurada', () => {
     beforeEach(async () => {
-      await start('segredo')
+      await start('senha-de-teste-longa')
     })
 
     it('rota protegida sem sessão redireciona para o login', async () => {
@@ -85,7 +85,7 @@ describe('autenticação', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/login',
-        payload: { password: 'segredo' },
+        payload: { password: 'senha-de-teste-longa' },
       })
 
       expect(res.statusCode).toBe(302)
@@ -106,11 +106,44 @@ describe('autenticação', () => {
       expect(res.headers['set-cookie']).toBeUndefined()
     })
 
+    /**
+     * Sem limite de tentativas, a senha única vira um segredo enumerável na velocidade da
+     * rede local — era o achado F4 da auditoria.
+     */
+    it('a sexta tentativa errada seguida responde 429 com Retry-After', async () => {
+      const errar = () =>
+        app.inject({ method: 'POST', url: '/login', payload: { password: 'errada' } })
+
+      for (let i = 0; i < 5; i++) {
+        expect((await errar()).statusCode).toBe(401)
+      }
+
+      const bloqueado = await errar()
+      expect(bloqueado.statusCode).toBe(429)
+      expect(bloqueado.headers['retry-after']).toBe('60')
+      expect(bloqueado.body).toContain('Muitas tentativas erradas')
+    })
+
+    it('bloqueado, nem a senha certa entra', async () => {
+      for (let i = 0; i < 5; i++) {
+        await app.inject({ method: 'POST', url: '/login', payload: { password: 'errada' } })
+      }
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/login',
+        payload: { password: 'senha-de-teste-longa' },
+      })
+
+      expect(res.statusCode).toBe(429)
+      expect(res.headers['set-cookie']).toBeUndefined()
+    })
+
     it('com a sessão, a rota protegida abre', async () => {
       const login = await app.inject({
         method: 'POST',
         url: '/login',
-        payload: { password: 'segredo' },
+        payload: { password: 'senha-de-teste-longa' },
       })
       const token = sessionFrom(login.headers['set-cookie'])
 
@@ -127,7 +160,7 @@ describe('autenticação', () => {
       const login = await app.inject({
         method: 'POST',
         url: '/login',
-        payload: { password: 'segredo' },
+        payload: { password: 'senha-de-teste-longa' },
       })
       const token = sessionFrom(login.headers['set-cookie'])
 

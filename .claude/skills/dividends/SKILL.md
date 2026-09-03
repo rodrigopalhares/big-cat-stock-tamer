@@ -173,9 +173,9 @@ All registered by `dividendRoutes(container)` in `dividend.routes.ts`.
 | Method | Path | Type | Behaviour |
 |--------|------|------|-----------|
 | GET | `/dividends/` | HTML | Page with form, filters (`ticker`, `type`, `assetType`) and table |
-| POST | `/dividends/new` | HTML | Creates, redirects to `returnTo` or `/dividends/` |
-| POST | `/dividends/:id/edit` | HTML | Updates, redirects to `returnTo` or `/dividends/` |
-| POST | `/dividends/:id/delete` | HTML | Deletes, redirects to `returnTo` or `/dividends/` |
+| POST | `/dividends/new` | HTML | Creates, redirects to a valid `returnTo` or `/dividends/` |
+| POST | `/dividends/:id/edit` | HTML | Updates, redirects to a valid `returnTo` or `/dividends/` |
+| POST | `/dividends/:id/delete` | HTML | Deletes, redirects to a valid `returnTo` or `/dividends/` |
 | GET | `/dividends/ticker-info?ticker=X` | HTMX | Ticker status fragment (empty if under 3 chars) |
 | POST | `/dividends/parse-csv` | HTMX | Renders `DividendCsvPreview` from pasted CSV |
 | POST | `/dividends/parse-xlsx` | multipart | Same preview, from the B3 statement upload |
@@ -188,6 +188,14 @@ All registered by `dividendRoutes(container)` in `dividend.routes.ts`.
 redirect back to it when it comes in the body. `/dividends/` posts without it and lands on
 itself; `DividendsTable` on the asset page sends `/assets/<TICKER>` in a hidden input (delete)
 or in `data-return-to` (edit and create), which `src/client/dividends.ts` copies into the form.
+
+**`returnTo` is user input, so it is never trusted as a destination.** All three routes pass it
+through `internalPath()` (`src/shared/safe-redirect.ts`), which only accepts an internal path —
+one leading slash, and not `//host` or `/\host`, which look relative but are read by the browser
+as absolute URLs. Anything else falls back to `/dividends/` silently. Without it,
+`returnTo=https://evil.example.com` sent the user off-domain right after a successful write,
+which is the ideal setup for a credential phish. A new redirect on this feature must go through
+the same helper.
 
 ## Schemas
 
