@@ -102,6 +102,15 @@ O sufixo `J` marca "com Juros Semestrais": `TD:IPCA2035` é o principal e `TD:IP
 de cupom — mesmo vencimento, PU quase o dobro, então trocar um pelo outro erra a carteira
 em silêncio.
 
+**O arquivo do Tesouro é de ontem.** O CSV sai com um dia útil de atraso, então a última
+`Data Base` publicada nunca é hoje — ao contrário do Yahoo, que devolve cotação do próprio
+dia. Por isso `fetchQuotesBatch` devolve `[data, preço]`, e não só o número: quem grava
+carimba o PU com a data da fonte. Fazer como o Yahoo (`date === today` na atualização
+diária, `date: today` ao gravar) custava duas coisas ao mesmo tempo — a diária gravava zero
+preço todo dia, calada, e a tela da carteira punha o PU de um dia sob a data do outro. Pior,
+a linha datada de hoje virava a marca d'água do `runBackfill`, que retoma de
+`último gravado + 1` e passava a pular o ativo inteiro: o dia que faltava não voltava nunca.
+
 **Trocar o `yfTicker` refaz a série de preços.** `price_history` é chaveada pelo ticker do
 cadastro, não pelo símbolo externo — então corrigir o `yfTicker` deixaria os preços do papel
 antigo no histórico do ativo, misturados aos novos e indistinguíveis, e ninguém os

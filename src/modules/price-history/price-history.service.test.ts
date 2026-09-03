@@ -321,5 +321,69 @@ describe('PriceHistoryService', () => {
 
       await expect(service.runDailyUpdate(TODAY)).resolves.toBeUndefined()
     })
+
+    describe('Tesouro Direto', () => {
+      /** Título em carteira, com a série já começada num dia anterior ao do arquivo. */
+      async function seedTesouro(lastStored: string | null) {
+        server.use(tesouroCsv('tesouro_direto_sample.csv'))
+        await createAsset(db, 'TD:SELIC2029', {
+          type: 'TESOURO_DIRETO',
+          yfTicker: 'Tesouro Selic;01/03/2029',
+          hasPosition: true,
+        })
+        await createTransaction(db, 'TD:SELIC2029', { date: '2024-01-01' })
+        if (lastStored !== null) await createPriceHistory(db, 'TD:SELIC2029', lastStored, 1)
+      }
+
+      it('grava a última data-base publicada, que não é a de hoje', async () => {
+        // O arquivo do Tesouro sai com atraso: exigir `date === today` zerava a atualização
+        // todo dia, calada, e o histórico só andava por quem abrisse a tela da carteira.
+        await seedTesouro('2024-03-02')
+
+        await service.runDailyUpdate(TODAY)
+
+        const stored = await db.priceHistory.findMany({
+          where: { assetId: 'TD:SELIC2029' },
+          orderBy: { date: 'asc' },
+        })
+        expect(stored.map((p) => p.date)).toEqual(['2024-03-02', '2024-03-03'])
+        expect(stored[1]?.close).toBeCloseTo(14215.6, 2)
+      })
+
+      it('emenda os dias que ficaram para trás', async () => {
+        await seedTesouro('2024-02-28')
+
+        await service.runDailyUpdate(TODAY)
+
+        const dates = (
+          await db.priceHistory.findMany({
+            where: { assetId: 'TD:SELIC2029' },
+            orderBy: { date: 'asc' },
+          })
+        ).map((p) => p.date)
+        expect(dates).toEqual(['2024-02-28', '2024-03-01', '2024-03-02', '2024-03-03'])
+      })
+
+      it('não regrava o que já está no banco', async () => {
+        await seedTesouro('2024-03-03')
+
+        await service.runDailyUpdate(TODAY)
+
+        // O preço de marcação continua o que já estava: nada foi buscado por cima dele.
+        const stored = await db.priceHistory.findMany({ where: { assetId: 'TD:SELIC2029' } })
+        expect(stored).toHaveLength(1)
+        expect(stored[0]?.close).toBe(1)
+      })
+
+      it('sem histórico nenhum, deixa a série para o backfill', async () => {
+        // Ativo recém-cadastrado: a atualização diária só emenda a ponta, senão puxaria
+        // dezesseis anos de PU aqui dentro.
+        await seedTesouro(null)
+
+        await service.runDailyUpdate(TODAY)
+
+        expect(await db.priceHistory.count({ where: { assetId: 'TD:SELIC2029' } })).toBe(0)
+      })
+    })
   })
 })

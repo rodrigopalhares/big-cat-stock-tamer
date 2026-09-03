@@ -8,6 +8,7 @@ import {
 } from '../../domain/calculation.js'
 import { type AssetType, NO_QUOTE_TYPES } from '../../domain/constants.js'
 import {
+  type DatedPrice,
   type PriceRecord,
   resolveQuoteSymbol,
   resolveTesouroSymbol,
@@ -169,34 +170,31 @@ export class PortfolioService {
       }
     }
 
-    const allTickers = [...yfToAsset.values(), ...tdToAsset.values()]
+    const yfTickers = [...yfToAsset.values()]
     const storedToday =
-      allTickers.length > 0
-        ? await this.priceHistory.getPricesForDate(allTickers, today)
+      yfTickers.length > 0
+        ? await this.priceHistory.getPricesForDate(yfTickers, today)
         : new Map<string, number>()
 
     const liveQuotes = new Map<string, number>()
     const yfToFetch: string[] = []
-    const tdToFetch: string[] = []
 
     for (const [symbol, assetTicker] of yfToAsset) {
       const stored = storedToday.get(assetTicker)
       if (stored !== undefined) liveQuotes.set(symbol, stored)
       else yfToFetch.push(symbol)
     }
-    for (const [symbol, assetTicker] of tdToAsset) {
-      const stored = storedToday.get(assetTicker)
-      if (stored !== undefined) liveQuotes.set(symbol, stored)
-      else tdToFetch.push(symbol)
-    }
 
     if (yfToFetch.length > 0) {
       const fetched = await this.yahoo.fetchQuotesBatch(yfToFetch)
       await this.storeQuotes(fetched, yfToAsset, today, liveQuotes)
     }
-    if (tdToFetch.length > 0) {
-      const fetched = await this.tesouro.fetchQuotesBatch(tdToFetch)
-      await this.storeQuotes(fetched, tdToAsset, today, liveQuotes)
+    // O Tesouro não entra no atalho do "já tem preço de hoje": o arquivo sai com um dia
+    // útil de atraso, então nunca existe linha de hoje para reaproveitar. Consultar sempre
+    // não custa requisição — o CSV inteiro fica em cache no cliente por quatro horas.
+    if (tdToAsset.size > 0) {
+      const fetched = await this.tesouro.fetchQuotesBatch([...tdToAsset.keys()])
+      await this.storeDatedQuotes(fetched, tdToAsset, liveQuotes)
     }
 
     return liveQuotes
@@ -214,6 +212,27 @@ export class PortfolioService {
       const assetTicker = symbolToAsset.get(symbol)
       if (assetTicker !== undefined)
         records.push({ assetId: assetTicker, date: today, close: price })
+    }
+    await this.priceHistory.upsertPrices(records)
+  }
+
+  /**
+   * Grava a cotação na data que a fonte declara, e usa o valor como preço de tela.
+   *
+   * O preço do Tesouro é o da última data-base publicada, que não é a de hoje. Carimbá-lo
+   * com hoje gravava o PU de um dia no outro — e deixava a série com a marca d'água em
+   * hoje, o que fazia o `runBackfill` pular o ativo e nunca preencher os dias que faltavam.
+   */
+  private async storeDatedQuotes(
+    fetched: ReadonlyMap<string, DatedPrice>,
+    symbolToAsset: ReadonlyMap<string, string>,
+    into: Map<string, number>,
+  ): Promise<void> {
+    const records: PriceRecord[] = []
+    for (const [symbol, [date, price]] of fetched) {
+      into.set(symbol, price)
+      const assetTicker = symbolToAsset.get(symbol)
+      if (assetTicker !== undefined) records.push({ assetId: assetTicker, date, close: price })
     }
     await this.priceHistory.upsertPrices(records)
   }

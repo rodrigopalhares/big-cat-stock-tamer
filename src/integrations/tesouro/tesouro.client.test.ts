@@ -18,7 +18,15 @@ describe('fetchQuotesBatch', () => {
 
     const result = await client().fetchQuotesBatch([SELIC_2029])
     // A data-base mais recente do fixture é 03/03/2024, com PU 14215,60.
-    expect(result.get(SELIC_2029)).toBeCloseTo(14215.6, 2)
+    expect(result.get(SELIC_2029)).toEqual(['2024-03-03', 14215.6])
+  })
+
+  it('devolve a data-base do arquivo junto do preço', async () => {
+    server.use(tesouroCsv('tesouro_direto_sample.csv'))
+
+    // O arquivo é publicado com atraso: quem grava precisa da data dele, não da de hoje.
+    const [date] = (await client().fetchQuotesBatch([SELIC_2029])).get(SELIC_2029) ?? []
+    expect(date).toBe('2024-03-03')
   })
 
   it('ticker que não é do Tesouro é ignorado', async () => {
@@ -103,8 +111,8 @@ describe('código curto do ativo', () => {
 
     const result = await client().fetchQuotesBatch(['TD:IPCA2026', 'TD:SELIC2027'])
 
-    expect(result.get('TD:IPCA2026')).toBeCloseTo(4708.05, 2)
-    expect(result.get('TD:SELIC2027')).toBeCloseTo(19548.33, 2)
+    expect(result.get('TD:IPCA2026')).toEqual(['2024-03-03', 4708.05])
+    expect(result.get('TD:SELIC2027')).toEqual(['2024-03-03', 19548.33])
   })
 
   it('IPCA sem sufixo não pega o preço do título com juros semestrais', async () => {
@@ -113,8 +121,8 @@ describe('código curto do ativo', () => {
     const result = await client().fetchQuotesBatch(['TD:IPCA2026', 'TD:IPCAJ2026'])
 
     // Mesmo vencimento, PU diferente: confundir os dois erraria o valor da carteira.
-    expect(result.get('TD:IPCA2026')).toBeCloseTo(4708.05, 2)
-    expect(result.get('TD:IPCAJ2026')).toBeCloseTo(4847.23, 2)
+    expect(result.get('TD:IPCA2026')?.[1]).toBeCloseTo(4708.05, 2)
+    expect(result.get('TD:IPCAJ2026')?.[1]).toBeCloseTo(4847.23, 2)
   })
 
   it('título vencido não tem cotação de hoje, mas tem histórico', async () => {

@@ -7,7 +7,7 @@ import {
   createPriceHistory,
   createTransaction,
 } from '../../../tests/factories.js'
-import { server, yahooChart } from '../../../tests/msw.js'
+import { server, tesouroCsv, yahooChart } from '../../../tests/msw.js'
 import { BcbClient } from '../../integrations/bcb/bcb.client.js'
 import { TesouroClient } from '../../integrations/tesouro/tesouro.client.js'
 import { YahooClient } from '../../integrations/yahoo/yahoo.client.js'
@@ -169,6 +169,24 @@ describe('PortfolioService', () => {
       expect(position?.currentPrice).toBeCloseTo(38.45, 2)
       const stored = await db.priceHistory.findFirst({ where: { assetId: 'PETR3', date: TODAY } })
       expect(stored?.close).toBeCloseTo(38.45, 2)
+    })
+
+    it('grava o preço do Tesouro na data-base do arquivo, não na de hoje', async () => {
+      server.use(tesouroCsv('tesouro_direto_sample.csv'))
+      await seedPosition('TD:SELIC2029', {
+        type: 'TESOURO_DIRETO',
+        yfTicker: 'Tesouro Selic;01/03/2029',
+      })
+
+      const [position] = await service.buildPositions(await db.asset.findMany(), true, TODAY)
+
+      // O PU é o da última data-base publicada (03/03/2024) e serve de preço de tela...
+      expect(position?.currentPrice).toBeCloseTo(14215.6, 2)
+      // ...mas no histórico ele entra com a data dele. Carimbar com hoje gravava o PU de um
+      // dia no outro e travava o `runBackfill`, que retoma do último preço gravado.
+      const stored = await db.priceHistory.findMany({ where: { assetId: 'TD:SELIC2029' } })
+      expect(stored.map((p) => p.date)).toEqual(['2024-03-03'])
+      expect(await db.priceHistory.count({ where: { date: TODAY } })).toBe(0)
     })
 
     it('ativo deslistado não é consultado na API', async () => {

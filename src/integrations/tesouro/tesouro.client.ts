@@ -81,9 +81,15 @@ export class TesouroClient {
     }
   }
 
-  /** Preço atual de cada título, pela data-base mais recente do arquivo. */
-  async fetchQuotesBatch(tickers: readonly string[]): Promise<Map<string, number>> {
-    const results = new Map<string, number>()
+  /**
+   * Preço atual de cada título, pela data-base mais recente do arquivo — **com a data**.
+   *
+   * O arquivo é publicado com um dia útil de atraso, então essa data quase nunca é hoje.
+   * Devolver só o número deixava quem grava sem saber disso, e o PU de ontem entrava no
+   * histórico carimbado com a data de hoje.
+   */
+  async fetchQuotesBatch(tickers: readonly string[]): Promise<Map<string, DatedPrice>> {
+    const results = new Map<string, DatedPrice>()
     if (tickers.length === 0) return results
 
     const rows = await this.fetchCsv()
@@ -96,8 +102,12 @@ export class TesouroClient {
 
       // Título vencido não aparece na data-base mais recente. Não é erro de digitação,
       // então sai calado — quem avisa é o `resolve`, que não achou o papel em lugar nenhum.
-      const price = rowsForTicker(latest, resolved.code)[0]?.puCompraManha
-      if (price !== null && price !== undefined && price > 0) results.set(ticker, price)
+      const row = rowsForTicker(latest, resolved.code)[0]
+      if (row === undefined) continue
+
+      const { dataBase, puCompraManha } = row
+      if (dataBase === null || puCompraManha === null || puCompraManha <= 0) continue
+      results.set(ticker, [dataBase, puCompraManha])
     }
     return results
   }

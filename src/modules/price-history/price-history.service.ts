@@ -238,7 +238,10 @@ export class PriceHistoryService {
   }
 
   /**
-   * Busca só o preço de hoje — roda no scheduler das 18:30.
+   * Busca a ponta da série — roda no scheduler das 18:30.
+   *
+   * No Yahoo isso é o preço de hoje. No Tesouro é a última data-base publicada, que vem
+   * com um dia útil de atraso, mais o que tiver ficado para trás desde o último gravado.
    *
    * Só de quem ainda está em carteira. Papel já vendido não muda mais o patrimônio nem a
    * evolução: a cotação de hoje dele não entra em conta nenhuma, e buscá-la só gastava
@@ -276,9 +279,25 @@ export class PriceHistoryService {
 
     if (maps.tdTickerMap.size > 0) {
       const batch = await this.tesouro.fetchHistoricalQuotesBatch([...maps.tdTickerMap.keys()])
+
+      // O arquivo do Tesouro sai com um dia útil de atraso — nunca traz a data de hoje.
+      // Filtrar por `date === today`, como se faz com o Yahoo, não casava nunca: a
+      // atualização diária gravava zero preço todo dia, em silêncio. O que interessa aqui
+      // é o que ainda não está no banco, inclusive o dia que ficou para trás porque a
+      // aplicação estava fora do ar.
+      const tdTickers = [...new Set(maps.tdTickerMap.values())]
+      const lastStored = new Map(
+        await Promise.all(
+          tdTickers.map(async (t) => [t, await this.getLastStoredDate(t)] as const),
+        ),
+      )
+      // Sem nada gravado, quem monta a série é o `runBackfill`; a atualização diária só
+      // emenda a ponta, senão um ativo recém-cadastrado puxaria o histórico inteiro aqui.
+      const floor = (ticker: string): IsoDate => lastStored.get(ticker) ?? addDays(today, -1)
+
       const records = filterBatchToRecords(
         batch,
-        (_ticker, date) => date === today,
+        (ticker, date) => date > floor(ticker) && date <= today,
         (key) => maps.tdTickerMap.get(key) ?? null,
       )
       await this.upsertPrices(records)
