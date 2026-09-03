@@ -7,6 +7,8 @@ import {
   calculatePosition,
   calculateUnrealizedPnl,
   calculateXirr,
+  findQuantityShortfall,
+  type QuantityEvent,
   type TransactionData,
 } from './calculation.js'
 import type { TransactionType } from './constants.js'
@@ -466,5 +468,64 @@ describe('calculateXirr', () => {
   it('valor atual entra na data informada', () => {
     const flows = [flow('2024-01-01', -1000)]
     expect(calculateXirr(flows, 1200, isoDate('2025-01-01')) as number).toBeCloseTo(0.2, 2)
+  })
+})
+
+describe('findQuantityShortfall', () => {
+  const ev = (type: TransactionType, quantity: number, date: string): QuantityEvent => ({
+    type,
+    quantity,
+    date: isoDate(date),
+  })
+  const buy100 = ev('BUY', 100, '2024-01-10')
+
+  it('venda dentro da posição passa, inclusive a que zera', () => {
+    expect(findQuantityShortfall([buy100], [ev('SELL', 100, '2024-02-10')])).toBeNull()
+  })
+
+  it('venda acima da posição acusa a candidata e o que havia na data', () => {
+    const sell = ev('SELL', 150, '2024-02-10')
+    expect(findQuantityShortfall([buy100], [sell])).toEqual({ candidate: sell, available: 100 })
+  })
+
+  it('venda com data anterior à compra não tem posição, mesmo com saldo hoje', () => {
+    const sell = ev('SELL', 50, '2023-12-01')
+    expect(findQuantityShortfall([buy100], [sell])).toEqual({ candidate: sell, available: 0 })
+  })
+
+  it('no mesmo dia a compra conta antes da venda, em qualquer ordem', () => {
+    const sameDay = [ev('SELL', 100, '2024-01-10'), ev('BUY', 100, '2024-01-10')]
+    expect(findQuantityShortfall([], sameDay)).toBeNull()
+  })
+
+  it('agrupamento também reduz e é barrado do mesmo jeito', () => {
+    const grouping = ev('AGRUPAMENTO', 101, '2024-03-10')
+    expect(findQuantityShortfall([buy100], [grouping])?.available).toBe(100)
+  })
+
+  it('redução de capital não mexe na quantidade', () => {
+    const events = [ev('REDUCAO_CAPITAL', 100, '2024-03-10'), ev('SELL', 100, '2024-04-10')]
+    expect(findQuantityShortfall([buy100], events)).toBeNull()
+  })
+
+  it('histórico já furado não bloqueia; só a candidata acusa', () => {
+    // A venda antiga de 150 sobre 100 é ignorada no que excede, como no cálculo de posição.
+    const broken = [buy100, ev('SELL', 150, '2024-02-10'), ev('BUY', 30, '2024-03-10')]
+    expect(findQuantityShortfall(broken, [ev('SELL', 30, '2024-04-10')])).toBeNull()
+    expect(findQuantityShortfall(broken, [ev('SELL', 31, '2024-04-10')])?.available).toBe(30)
+  })
+
+  it('o sinal gravado não importa — quem manda é o tipo', () => {
+    const existing = [buy100, ev('SELL', -100, '2024-02-10')]
+    expect(findQuantityShortfall(existing, [ev('SELL', 1, '2024-03-10')])?.available).toBe(0)
+  })
+
+  it('entre várias candidatas, acusa a primeira em ordem de data', () => {
+    const first = ev('SELL', 60, '2024-02-10')
+    const second = ev('SELL', 60, '2024-03-10')
+    expect(findQuantityShortfall([buy100], [second, first])).toEqual({
+      candidate: second,
+      available: 40,
+    })
   })
 })

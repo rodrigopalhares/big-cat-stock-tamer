@@ -133,6 +133,8 @@ describe('TransactionService', () => {
     })
 
     it('agrupamento é gravado com quantidade negativa', async () => {
+      await createTransaction(db, 'PETR4', { quantity: 1000 })
+
       const tx = await service.createTransaction('PETR4', {
         type: 'AGRUPAMENTO',
         quantity: 900,
@@ -169,6 +171,7 @@ describe('TransactionService', () => {
     })
 
     it('editar para agrupamento inverte o sinal e limpa o preço', async () => {
+      await createTransaction(db, 'PETR4', { quantity: 100, price: 20 })
       const created = await createTransaction(db, 'PETR4', { quantity: 100, price: 20 })
 
       await service.updateTransaction(created.id, {
@@ -273,6 +276,7 @@ describe('TransactionService', () => {
 
     it('venda é gravada com quantidade negativa', async () => {
       await createAsset(db, 'PETR4')
+      await createTransaction(db, 'PETR4', { quantity: 100 })
 
       const tx = await service.createTransaction('PETR4', {
         type: 'sell',
@@ -372,6 +376,7 @@ describe('TransactionService', () => {
   describe('updateTransaction e deleteTransaction', () => {
     it('atualiza e devolve o ticker afetado', async () => {
       await createAsset(db, 'PETR4')
+      await createTransaction(db, 'PETR4')
       const tx = await createTransaction(db, 'PETR4')
 
       const assetId = await service.updateTransaction(tx.id, {
@@ -410,6 +415,83 @@ describe('TransactionService', () => {
 
     it('apagar transação inexistente dá 404', async () => {
       await expect(service.deleteTransaction(9999)).rejects.toMatchObject({ statusCode: 404 })
+    })
+  })
+
+  describe('posição não pode ficar negativa', () => {
+    beforeEach(async () => {
+      await createAsset(db, 'ITUB3')
+      await createTransaction(db, 'ITUB3', { quantity: 1586, date: '2024-01-15' })
+    })
+
+    const sell = (quantity: number, date: string) => ({
+      type: 'SELL',
+      quantity,
+      price: 40,
+      fees: 0,
+      date: isoDate(date),
+    })
+
+    it('venda maior que a posição dá 400 dizendo quanto havia na data', async () => {
+      await expect(
+        service.createTransaction('ITUB3', sell(999999, '2026-01-01')),
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: 'Venda de 999.999 ITUB3 em 01/01/2026 supera a posição de 1.586 na data.',
+      })
+      expect(await db.transaction.count()).toBe(1)
+    })
+
+    it('venda com data anterior à compra é barrada mesmo havendo posição hoje', async () => {
+      await expect(
+        service.createTransaction('ITUB3', sell(10, '2023-12-01')),
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: 'Venda de 10 ITUB3 em 01/12/2023 supera a posição de 0 na data.',
+      })
+    })
+
+    it('venda que zera a posição passa', async () => {
+      await expect(
+        service.createTransaction('ITUB3', sell(1586, '2026-01-01')),
+      ).resolves.toBeDefined()
+    })
+
+    it('agrupamento acima da posição usa o próprio rótulo na mensagem', async () => {
+      await expect(
+        service.createTransaction('ITUB3', {
+          type: 'AGRUPAMENTO',
+          quantity: 2000,
+          price: 0,
+          fees: 0,
+          date: isoDate('2026-01-01'),
+        }),
+      ).rejects.toMatchObject({ statusCode: 400, message: /^Agrupamento de 2\.000 ITUB3/ })
+    })
+
+    it('editar a única compra para venda dá 400 — a linha em edição sai da conta', async () => {
+      const buy = await db.transaction.findFirstOrThrow()
+
+      await expect(service.updateTransaction(buy.id, sell(10, '2026-01-01'))).rejects.toMatchObject(
+        {
+          statusCode: 400,
+        },
+      )
+      expect((await db.transaction.findUniqueOrThrow({ where: { id: buy.id } })).type).toBe('BUY')
+    })
+
+    it('editar a própria venda não a conta duas vezes', async () => {
+      const existing = await service.createTransaction('ITUB3', sell(1586, '2025-01-01'))
+
+      await expect(
+        service.updateTransaction(existing.id, { ...sell(1586, '2025-01-01'), price: 41 }),
+      ).resolves.toBe('ITUB3')
+    })
+
+    it('quantidade zero dá 400', async () => {
+      await expect(
+        service.createTransaction('ITUB3', { ...sell(0, '2026-01-01'), type: 'BUY' }),
+      ).rejects.toMatchObject({ statusCode: 400, message: 'Quantidade deve ser maior que zero' })
     })
   })
 

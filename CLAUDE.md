@@ -110,6 +110,16 @@ existente: mexer num sem mexer no outro deixa histórico e ativo novo em classes
 A FK é `ON DELETE SET NULL` e ativo sem classe aparece no balde "Sem classe" de `/allocation/`,
 em vez de sumir da conta.
 
+**Posição não fica negativa, e quem garante é o service.** Venda ou agrupamento que deixaria a
+quantidade abaixo de zero em *qualquer ponto* do histórico é recusado com 400 — refazendo a
+sequência inteira por data, porque a venda lançada com data antiga passa batido em quem olha só
+o saldo de hoje. A regra vive em `TransactionService.assertPositionStaysNonNegative`, e não na
+rota, porque formulário, API e lote do CSV escrevem pelo mesmo caminho; o lote a roda para todas
+as linhas de um ticker antes de gravar a primeira, senão parar no meio deixaria metade no banco
+para duplicar no reenvio. Só a linha nova acusa: histórico já furado não trava o ativo. No mesmo
+dia, o que soma conta antes do que reduz. Provento segue a mesma ideia com valor bruto positivo e
+IR entre zero e o bruto.
+
 **Nada de rede dentro de transação.** O SQLite tem escritor único; segurar o lock durante uma
 chamada HTTP trava a aplicação inteira. Busque primeiro, escreva depois.
 

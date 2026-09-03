@@ -572,6 +572,29 @@ describe('rotas da aplicação', () => {
       expect(asset.avgPrice).toBeCloseTo(10, 4)
     })
 
+    it('venda acima da posição volta 400 em português e não grava', async () => {
+      await createAsset(h.db, 'ITUB3')
+      await createTransaction(h.db, 'ITUB3', { quantity: 1586, price: 20, date: '2024-01-02' })
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/transactions/new',
+        payload: {
+          ticker: 'ITUB3',
+          type: 'SELL',
+          quantity: '999999',
+          price: '40',
+          fees: '0',
+          date: '2026-01-01',
+          currency: 'BRL',
+        },
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(res.body).toContain('Venda de 999.999 ITUB3 em 01/01/2026 supera a posição de 1.586')
+      expect(await h.db.transaction.count()).toBe(1)
+    })
+
     it('agrupamento reduz a posição sem realizar resultado', async () => {
       await createAsset(h.db, 'PETR4')
       await createTransaction(h.db, 'PETR4', { quantity: 1000, price: 1, date: '2024-01-02' })
@@ -674,6 +697,7 @@ describe('rotas da aplicação', () => {
 
     it('a API JSON aceita evento societário e recusa tipo inventado', async () => {
       await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4', { quantity: 1000, price: 1, date: '2024-01-02' })
 
       const ok = await h.app.inject({
         method: 'POST',
@@ -687,7 +711,9 @@ describe('rotas da aplicação', () => {
         },
       })
       expect(ok.statusCode).toBe(201)
-      expect(await h.db.transaction.findFirstOrThrow()).toMatchObject({ quantity: -900 })
+      expect(
+        await h.db.transaction.findFirstOrThrow({ where: { type: 'AGRUPAMENTO' } }),
+      ).toMatchObject({ quantity: -900 })
 
       // Recusa sem gravar. O código é 500 porque o ZodError não carrega `statusCode` e o
       // setErrorHandler cai no padrão — vale para toda validação Zod do app, não só aqui.
@@ -697,7 +723,7 @@ describe('rotas da aplicação', () => {
         payload: { assetId: 'PETR4', type: 'XPTO', quantity: 1, price: 1, date: '2024-06-01' },
       })
       expect(bad.statusCode).toBeGreaterThanOrEqual(400)
-      expect(await h.db.transaction.count()).toBe(1)
+      expect(await h.db.transaction.count()).toBe(2)
     })
 
     it('a API JSON não deixa desdobramento gravar preço', async () => {

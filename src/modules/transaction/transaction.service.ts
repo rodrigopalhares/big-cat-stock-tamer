@@ -1,9 +1,11 @@
 import type { Db } from '../../config/db.js'
+import { findQuantityShortfall, type QuantityEvent } from '../../domain/calculation.js'
 import type { Currency } from '../../domain/constants.js'
 import type { Asset, Transaction } from '../../generated/prisma/client.js'
 import type { AssetInfoLookup } from '../../integrations/asset-info.client.js'
+import { quantity as fmtQuantity } from '../../shared/format.js'
 import { HttpError } from '../../shared/http-error.js'
-import type { IsoDate } from '../../shared/iso-date.js'
+import { type IsoDate, toBrazilianDate } from '../../shared/iso-date.js'
 import { transactionTypeMeta } from '../../shared/transaction-types.js'
 import type { AssetClassService } from '../allocation/asset-class.service.js'
 import type { ExchangeRateService } from '../exchange-rate/exchange-rate.service.js'
@@ -147,6 +149,15 @@ export class TransactionService {
     const tx = await this.db.transaction.findUnique({ where: { id } })
     if (tx === null) throw HttpError.notFound('Transaction not found')
 
+    assertQuantity(input.quantity)
+    const type = normalizeType(input.type)
+    // A própria linha sai da conta: é a versão nova dela que está em julgamento.
+    await this.assertPositionStaysNonNegative(
+      tx.assetId,
+      [{ type, quantity: input.quantity, date: input.date }],
+      id,
+    )
+
     const asset = await this.db.asset.findUnique({ where: { ticker: tx.assetId } })
     const assetCurrency = asset?.currency ?? 'BRL'
     const converted = await this.convertPrices(
@@ -157,7 +168,6 @@ export class TransactionService {
       input.date,
     )
 
-    const type = normalizeType(input.type)
     const meta = transactionTypeMeta(type)
     const normalized = normalizePriceFees(type, converted.price, converted.fees)
     const normalizedBrl = normalizePriceFees(type, converted.priceBrl, converted.feesBrl)
@@ -263,11 +273,54 @@ export class TransactionService {
       : { ticker: normalized, name: info.name, type: info.type, status: 'FOUND_ONLINE' }
   }
 
+  /**
+   * Recusa a redução (venda ou agrupamento) que deixaria a posição negativa em algum ponto
+   * do histórico — a venda de 999.999 ações de um papel com 1.586 entrava calada e virava
+   * um "Total Investido" negativo de milhões no dashboard.
+   *
+   * Fica no service, e não na rota, porque é um dos três caminhos de escrita (formulário,
+   * API e lote do CSV) e a regra vale para todos. Público porque o lote valida todas as
+   * linhas de um ticker de uma vez, antes de gravar qualquer uma.
+   *
+   * [excludeId] tira do histórico a linha em edição: quem está em julgamento é a versão nova.
+   */
+  async assertPositionStaysNonNegative(
+    assetId: string,
+    candidates: readonly QuantityEvent[],
+    excludeId?: number,
+  ): Promise<void> {
+    // Só quem reduz pode estourar; compra e evento que só soma não precisam da consulta.
+    if (candidates.every((c) => transactionTypeMeta(c.type).sign > 0)) return
+
+    const existing = await this.db.transaction.findMany({
+      where: { assetId, ...(excludeId === undefined ? {} : { id: { not: excludeId } }) },
+      select: { type: true, quantity: true, date: true },
+    })
+    const shortfall = findQuantityShortfall(
+      existing.map((t) => ({ ...t, date: t.date as IsoDate })),
+      candidates,
+    )
+    if (shortfall === null) return
+
+    const { candidate, available } = shortfall
+    throw HttpError.badRequest(
+      `${transactionTypeMeta(candidate.type).labelPt} de ${fmtQuantity(Math.abs(candidate.quantity))} ` +
+        `${assetId} em ${toBrazilianDate(candidate.date)} supera a posição de ` +
+        `${fmtQuantity(available)} na data.`,
+    )
+  }
+
   private async insert(
     asset: Asset,
     assetId: string,
     input: TransactionInput,
   ): Promise<Transaction> {
+    assertQuantity(input.quantity)
+    const type = normalizeType(input.type)
+    await this.assertPositionStaysNonNegative(assetId, [
+      { type, quantity: input.quantity, date: input.date },
+    ])
+
     const converted = await this.convertPrices(
       input.price,
       input.fees,
@@ -275,7 +328,6 @@ export class TransactionService {
       asset.currency,
       input.date,
     )
-    const type = normalizeType(input.type)
     const meta = transactionTypeMeta(type)
     const normalized = normalizePriceFees(type, converted.price, converted.fees)
     const normalizedBrl = normalizePriceFees(type, converted.priceBrl, converted.feesBrl)
@@ -321,6 +373,11 @@ export class TransactionService {
 
 function blankToNull(value: string | null | undefined): string | null {
   return value === undefined || value === null || value.trim() === '' ? null : value
+}
+
+/** Quantidade zero (ou NaN) gravaria uma linha que o cálculo ignora e a tabela mostra. */
+function assertQuantity(quantity: number): void {
+  if (!(Math.abs(quantity) > 0)) throw HttpError.badRequest('Quantidade deve ser maior que zero')
 }
 
 function normalizeType(type: string): string {

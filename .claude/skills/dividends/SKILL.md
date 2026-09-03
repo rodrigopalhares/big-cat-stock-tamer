@@ -145,6 +145,9 @@ class DividendService {
   // Uppercases ticker and type, converts to BRL, and calls transactions.findOrCreateAsset()
   // BEFORE the write — asset creation may hit the network, which must never happen
   // inside a write transaction.
+  // Rejects with 400 (HttpError) when totalAmount <= 0, taxWithheld < 0 or
+  // taxWithheld > totalAmount — `assertAmounts()`, shared with updateDividend(). The HTML
+  // `min` does not protect the batch or an edited preview, so the rule lives here.
 
   listDividends(ticker?, type?, assetType?): Promise<Dividend[]>     // date DESC
   // `type` é o tipo do PROVENTO (DIVIDENDO, JCP…); `assetType` é o do PAPEL (STOCK, REIT…)

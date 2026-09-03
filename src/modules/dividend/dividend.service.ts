@@ -27,6 +27,7 @@ export class DividendService {
   ) {}
 
   async createDividend(ticker: string, input: DividendInput): Promise<Dividend> {
+    assertAmounts(input)
     const normalized = ticker.trim().toUpperCase()
     const currency = input.currency || 'BRL'
     const converted = await this.convertToBrl(
@@ -93,6 +94,7 @@ export class DividendService {
     const existing = await this.db.dividend.findUnique({ where: { id } })
     if (existing === null) throw HttpError.notFound('Dividend not found')
 
+    assertAmounts(input)
     const currency = input.currency || 'BRL'
     const converted = await this.convertToBrl(
       input.totalAmount,
@@ -191,4 +193,17 @@ export class DividendService {
 
 function blankToNull(value: string | null | undefined): string | null {
   return value === undefined || value === null || value.trim() === '' ? null : value
+}
+
+/**
+ * Valor negativo passava pelo formulário e pelo lote (o `min` do HTML não vale para quem
+ * edita o preview) e entrava calado no total de proventos. A API já exigia positivo — aqui
+ * a regra vale para os três caminhos.
+ */
+function assertAmounts(input: DividendInput): void {
+  if (!(input.totalAmount > 0)) throw HttpError.badRequest('Valor bruto deve ser maior que zero')
+  if (!(input.taxWithheld >= 0)) throw HttpError.badRequest('IR retido não pode ser negativo')
+  if (input.taxWithheld > input.totalAmount) {
+    throw HttpError.badRequest('IR retido não pode superar o valor bruto')
+  }
 }

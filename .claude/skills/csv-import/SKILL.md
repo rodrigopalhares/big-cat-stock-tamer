@@ -34,7 +34,11 @@ User uploads broker note PDF -> CSV --┘
 3. **Step 2** parses every CSV line into transaction rows with validation. Error rows are
    editable and pre-marked as ignored. Ignored assets from step 1 carry over.
 4. **Submit** sends valid, non-ignored rows + new assets as JSON to the backend, which
-   persists everything in a single batch
+   persists everything in a single batch. `batchImport()` reorders the rows by date (and, on
+   the same day, position-increasing types before reducing ones) and validates every ticker
+   with `TransactionService.assertPositionStaysNonNegative()` **before** writing the first
+   row: a sale above the position rejects the whole batch with a 400 in Portuguese, so a
+   resend never duplicates the rows that were valid. The client shows that message verbatim.
 
 Both tables come sorted by `sortByImportOrder()` (`src/domain/csv/import-order.ts`): status
 first (erro → desconhecido → novo → existente), then type, then name — ticker where there is
@@ -240,6 +244,11 @@ table; it flows from the client's `pendingBrokerNoteId` through `/transactions/b
 ### Changing validation rules
 - Validation logic is in `parseSingleRow()` inside `transaction-csv.ts`
 - Return `errorRow("message")` for invalid data — the row will appear in step 2 as editable + pre-ignored
+- Rules that need the database (today: a sale or agrupamento may not leave the position
+  negative at any point of the history) live in `TransactionService`, not in the parser —
+  they must hold for the form and the API too. The batch runs them per ticker up front; the
+  per-row `createTransaction()` runs them again, which is why the rows are inserted in date
+  order.
 
 ### Modifying the ignore behavior
 - Step 1 ignore: checkbox with class `asset-ignore-check`, handler `onAssetIgnoreToggle()`

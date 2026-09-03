@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { clearAllData, createTestDb, type TestDb } from '../../../tests/db.js'
-import { createAsset } from '../../../tests/factories.js'
+import { createAsset, createTransaction } from '../../../tests/factories.js'
 import { server, yahooChart, yahooChartBySymbol } from '../../../tests/msw.js'
 import { buildXlsx, movimentacaoXlsx } from '../../../tests/xlsx.js'
 import { BcbClient } from '../../integrations/bcb/bcb.client.js'
@@ -184,6 +184,7 @@ describe('CsvImportService', () => {
 
     it('venda entra com quantidade negativa', async () => {
       await createAsset(db, 'PETR4')
+      await createTransaction(db, 'PETR4', { quantity: 1000 })
 
       await service.batchImport([
         {
@@ -199,12 +200,13 @@ describe('CsvImportService', () => {
         },
       ])
 
-      const tx = await db.transaction.findFirstOrThrow()
+      const tx = await db.transaction.findFirstOrThrow({ where: { type: 'SELL' } })
       expect(tx.quantity).toBe(-50)
     })
 
     it('agrupamento entra com quantidade negativa mesmo vindo positivo', async () => {
       await createAsset(db, 'PETR4')
+      await createTransaction(db, 'PETR4', { quantity: 1000 })
 
       await service.batchImport([
         {
@@ -220,7 +222,7 @@ describe('CsvImportService', () => {
         },
       ])
 
-      const tx = await db.transaction.findFirstOrThrow()
+      const tx = await db.transaction.findFirstOrThrow({ where: { type: 'AGRUPAMENTO' } })
       expect(tx).toMatchObject({ type: 'AGRUPAMENTO', quantity: -900 })
     })
 
@@ -264,6 +266,62 @@ describe('CsvImportService', () => {
 
       const tx = await db.transaction.findFirstOrThrow()
       expect(tx).toMatchObject({ type: 'BONIFICACAO', quantity: 10, price: 5, fees: 0 })
+    })
+
+    it('venda acima da posição recusa o lote inteiro sem gravar nada', async () => {
+      await createAsset(db, 'PETR4')
+      await createTransaction(db, 'PETR4', { quantity: 100, date: '2024-01-15' })
+
+      const row = (type: string, quantity: number, date: string) => ({
+        ticker: 'PETR4',
+        date,
+        type,
+        quantity,
+        price: 30,
+        fees: 0,
+        broker: '',
+        notes: '',
+        currency: 'BRL',
+      })
+
+      await expect(
+        service.batchImport([row('BUY', 50, '2024-06-01'), row('SELL', 500, '2024-06-02')]),
+      ).rejects.toMatchObject({
+        statusCode: 400,
+        message: 'Venda de 500 PETR4 em 02/06/2024 supera a posição de 150 na data.',
+      })
+      // A compra válida do mesmo lote também ficou de fora: reenviar não duplica nada.
+      expect(await db.transaction.count()).toBe(1)
+    })
+
+    it('compra e venda do mesmo dia entram em qualquer ordem, gravadas em ordem de data', async () => {
+      await createAsset(db, 'PETR4')
+
+      const row = (type: string, quantity: number, date: string) => ({
+        ticker: 'PETR4',
+        date,
+        type,
+        quantity,
+        price: 30,
+        fees: 0,
+        broker: '',
+        notes: '',
+        currency: 'BRL',
+      })
+
+      const inserted = await service.batchImport([
+        row('SELL', 100, '2024-06-02'),
+        row('SELL', 100, '2024-06-01'),
+        row('BUY', 200, '2024-06-01'),
+      ])
+
+      expect(inserted).toBe(3)
+      const saved = await db.transaction.findMany({ orderBy: { id: 'asc' } })
+      expect(saved.map((t) => [t.date, t.type])).toEqual([
+        ['2024-06-01', 'BUY'],
+        ['2024-06-01', 'SELL'],
+        ['2024-06-02', 'SELL'],
+      ])
     })
 
     it('lista vazia insere zero', async () => {

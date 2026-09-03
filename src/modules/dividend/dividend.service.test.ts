@@ -132,6 +132,58 @@ describe('DividendService', () => {
     })
   })
 
+  describe('valores', () => {
+    const input = (totalAmount: number, taxWithheld: number) => ({
+      type: 'DIVIDENDO',
+      date: isoDate('2024-03-01'),
+      totalAmount,
+      taxWithheld,
+    })
+
+    it('valor bruto negativo ou zero dá 400 sem gravar', async () => {
+      await createAsset(db, 'PETR4')
+
+      await expect(service.createDividend('PETR4', input(-5, 0))).rejects.toMatchObject({
+        statusCode: 400,
+        message: 'Valor bruto deve ser maior que zero',
+      })
+      await expect(service.createDividend('PETR4', input(0, 0))).rejects.toMatchObject({
+        statusCode: 400,
+      })
+      expect(await db.dividend.count()).toBe(0)
+    })
+
+    it('IR retido negativo dá 400', async () => {
+      await createAsset(db, 'PETR4')
+
+      await expect(service.createDividend('PETR4', input(100, -1))).rejects.toMatchObject({
+        statusCode: 400,
+        message: 'IR retido não pode ser negativo',
+      })
+    })
+
+    it('IR retido maior que o bruto dá 400', async () => {
+      await createAsset(db, 'PETR4')
+
+      await expect(service.createDividend('PETR4', input(100, 100.01))).rejects.toMatchObject({
+        statusCode: 400,
+        message: 'IR retido não pode superar o valor bruto',
+      })
+      await expect(service.createDividend('PETR4', input(100, 100))).resolves.toBeDefined()
+    })
+
+    it('a edição passa pela mesma regra', async () => {
+      await createAsset(db, 'PETR4')
+      const existing = await createDividend(db, 'PETR4')
+
+      await expect(service.updateDividend(existing.id, input(-5, 0))).rejects.toMatchObject({
+        statusCode: 400,
+      })
+      const saved = await db.dividend.findUniqueOrThrow({ where: { id: existing.id } })
+      expect(saved.totalAmount).toBe(100)
+    })
+  })
+
   describe('listDividends', () => {
     beforeEach(async () => {
       await createAsset(db, 'PETR4')
