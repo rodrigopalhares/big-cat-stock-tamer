@@ -65,12 +65,12 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
       const asset = await c.db.asset.findUnique({
         where: { ticker: req.params.ticker.toUpperCase() },
       })
-      if (asset === null) throw HttpError.notFound('Asset not found')
+      if (asset === null) throw HttpError.notFound('Ativo não encontrado')
 
       const positions = await c.portfolio.buildPositions([asset], true)
       const position = positions[0]
       if (position === undefined) {
-        throw HttpError.notFound('No transactions found for this asset')
+        throw HttpError.notFound('Este ativo não tem transações')
       }
       return position
     })

@@ -129,7 +129,7 @@ export class TransactionService {
   ): Promise<Transaction> {
     const normalized = assetId.toUpperCase()
     const asset = await this.db.asset.findUnique({ where: { ticker: normalized } })
-    if (asset === null) throw HttpError.notFound('Asset not found')
+    if (asset === null) throw HttpError.notFound('Ativo não encontrado')
     return this.insert(asset, asset.ticker, input)
   }
 
@@ -147,7 +147,7 @@ export class TransactionService {
 
   async updateTransaction(id: number, input: TransactionInput): Promise<string> {
     const tx = await this.db.transaction.findUnique({ where: { id } })
-    if (tx === null) throw HttpError.notFound('Transaction not found')
+    if (tx === null) throw HttpError.notFound('Transação não encontrada')
 
     assertQuantity(input.quantity)
     const type = normalizeType(input.type)
@@ -192,7 +192,7 @@ export class TransactionService {
 
   async deleteTransaction(id: number): Promise<string> {
     const tx = await this.db.transaction.findUnique({ where: { id } })
-    if (tx === null) throw HttpError.notFound('Transaction not found')
+    if (tx === null) throw HttpError.notFound('Transação não encontrada')
     await this.db.transaction.delete({ where: { id } })
     return tx.assetId
   }

@@ -595,6 +595,38 @@ describe('rotas da aplicação', () => {
       expect(await h.db.transaction.count()).toBe(1)
     })
 
+    it('o lote do CSV pede JSON e recebe o motivo em JSON, não a página de erro', async () => {
+      await createAsset(h.db, 'ITUB3')
+      await createTransaction(h.db, 'ITUB3', { quantity: 1586, price: 20, date: '2024-01-02' })
+
+      const res = await h.app.inject({
+        method: 'POST',
+        url: '/transactions/batch',
+        headers: { accept: 'application/json' },
+        payload: {
+          rows: [
+            {
+              ticker: 'ITUB3',
+              date: '2026-09-02',
+              type: 'SELL',
+              quantity: 5000,
+              price: 40,
+              fees: 0,
+              broker: '',
+              notes: '',
+              currency: 'BRL',
+            },
+          ],
+        },
+      })
+
+      expect(res.statusCode).toBe(400)
+      expect(res.json()).toEqual({
+        error: 'Venda de 5.000 ITUB3 em 02/09/2026 supera a posição de 1.586 na data.',
+      })
+      expect(await h.db.transaction.count()).toBe(1)
+    })
+
     it('agrupamento reduz a posição sem realizar resultado', async () => {
       await createAsset(h.db, 'PETR4')
       await createTransaction(h.db, 'PETR4', { quantity: 1000, price: 1, date: '2024-01-02' })
@@ -715,14 +747,14 @@ describe('rotas da aplicação', () => {
         await h.db.transaction.findFirstOrThrow({ where: { type: 'AGRUPAMENTO' } }),
       ).toMatchObject({ quantity: -900 })
 
-      // Recusa sem gravar. O código é 500 porque o ZodError não carrega `statusCode` e o
-      // setErrorHandler cai no padrão — vale para toda validação Zod do app, não só aqui.
+      // Recusa sem gravar: o ZodError vira 400 no setErrorHandler, com o campo em português.
       const bad = await h.app.inject({
         method: 'POST',
         url: '/transactions/api',
         payload: { assetId: 'PETR4', type: 'XPTO', quantity: 1, price: 1, date: '2024-06-01' },
       })
-      expect(bad.statusCode).toBeGreaterThanOrEqual(400)
+      expect(bad.statusCode).toBe(400)
+      expect(bad.json().details[0]).toMatch(/^Tipo deve ser um destes: BUY, SELL/)
       expect(await h.db.transaction.count()).toBe(2)
     })
 

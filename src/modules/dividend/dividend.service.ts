@@ -92,7 +92,7 @@ export class DividendService {
 
   async updateDividend(id: number, input: DividendInput): Promise<void> {
     const existing = await this.db.dividend.findUnique({ where: { id } })
-    if (existing === null) throw HttpError.notFound('Dividend not found')
+    if (existing === null) throw HttpError.notFound('Provento não encontrado')
 
     assertAmounts(input)
     const currency = input.currency || 'BRL'
@@ -121,7 +121,7 @@ export class DividendService {
 
   async deleteDividend(id: number): Promise<void> {
     const existing = await this.db.dividend.findUnique({ where: { id } })
-    if (existing === null) throw HttpError.notFound('Dividend not found')
+    if (existing === null) throw HttpError.notFound('Provento não encontrado')
     await this.db.dividend.delete({ where: { id } })
   }
 

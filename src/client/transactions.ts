@@ -7,6 +7,7 @@
  */
 
 import { transactionTypeMetaOrNull } from '../shared/transaction-types.js'
+import { ACCEPT_HTML_OR_JSON, ACCEPT_JSON, errorMessage } from './lib/http.js'
 
 type AssetDraft = {
   ticker: string
@@ -281,10 +282,13 @@ async function parseNote(): Promise<void> {
   body.append('file', file)
 
   try {
-    const response = await fetch('/transactions/parse-note', { method: 'POST', body })
-    const text = await response.text()
-    if (!response.ok) throw new Error(text === '' ? `Erro ${response.status}` : text)
-    area.innerHTML = text
+    const response = await fetch('/transactions/parse-note', {
+      method: 'POST',
+      headers: ACCEPT_HTML_OR_JSON,
+      body,
+    })
+    if (!response.ok) throw new Error(await errorMessage(response, `Erro ${response.status}`))
+    area.innerHTML = await response.text()
   } catch (error) {
     setError(area, error)
   } finally {
@@ -438,8 +442,14 @@ async function goToPreviewStep(): Promise<void> {
   const body = new URLSearchParams({ csv: rawCsv.value })
 
   try {
-    const response = await fetch('/transactions/parse-csv-step2', { method: 'POST', body })
-    if (!response.ok) throw new Error(`Erro ao processar: ${response.status}`)
+    const response = await fetch('/transactions/parse-csv-step2', {
+      method: 'POST',
+      headers: ACCEPT_HTML_OR_JSON,
+      body,
+    })
+    if (!response.ok) {
+      throw new Error(await errorMessage(response, `Erro ao processar: ${response.status}`))
+    }
     setPreview(await response.text())
 
     for (const tr of Array.from(
@@ -521,10 +531,13 @@ async function submitBatch(): Promise<void> {
   try {
     const response = await fetch('/transactions/batch', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...ACCEPT_JSON },
       body: JSON.stringify(payload),
     })
-    if (!response.ok) throw new Error(`Erro ao importar: ${response.status}`)
+    // O corpo traz o motivo em português (ex.: venda acima da posição); o status sozinho não.
+    if (!response.ok) {
+      throw new Error(await errorMessage(response, `Erro ao importar: ${response.status}`))
+    }
     location.href = '/transactions/'
   } catch (error) {
     setPreviewError(error)

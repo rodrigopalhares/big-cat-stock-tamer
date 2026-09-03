@@ -70,7 +70,7 @@ export class AssetClassService {
   async assignAsset(ticker: string, classId: number | null): Promise<void> {
     const normalized = ticker.trim().toUpperCase()
     const asset = await this.db.asset.findUnique({ where: { ticker: normalized } })
-    if (asset === null) throw HttpError.notFound('Asset not found')
+    if (asset === null) throw HttpError.notFound('Ativo não encontrado')
     if (classId !== null) await this.findOrFail(classId)
 
     await this.db.asset.update({ where: { ticker: normalized }, data: { assetClassId: classId } })

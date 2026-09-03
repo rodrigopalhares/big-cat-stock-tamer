@@ -91,7 +91,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
     app.get<{ Params: { ticker: string } }>('/assets/:ticker', async (req, reply) => {
       const ticker = req.params.ticker.toUpperCase()
       const asset = await c.assets.findById(ticker)
-      if (asset === null) throw HttpError.notFound('Asset not found')
+      if (asset === null) throw HttpError.notFound('Ativo não encontrado')
 
       const [entity, transactions, dividends, classes] = await Promise.all([
         c.db.asset.findUniqueOrThrow({ where: { ticker } }),
@@ -188,7 +188,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
 
     app.get<{ Params: { ticker: string } }>('/assets/api/:ticker', async (req) => {
       const asset = await c.assets.findById(req.params.ticker)
-      if (asset === null) throw HttpError.notFound('Asset not found')
+      if (asset === null) throw HttpError.notFound('Ativo não encontrado')
       return asset
     })
   }

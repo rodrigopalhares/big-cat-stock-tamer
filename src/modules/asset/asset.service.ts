@@ -109,7 +109,7 @@ export class AssetService {
   ): Promise<AssetUpdateResult> {
     const normalized = ticker.toUpperCase()
     const current = await this.db.asset.findUnique({ where: { ticker: normalized } })
-    if (current === null) throw HttpError.notFound('Asset not found')
+    if (current === null) throw HttpError.notFound('Ativo não encontrado')
 
     // Id inválido viraria erro de FK do Prisma, que sai como 500. Confere antes.
     if (fields.assetClassId !== undefined && fields.assetClassId !== null) {
@@ -154,7 +154,7 @@ export class AssetService {
 
   async delete(ticker: string): Promise<void> {
     const normalized = ticker.toUpperCase()
-    if (!(await this.exists(normalized))) throw HttpError.notFound('Asset not found')
+    if (!(await this.exists(normalized))) throw HttpError.notFound('Ativo não encontrado')
     // As transações, proventos, preços e snapshots saem por ON DELETE CASCADE.
     await this.db.asset.delete({ where: { ticker: normalized } })
   }

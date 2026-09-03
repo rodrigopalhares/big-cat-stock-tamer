@@ -74,7 +74,10 @@ Verificadas pelo `dependency-cruiser` no CI, não só combinadas:
 - Arquivos em `kebab-case`, com sufixo `.service.ts`, `.routes.ts`, `.schema.ts`, `.test.ts`.
 - Sem `export default` — sempre nomeado.
 - `any` proibido; use `unknown` + validação Zod na fronteira externa.
-- Erros de aplicação via `HttpError`; um único `setErrorHandler` decide HTML ou JSON.
+- Erros de aplicação via `HttpError`; um único `setErrorHandler` (`src/plugins/errors.ts`) decide
+  JSON, fragmento HTMX ou a página de erro com layout. `ZodError` vira 400 ali mesmo, com uma frase
+  em português por campo (`src/shared/validation-message.ts`) — rota não precisa de `safeParse`.
+  Mensagem de `HttpError` é texto de tela: escreva em português.
 - Cor de tipo de ativo sai de `src/shared/asset-colors.ts` — gráficos e badges leem do mesmo
   mapa, então STOCK é o mesmo azul em toda a interface. Tipo novo entra lá, e só lá.
 

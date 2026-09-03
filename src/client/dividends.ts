@@ -3,6 +3,8 @@
  * Porte de static/js/dividends.js.
  */
 
+import { ACCEPT_HTML_OR_JSON, ACCEPT_JSON, errorMessage } from './lib/http.js'
+
 declare const bootstrap: { Modal: new (el: Element) => { show: () => void } }
 
 const byId = <T extends HTMLElement>(id: string): T | null =>
@@ -45,10 +47,13 @@ async function parseXlsx(): Promise<void> {
   body.append('file', file)
 
   try {
-    const response = await fetch('/dividends/parse-xlsx', { method: 'POST', body })
-    const text = await response.text()
-    if (!response.ok) throw new Error(text === '' ? `Erro ${response.status}` : text)
-    area.innerHTML = text
+    const response = await fetch('/dividends/parse-xlsx', {
+      method: 'POST',
+      headers: ACCEPT_HTML_OR_JSON,
+      body,
+    })
+    if (!response.ok) throw new Error(await errorMessage(response, `Erro ${response.status}`))
+    area.innerHTML = await response.text()
   } catch (error) {
     showError(area, error instanceof Error ? error.message : String(error))
   } finally {
@@ -141,10 +146,13 @@ async function submitBatch(): Promise<void> {
   try {
     const response = await fetch('/dividends/batch', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...ACCEPT_JSON },
       body: JSON.stringify({ rows }),
     })
-    if (!response.ok) throw new Error(`Erro ao importar: ${response.status}`)
+    // O corpo traz o motivo em português (ex.: valor bruto negativo); o status sozinho não.
+    if (!response.ok) {
+      throw new Error(await errorMessage(response, `Erro ao importar: ${response.status}`))
+    }
     location.href = '/dividends/'
   } catch (error) {
     showError(area, error instanceof Error ? error.message : String(error))
