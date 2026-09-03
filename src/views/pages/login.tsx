@@ -1,7 +1,16 @@
 import { BareLayout } from '../layout.js'
 
 /** Porte de src/main/resources/templates/login.html. */
-export function LoginPage({ error = false }: { error?: boolean }) {
+
+export type LoginError = 'invalid' | 'blocked'
+
+export type LoginPageProps = {
+  error?: LoginError
+  /** Quanto falta do bloqueio, em segundos. Só usado quando `error` é 'blocked'. */
+  retryAfterSeconds?: number
+}
+
+export function LoginPage({ error, retryAfterSeconds = 0 }: LoginPageProps) {
   return (
     <BareLayout title="Entrar — Carteira">
       <div class="d-flex align-items-center justify-content-center" style="min-height: 100vh;">
@@ -13,9 +22,16 @@ export function LoginPage({ error = false }: { error?: boolean }) {
               <p class="text-secondary small mb-0">Acesso restrito</p>
             </div>
 
-            {error && (
+            {error === 'invalid' && (
               <div class="alert alert-danger py-2 small" role="alert">
                 <i class="bi bi-exclamation-triangle-fill me-1" /> Senha incorreta.
+              </div>
+            )}
+
+            {error === 'blocked' && (
+              <div class="alert alert-warning py-2 small" role="alert">
+                <i class="bi bi-shield-lock-fill me-1" /> Muitas tentativas erradas. Tente de novo
+                em {waitLabel(retryAfterSeconds)}.
               </div>
             )}
 
@@ -43,4 +59,11 @@ export function LoginPage({ error = false }: { error?: boolean }) {
       </div>
     </BareLayout>
   )
+}
+
+/** Arredonda para cima: "em 0 minutos" mandaria tentar de novo antes da hora. */
+function waitLabel(seconds: number): string {
+  if (seconds <= 60) return 'um minuto'
+  const minutes = Math.ceil(seconds / 60)
+  return `${minutes} minutos`
 }

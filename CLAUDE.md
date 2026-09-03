@@ -187,6 +187,12 @@ assimetria é de propósito, porque errar para o lado "ligado" nunca abre a apli
 As sessões são persistidas em `${APP_DATA_DIR}/auth.key` como *hashes* de token — o arquivo
 nunca guarda o token em claro, então vazá-lo não dá acesso a ninguém.
 
+Tentativas erradas são contadas por IP, em memória: cinco numa janela de um minuto bloqueiam, e
+o bloqueio cresce (1 min, 5, 15). Comparar em tempo constante defende de ataque por temporização,
+não de volume — e com um segredo só protegendo tudo, num processo que escuta em `0.0.0.0`, é o
+volume que importa. O `level` do cliente sobrevive uma hora ao fim do bloqueio; sem isso bastaria
+esperar um minuto para ganhar cinco tentativas novas, para sempre.
+
 ## Histórico
 
 Este projeto era Kotlin/Spring Boot e foi migrado para TypeScript. O plano, as decisões e o

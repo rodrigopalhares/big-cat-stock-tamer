@@ -18,16 +18,24 @@ export function authRoutes(c: Container, sessionDays: number): FastifyPluginAsyn
 
     app.post('/login', async (req, reply) => {
       const { password } = LoginForm.parse(req.body)
-      const token = c.auth.login(password)
+      // O IP identifica o cliente para a contagem de tentativas.
+      const result = c.auth.login(password, req.ip)
 
-      if (token === null) {
-        // Mesma página com o aviso — sem redirect, para não expor o erro na URL.
-        return reply.code(401).html(LoginPage({ error: true }))
+      if (result.ok) {
+        return reply
+          .setCookie(SESSION_COOKIE, result.token, sessionCookieOptions(sessionDays * 86_400))
+          .redirect('/portfolio/', 302)
       }
 
-      return reply
-        .setCookie(SESSION_COOKIE, token, sessionCookieOptions(sessionDays * 86_400))
-        .redirect('/portfolio/', 302)
+      if (result.reason === 'blocked') {
+        return reply
+          .code(429)
+          .header('Retry-After', String(result.retryAfterSeconds))
+          .html(LoginPage({ error: 'blocked', retryAfterSeconds: result.retryAfterSeconds }))
+      }
+
+      // Mesma página com o aviso — sem redirect, para não expor o erro na URL.
+      return reply.code(401).html(LoginPage({ error: 'invalid' }))
     })
 
     app.post('/logout', async (req, reply) => {
