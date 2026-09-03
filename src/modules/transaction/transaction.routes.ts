@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { Container } from '../../container.js'
 import { HttpError } from '../../shared/http-error.js'
 import { isoDate, today as todayIso } from '../../shared/iso-date.js'
+import { internalPath } from '../../shared/safe-redirect.js'
 import { TransactionTickerInfo } from '../../views/components/ticker-info.js'
 import { TransactionsPage } from '../../views/pages/transactions.js'
 import { BrokerNotePreview } from '../../views/partials/broker-note-preview.js'
@@ -131,7 +132,7 @@ export function transactionRoutes(c: Container): FastifyPluginAsync {
       })
       await c.assets.refreshPositionFields(form.ticker)
 
-      return reply.redirect(form.returnTo ?? '/transactions/', 302)
+      return reply.redirect(internalPath(form.returnTo, '/transactions/'), 302)
     })
 
     app.post<{ Params: { id: string } }>('/transactions/:id/edit', async (req, reply) => {
@@ -155,14 +156,14 @@ export function transactionRoutes(c: Container): FastifyPluginAsync {
         inputCurrency: form.currency,
       })
       await c.assets.refreshPositionFields(assetId)
-      return reply.redirect(form.returnTo ?? '/transactions/', 302)
+      return reply.redirect(internalPath(form.returnTo, '/transactions/'), 302)
     })
 
     app.post<{ Params: { id: string } }>('/transactions/:id/delete', async (req, reply) => {
       const { returnTo } = z.object({ returnTo: z.string().optional() }).parse(req.body ?? {})
       const assetId = await c.transactions.deleteTransaction(Number(req.params.id))
       await c.assets.refreshPositionFields(assetId)
-      return reply.redirect(returnTo ?? '/transactions/', 302)
+      return reply.redirect(internalPath(returnTo, '/transactions/'), 302)
     })
 
     // --- Importação de CSV ---

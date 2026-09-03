@@ -286,6 +286,32 @@ describe('rotas de ativos', () => {
 
       expect(res.headers.location).toBe('/assets/PETR4')
     })
+
+    /**
+     * `returnTo` é do usuário e ia direto para o Location — era o achado F3 da auditoria.
+     * `//host` parece caminho relativo e o navegador lê como URL absoluta.
+     */
+    it.each(['https://evil.example.com/phish', '//evil.example.com/', '/\\evil.example.com'])(
+      'recusa o destino externo %s e volta para a lista',
+      async (returnTo) => {
+        await createAsset(h.db, 'PETR4')
+
+        const res = await h.app.inject({
+          method: 'POST',
+          url: '/assets/PETR4/edit',
+          payload: {
+            name: 'x',
+            type: 'STOCK',
+            yf_ticker: '',
+            currency: 'BRL',
+            returnTo,
+          },
+        })
+
+        expect(res.statusCode).toBe(302)
+        expect(res.headers.location).toBe('/assets/')
+      },
+    )
   })
 
   describe('POST /assets/:ticker/delete', () => {

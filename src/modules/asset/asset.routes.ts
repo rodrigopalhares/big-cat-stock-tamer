@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { Container } from '../../container.js'
 import { HttpError } from '../../shared/http-error.js'
 import { today as todayIso } from '../../shared/iso-date.js'
+import { internalPath } from '../../shared/safe-redirect.js'
 import { AssetTickerInfo } from '../../views/components/ticker-info.js'
 import { AssetDetailPage } from '../../views/pages/asset-detail.js'
 import { AssetsPage } from '../../views/pages/assets.js'
@@ -15,19 +16,6 @@ import { AssetFilters, AssetRequest } from './asset.schema.js'
 const TickerQuery = z.object({ ticker: z.string().default('') })
 
 const PriceWarningQuery = z.object({ prices: z.string().optional(), ticker: z.string().optional() })
-
-/**
- * Para onde a edição volta.
- *
- * O campo `returnTo` do modal é sempre enviado, e vem **vazio** quando a edição partiu da
- * lista. String vazia não é `null`, então `?? '/assets/'` não a pegava e o `redirect('')`
- * era resolvido pelo navegador relativo à URL do POST — parando em `/assets/PETR4/edit`,
- * que só aceita POST. Em branco é ausente, não destino.
- */
-function destinationOf(returnTo: string | undefined): string {
-  const trimmed = returnTo?.trim() ?? ''
-  return trimmed === '' ? '/assets/' : trimmed
-}
 
 /** Anexa o aviso preservando a query que o destino já tenha. */
 function withPriceWarning(destination: string, ticker: string | null): string {
@@ -181,7 +169,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
       // Símbolo trocado e busca vazia: o histórico ficou como estava, e quase sempre é
       // porque o símbolo novo não existe. Sem este aviso o usuário sai achando que corrigiu.
       const warn = result.refetchedPrices === 0 ? req.params.ticker : null
-      return reply.redirect(withPriceWarning(destinationOf(form.returnTo), warn), 302)
+      return reply.redirect(withPriceWarning(internalPath(form.returnTo, '/assets/'), warn), 302)
     })
 
     app.post<{ Params: { ticker: string } }>('/assets/:ticker/delete', async (req, reply) => {
