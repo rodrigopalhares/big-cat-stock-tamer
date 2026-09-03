@@ -48,7 +48,7 @@ describe('autenticação', () => {
 
   describe('com senha configurada', () => {
     beforeEach(async () => {
-      await start('segredo')
+      await start('senha-de-teste-longa')
     })
 
     it('rota protegida sem sessão redireciona para o login', async () => {
@@ -85,7 +85,7 @@ describe('autenticação', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/login',
-        payload: { password: 'segredo' },
+        payload: { password: 'senha-de-teste-longa' },
       })
 
       expect(res.statusCode).toBe(302)
@@ -110,7 +110,7 @@ describe('autenticação', () => {
       const login = await app.inject({
         method: 'POST',
         url: '/login',
-        payload: { password: 'segredo' },
+        payload: { password: 'senha-de-teste-longa' },
       })
       const token = sessionFrom(login.headers['set-cookie'])
 
@@ -127,7 +127,7 @@ describe('autenticação', () => {
       const login = await app.inject({
         method: 'POST',
         url: '/login',
-        payload: { password: 'segredo' },
+        payload: { password: 'senha-de-teste-longa' },
       })
       const token = sessionFrom(login.headers['set-cookie'])
 

@@ -180,7 +180,10 @@ ou desconhecido fica em branco e vai para a revisão manual.
 
 ## Autenticação
 
-Usuário único, senha em `APP_AUTH_PASSWORD`. Em branco, autenticação desabilitada.
+Usuário único, senha em `APP_AUTH_PASSWORD` — **obrigatória**, mínimo 12 caracteres. Campo
+em branco derruba o boot: desligar a autenticação exige `APP_AUTH_DISABLED=true` explícito, e
+essa flag não é aceita com `NODE_ENV=production`. Com senha configurada a flag é ignorada — a
+assimetria é de propósito, porque errar para o lado "ligado" nunca abre a aplicação sem querer.
 As sessões são persistidas em `${APP_DATA_DIR}/auth.key` como *hashes* de token — o arquivo
 nunca guarda o token em claro, então vazá-lo não dá acesso a ninguém.
 

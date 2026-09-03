@@ -51,6 +51,11 @@ arquivo: `process.loadEnvFile` **não** sobrescreve o ambiente, então o `.env` 
 
 O arquivo tem a chave da Anthropic e a senha de acesso — mantenha em `chmod 600`.
 
+A senha **não é opcional aqui**: com `NODE_ENV=production` o `loadEnv` recusa subir sem
+`APP_AUTH_PASSWORD` (mínimo 12 caracteres), e o `APP_AUTH_DISABLED=true` que existe para
+desenvolvimento não vale em produção. É a mesma ideia do `ExecStartPre` abaixo: falhar no
+start com o motivo no `systemctl status` é melhor do que subir a carteira aberta na rede.
+
 ### O caminho dos dados aparece duas vezes
 
 `ReadWritePaths=` não expande variável de ambiente — `systemd.exec(5)` deixa claro que a
