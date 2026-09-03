@@ -51,8 +51,27 @@ document.addEventListener('click', (event) => {
     return
   }
 
+  const exampleTrigger = target?.closest<HTMLElement>('[data-csv-example]')
+  if (exampleTrigger !== null && exampleTrigger !== undefined) {
+    fillCsvExample(exampleTrigger)
+    return
+  }
+
   if (target?.closest('[data-theme-toggle]') !== null) toggleTheme()
 })
+
+/**
+ * "Preencher com um exemplo" copia as linhas de `data-csv-example-source` para o textarea
+ * do CSV. O exemplo mora num `<textarea hidden>` porque é o único lugar em que tab e quebra
+ * de linha sobrevivem intactos no HTML.
+ */
+function fillCsvExample(trigger: HTMLElement): void {
+  const target = document.getElementById(trigger.dataset['csvExample'] ?? '')
+  const source = document.getElementById(trigger.dataset['csvExampleSource'] ?? '')
+  if (!(target instanceof HTMLTextAreaElement) || !(source instanceof HTMLTextAreaElement)) return
+  target.value = source.value
+  target.focus()
+}
 
 // --- tema (era static/js/theme.js, que dependia de um `toggleTheme` global) ---
 
@@ -89,6 +108,18 @@ function openEditAssetModal(trigger: HTMLElement): void {
   // Sem data-return-to (a lista), o formulário volta para /assets/ pelo padrão do servidor.
   setValue('editReturnTo', d['returnTo'] ?? '')
 
+  // O formulário de exclusão fica fora do de edição (form não aninha) e ganha aqui o alvo e
+  // a confirmação com o que some junto — é o número que faz a pessoa parar antes de clicar.
+  const deleteForm = document.getElementById('deleteAssetForm')
+  if (deleteForm instanceof HTMLFormElement) {
+    deleteForm.action = `/assets/${ticker}/delete`
+    deleteForm.dataset['confirm'] = deleteConfirmMessage(
+      ticker,
+      Number(d['assetTransactionCount'] ?? 0),
+      Number(d['assetDividendCount'] ?? 0),
+    )
+  }
+
   const modal = document.getElementById('editAssetModal')
   if (modal !== null) new bootstrap.Modal(modal).show()
 }
@@ -113,6 +144,15 @@ function openAssetClassModal(trigger: HTMLElement | null): void {
 
   const modal = document.getElementById('assetClassModal')
   if (modal !== null) new bootstrap.Modal(modal).show()
+}
+
+function deleteConfirmMessage(ticker: string, transactions: number, dividends: number): string {
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+  const gone =
+    transactions === 0 && dividends === 0
+      ? 'Ele não tem transações nem proventos.'
+      : `Somem junto ${plural(transactions, 'transação', 'transações')} e ${plural(dividends, 'provento', 'proventos')}.`
+  return `Excluir ${ticker}? ${gone} Não dá para desfazer.`
 }
 
 function setText(id: string, value: string): void {

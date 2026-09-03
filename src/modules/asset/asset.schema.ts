@@ -40,9 +40,17 @@ export type AssetView = {
   /** Classe de alocação; null é o balde "Sem classe" de `/allocation/`. */
   assetClassId: number | null
   createdAt: Date
+  /** O que a exclusão leva junto — é o número que a confirmação mostra. */
+  transactionCount: number
+  dividendCount: number
 }
 
-export function toAssetView(asset: Asset): AssetView {
+/** O `_count` vem do `include` das consultas de listagem; quem não o pede fica com zero. */
+export type AssetWithCounts = Asset & {
+  _count?: { transactions: number; dividends: number }
+}
+
+export function toAssetView(asset: AssetWithCounts): AssetView {
   return {
     ticker: asset.ticker,
     yfTicker: asset.yfTicker,
@@ -53,5 +61,7 @@ export function toAssetView(asset: Asset): AssetView {
     hasPosition: asset.hasPosition,
     assetClassId: asset.assetClassId,
     createdAt: asset.createdAt,
+    transactionCount: asset._count?.transactions ?? 0,
+    dividendCount: asset._count?.dividends ?? 0,
   }
 }

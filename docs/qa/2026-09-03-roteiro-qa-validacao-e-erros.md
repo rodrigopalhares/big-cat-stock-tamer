@@ -188,6 +188,67 @@ curl -s -i -X POST localhost:3999/transactions/new \
 - [ ] Dashboard, Ativos, Alocação, Proventos, Evolução e Risk Metrics abrem sem erro.
 - [ ] No final, o Histórico está em 513 e Proventos em 2.059 (se apagou o que criou).
 
+## F. Fase 1 — feedback e rótulos
+
+- [ ] Menu diz **Risco** (não "Risk Metrics"); a página abre como "Métricas de Risco" e o
+  card diz "Última atualização" com acento. A navbar não mostra mais "Fastify + TypeScript".
+- [ ] Títulos de aba terminam em "— Carteira" em todas as telas.
+- [ ] Badges e selects de tipo de ativo estão em português: "Ação", "FII", "Tesouro Direto",
+  "Renda Fixa". Passe o mouse num badge: o `title` mostra o código (`TESOURO_DIRETO`).
+- [ ] Legenda dos dois gráficos do dashboard também em português.
+- [ ] Transações: os filtros dizem **Tipo de ativo** e **Operação**. Escolha "Venda" em
+  Operação → só vendas na lista; a URL ganha `operation=SELL`.
+- [ ] Proventos: filtros dizem **Tipo de ativo** e **Provento**.
+- [ ] Evolução → **Recalcular**: o botão vira "Recalculando..." com spinner, a página segue
+  responsiva, e recarrega sozinha ao terminar (~1 min). Nada de aba travada.
+- [ ] Dashboard sem snapshot (cópia recém-criada, antes de recalcular): no lugar do gráfico
+  aparece um card explicando e com o mesmo botão Recalcular.
+
+## G. Fase 2 — listas grandes
+
+- [ ] Transações abre com 100 linhas e o badge "Histórico" mostra o total (513). Role até o
+  fim: aparece "Carregando mais..." e as próximas 100 entram sem recarregar a página. Repita
+  até acabar — a última página não tem sentinela.
+- [ ] Com filtro (ex.: Tipo de ativo = FII), a rolagem continua respeitando o filtro.
+- [ ] Busca: digite `itub` e Enter → só ITUB3/ITUB4; o campo fica preenchido em maiúsculas;
+  o X limpa tudo.
+- [ ] Ano: escolha 2026 → só lançamentos de 2026; combina com a busca.
+- [ ] Proventos: mesma rolagem; o cabeçalho mostra "R$ X líquidos" de **tudo** que o filtro
+  pegou (mude o ano e veja o valor mudar). Com 2.059 linhas a página abre rápido.
+- [ ] Evolução: gráfico em cima; a tabela começa no mês mais recente; só ativos com posição
+  têm coluna; rolagem carrega 36 meses por vez.
+- [ ] Editar e excluir uma linha carregada pela rolagem (além da página 1) funciona normalmente.
+
+## H. Fase 3 — tabela de posições e celular
+
+- [ ] Dashboard: a tabela rola dentro da própria área; cabeçalho e coluna do ticker ficam
+  fixos ao rolar (vertical e horizontal); a linha Total gruda embaixo.
+- [ ] Moeda e TIR/mês começam escondidas; "Colunas extras" mostra as duas e a escolha
+  sobrevive a um F5.
+- [ ] Depois de cada grupo de tipo há uma linha "Subtotal Ação · N ativos" com custo, valor,
+  lucro, proventos e TIR do grupo. Filtrar por tipo mantém só o subtotal daquele tipo; ordenar
+  por qualquer coluna esconde os subtotais.
+- [ ] Ordenação por coluna continua funcionando (clique em "Valor Atual").
+- [ ] Celular (ou janela com ~400px): cards do resumo em duas colunas; em Transações,
+  Proventos e Ativos o formulário começa recolhido e o botão "Nova/Novo" no topo abre-o. No
+  desktop (≥ 992px) o formulário aparece direto, sem botão.
+
+## I. Fase 4 — exclusão e acessibilidade
+
+- [ ] Ativos: as linhas têm só "Ver transações" e "Editar", lado a lado; não há lixeira.
+- [ ] Editar um ativo com lançamentos → no rodapé do modal, à esquerda, **Excluir**. O
+  confirm diz "Excluir PETR4? Somem junto N transações e M proventos. Não dá para desfazer."
+  com os números certos. Cancele.
+- [ ] Ativo sem lançamentos: o confirm diz "Ele não tem transações nem proventos."
+- [ ] Confirme a exclusão de um ativo de teste criado para isso → volta para a lista sem ele.
+- [ ] Importar CSV (transações e proventos): "Preencher com um exemplo" põe três linhas no
+  textarea, com tabs; "Baixar modelo (.tsv)" baixa o arquivo. Processar o exemplo funciona
+  (PETR4 existe; VOO pode aparecer como novo).
+- [ ] Clique num rótulo de campo (ex.: "Quantidade") → o foco vai para o campo. Vale para os
+  formulários de transação, provento, ativo e para os modais.
+- [ ] Com leitor de tela ou inspecionando: os botões de lápis e lixeira têm `aria-label`
+  ("Editar transação", "Excluir provento"…), assim como o botão de tema e o de sair.
+
 ## Se algo falhar
 
 Anote o caso (A1, B2…), o que apareceu na tela e, se for erro 500, o trecho de

@@ -194,6 +194,7 @@ function ClassCard({
                 type="button"
                 class="btn btn-sm btn-outline-primary"
                 title="Editar classe"
+                aria-label={`Editar classe ${bucket.name}`}
                 data-edit-class
                 data-class-id={String(bucket.id)}
                 data-class-name={bucket.name}
@@ -206,6 +207,7 @@ function ClassCard({
                 type="button"
                 class="btn btn-sm btn-outline-danger"
                 title="Excluir classe"
+                aria-label={`Excluir classe ${bucket.name}`}
                 hx-delete={`/allocation/classes/${bucket.id}`}
                 hx-target="#allocation-body"
                 hx-swap="outerHTML"
@@ -372,7 +374,7 @@ function AssetClassModal() {
               <h5 class="modal-title" id="assetClassModalTitle">
                 Nova classe
               </h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" />
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar" />
             </div>
             <div class="modal-body">
               <div class="mb-3">

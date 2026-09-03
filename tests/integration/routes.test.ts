@@ -1287,6 +1287,62 @@ describe('rotas da aplicação', () => {
     })
   })
 
+  describe('exclusão de ativo e acessibilidade', () => {
+    it('a lista não tem mais lixeira por linha; excluir fica no modal, com a contagem do que some', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4')
+      await createDividend(h.db, 'PETR4')
+
+      const res = await h.app.inject({ method: 'GET', url: '/assets/' })
+
+      expect(res.body).not.toContain('action="/assets/PETR4/delete"')
+      expect(res.body).toContain('data-asset-transaction-count="2"')
+      expect(res.body).toContain('data-asset-dividend-count="1"')
+      expect(res.body).toContain('form="deleteAssetForm"')
+      expect(res.body).toContain('id="deleteAssetForm"')
+      expect(res.body).toContain('aria-label="Editar PETR4"')
+    })
+
+    it('o detalhe do ativo traz as mesmas contagens para o modal', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4')
+
+      const res = await h.app.inject({ method: 'GET', url: '/assets/PETR4' })
+      expect(res.body).toContain('data-asset-transaction-count="1"')
+      expect(res.body).toContain('data-asset-dividend-count="0"')
+    })
+
+    it('botões só com ícone têm aria-label e todo rótulo aponta para o seu campo', async () => {
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4')
+
+      const res = await h.app.inject({ method: 'GET', url: '/transactions/' })
+
+      expect(res.body).toContain('aria-label="Excluir transação"')
+      expect(res.body).toContain('aria-label="Editar transação"')
+      expect(res.body).toContain('for="txDate"')
+      expect(res.body).toContain('id="txDate"')
+      expect(res.body).toContain('for="txType"')
+      // Nenhum rótulo de formulário sem `for` sobrou.
+      expect(res.body).not.toMatch(/<label class="form-label">/)
+    })
+
+    it('a importação oferece um exemplo copiável e um modelo para baixar', async () => {
+      const page = await h.app.inject({ method: 'GET', url: '/transactions/' })
+      expect(page.body).toContain('data-csv-example="csvTextarea"')
+      expect(page.body).toContain('id="csvExampleText"')
+      expect(page.body).toContain('href="/modelos/transacoes.tsv"')
+
+      const model = await h.app.inject({ method: 'GET', url: '/modelos/transacoes.tsv' })
+      expect(model.statusCode).toBe(200)
+      expect(model.body).toContain('PETR4\t01/01/2024\tC\t100')
+
+      const dividends = await h.app.inject({ method: 'GET', url: '/dividends/' })
+      expect(dividends.body).toContain('href="/modelos/proventos.tsv"')
+    })
+  })
+
   describe('rótulos da interface', () => {
     it('o menu diz Risco, a página diz Métricas de Risco e a navbar não expõe a stack', async () => {
       const res = await h.app.inject({ method: 'GET', url: '/risk-metrics/' })

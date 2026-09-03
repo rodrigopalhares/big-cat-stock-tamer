@@ -13,6 +13,13 @@ import { Layout } from '../layout.js'
 const NOTE_DISABLED_REASON =
   'Leitura de nota desativada: configure APP_ANTHROPIC_API_KEY para habilitar.'
 
+/** Três linhas com tab de verdade — o placeholder não dá para copiar. */
+const CSV_EXAMPLE = [
+  'PETR4\t01/01/2024\tC\t100\t25,50\t10,00\tXP\t0\tBRL\tcompra inicial',
+  'PETR4\t15/03/2024\tV\t50\t30,00\t8,00\tXP\t0\tBRL\t',
+  'VOO\t10/02/2024\tC\t2\t450,00\t0,00\tAvenue\t0\tUSD\tETF em dólar',
+].join('\n')
+
 export type TransactionsPageProps = {
   /** Primeira página do histórico — o resto chega pela rolagem infinita. */
   transactions: TransactionView[]
@@ -139,7 +146,9 @@ function CsvImportModal({ noteImportEnabled }: { noteImportEnabled: boolean }) {
                 role="tabpanel"
               >
                 <div class="flex-shrink-0 mb-3">
-                  <label class="form-label">Cole os dados do CSV (separado por tab):</label>
+                  <label class="form-label" for="csvTextarea">
+                    Cole os dados do CSV (separado por tab):
+                  </label>
                   <textarea
                     id="csvTextarea"
                     name="csv"
@@ -158,6 +167,23 @@ function CsvImportModal({ noteImportEnabled }: { noteImportEnabled: boolean }) {
                     R.CAP = redução de capital: a quantidade é a base de ações e o preço é o valor
                     devolvido por ação, que abate o preço médio.
                   </div>
+                  <div class="form-text">
+                    <button
+                      type="button"
+                      class="btn btn-link btn-sm p-0 align-baseline"
+                      data-csv-example="csvTextarea"
+                      data-csv-example-source="csvExampleText"
+                    >
+                      Preencher com um exemplo
+                    </button>
+                    {' · '}
+                    <a href="/modelos/transacoes.tsv" download>
+                      Baixar modelo (.tsv)
+                    </a>
+                  </div>
+                  <textarea id="csvExampleText" hidden readOnly>
+                    {CSV_EXAMPLE}
+                  </textarea>
                 </div>
                 <div class="flex-shrink-0 mb-3">
                   <button
@@ -282,7 +308,7 @@ function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageP
       <div class="card-body">
         <form method="post" action="/transactions/new">
           <div class="mb-3">
-            <label class="form-label">
+            <label class="form-label" for="tickerInput">
               Ticker <span class="text-danger">*</span>
             </label>
             {selectedTicker === null ? (
@@ -321,7 +347,7 @@ function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageP
           </div>
 
           <div class="mb-3">
-            <label class="form-label">
+            <label class="form-label" for="txType">
               Tipo <span class="text-danger">*</span>
             </label>
             <TransactionTypeSelect idPrefix="tx" selected="BUY" />
@@ -329,7 +355,9 @@ function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageP
           </div>
 
           <div class="mb-3">
-            <label class="form-label">Moeda</label>
+            <label class="form-label" for="txCurrency">
+              Moeda
+            </label>
             <select name="currency" id="txCurrency" class="form-select">
               <option value="BRL" selected>
                 BRL
@@ -340,7 +368,7 @@ function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageP
 
           <div class="row g-2 mb-3">
             <div class="col-6">
-              <label class="form-label">
+              <label class="form-label" for="txQty">
                 Quantidade <span class="text-danger">*</span>
               </label>
               <input
@@ -354,7 +382,7 @@ function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageP
               />
             </div>
             <div class="col-6" id="txPriceCol">
-              <label class="form-label" id="txPriceLabel">
+              <label class="form-label" id="txPriceLabel" for="txPrice">
                 Preço Unit.
               </label>
               <input
@@ -371,7 +399,9 @@ function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageP
 
           <div class="row g-2 mb-3" id="txMarketExtrasRow">
             <div class="col-6">
-              <label class="form-label">Valor Bruto</label>
+              <label class="form-label" for="txTotal">
+                Valor Bruto
+              </label>
               <input
                 type="number"
                 id="txTotal"
@@ -384,7 +414,9 @@ function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageP
               <div class="form-text small">Qtd × preço, sem as taxas</div>
             </div>
             <div class="col-6">
-              <label class="form-label">Taxas</label>
+              <label class="form-label" for="txFees">
+                Taxas
+              </label>
               <input
                 type="number"
                 id="txFees"
@@ -398,18 +430,41 @@ function NewTransactionForm({ assets, selectedTicker, today }: TransactionsPageP
           </div>
 
           <div class="mb-3">
-            <label class="form-label">
+            <label class="form-label" for="txDate">
               Data <span class="text-danger">*</span>
             </label>
-            <input type="date" name="date" class="form-control" value={today} required />
+            <input
+              id="txDate"
+              type="date"
+              name="date"
+              class="form-control"
+              value={today}
+              required
+            />
           </div>
           <div class="mb-3">
-            <label class="form-label">Corretora</label>
-            <input type="text" name="broker" class="form-control" placeholder="Ex: Clear, XP" />
+            <label class="form-label" for="txBroker">
+              Corretora
+            </label>
+            <input
+              id="txBroker"
+              type="text"
+              name="broker"
+              class="form-control"
+              placeholder="Ex: Clear, XP"
+            />
           </div>
           <div class="mb-3">
-            <label class="form-label">Notas</label>
-            <textarea name="notes" class="form-control" rows={2} placeholder="Opcional" />
+            <label class="form-label" for="txNotes">
+              Notas
+            </label>
+            <textarea
+              id="txNotes"
+              name="notes"
+              class="form-control"
+              rows={2}
+              placeholder="Opcional"
+            />
           </div>
           <button type="submit" class="btn btn-primary w-100">
             <i class="bi bi-check-lg" /> Registrar
@@ -636,6 +691,7 @@ function TransactionRow({ transaction: t }: { transaction: TransactionView }) {
           type="button"
           class="btn btn-sm btn-outline-primary border-0"
           title="Editar"
+          aria-label="Editar transação"
           data-edit-tx
           data-tx-id={String(t.id)}
           data-tx-type={t.type}
@@ -655,7 +711,12 @@ function TransactionRow({ transaction: t }: { transaction: TransactionView }) {
           class="d-inline"
           data-confirm="Excluir esta transação?"
         >
-          <button type="submit" class="btn btn-sm btn-outline-danger border-0">
+          <button
+            type="submit"
+            class="btn btn-sm btn-outline-danger border-0"
+            title="Excluir"
+            aria-label="Excluir transação"
+          >
             <i class="bi bi-trash" />
           </button>
         </form>
@@ -684,16 +745,20 @@ export function TransactionModal() {
               <i class="bi bi-pencil" id="editTxModalIcon" />{' '}
               <span id="editTxModalTitle">Editar Transação</span>
             </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" />
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar" />
           </div>
           <form id="editTxForm" method="post">
             <div class="modal-body">
               <div class="mb-3">
-                <label class="form-label">Tipo</label>
+                <label class="form-label" for="editTxType">
+                  Tipo
+                </label>
                 <TransactionTypeSelect idPrefix="editTx" selected={null} />
               </div>
               <div class="mb-3">
-                <label class="form-label">Moeda</label>
+                <label class="form-label" for="editTxCurrency">
+                  Moeda
+                </label>
                 <select id="editTxCurrency" name="currency" class="form-select">
                   <option value="BRL">BRL</option>
                   <option value="USD">USD</option>
@@ -702,7 +767,9 @@ export function TransactionModal() {
               {/* Quantidade e data valem para todo tipo; preço e taxas, só quando há negócio. */}
               <div class="row g-2 mb-3">
                 <div class="col-6">
-                  <label class="form-label">Quantidade</label>
+                  <label class="form-label" for="editTxQty">
+                    Quantidade
+                  </label>
                   <input
                     type="number"
                     id="editTxQty"
@@ -714,13 +781,15 @@ export function TransactionModal() {
                   />
                 </div>
                 <div class="col-6">
-                  <label class="form-label">Data</label>
+                  <label class="form-label" for="editTxDate">
+                    Data
+                  </label>
                   <input type="date" id="editTxDate" name="date" class="form-control" required />
                 </div>
               </div>
               <div class="row g-2 mb-3" id="editTxMarketRow">
                 <div class="col-6" id="editTxPriceCol">
-                  <label class="form-label" id="editTxPriceLabel">
+                  <label class="form-label" id="editTxPriceLabel" for="editTxPrice">
                     Preço Unit.
                   </label>
                   <input
@@ -736,7 +805,9 @@ export function TransactionModal() {
               </div>
               <div class="row g-2 mb-3" id="editTxMarketExtrasRow">
                 <div class="col-6">
-                  <label class="form-label">Valor Bruto</label>
+                  <label class="form-label" for="editTxTotal">
+                    Valor Bruto
+                  </label>
                   <input
                     type="number"
                     id="editTxTotal"
@@ -749,7 +820,9 @@ export function TransactionModal() {
                   <div class="form-text small">Qtd × preço, sem as taxas</div>
                 </div>
                 <div class="col-6" id="editTxFeesCol">
-                  <label class="form-label">Taxas</label>
+                  <label class="form-label" for="editTxFees">
+                    Taxas
+                  </label>
                   <input
                     type="number"
                     id="editTxFees"
@@ -762,11 +835,15 @@ export function TransactionModal() {
                 </div>
               </div>
               <div class="mb-3">
-                <label class="form-label">Corretora</label>
+                <label class="form-label" for="editTxBroker">
+                  Corretora
+                </label>
                 <input type="text" id="editTxBroker" name="broker" class="form-control" />
               </div>
               <div class="mb-3">
-                <label class="form-label">Notas</label>
+                <label class="form-label" for="editTxNotes">
+                  Notas
+                </label>
                 <textarea id="editTxNotes" name="notes" class="form-control" rows={2} />
               </div>
             </div>

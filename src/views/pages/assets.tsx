@@ -52,7 +52,7 @@ export function AssetsPage({
         {error !== null && (
           <div class="alert alert-danger alert-dismissible fade show" role="alert">
             <span>{error}</span>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" />
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar" />
           </div>
         )}
 
@@ -112,7 +112,7 @@ function CreateAssetForm() {
       <div class="card-body">
         <form method="post" action="/assets/new">
           <div class="mb-3">
-            <label class="form-label">
+            <label class="form-label" for="assetTicker">
               Ticker <span class="text-danger">*</span>
             </label>
             <input
@@ -133,7 +133,9 @@ function CreateAssetForm() {
             <input type="hidden" id="assetYfTicker" name="yf_ticker" value="" />
           </div>
           <div class="mb-3">
-            <label class="form-label">Nome</label>
+            <label class="form-label" for="assetName">
+              Nome
+            </label>
             <input
               type="text"
               id="assetName"
@@ -143,7 +145,9 @@ function CreateAssetForm() {
             />
           </div>
           <div class="mb-3">
-            <label class="form-label">Tipo</label>
+            <label class="form-label" for="assetType">
+              Tipo
+            </label>
             <select id="assetType" name="type" class="form-select">
               {ASSET_TYPES.map((t) => (
                 <option value={t}>{assetTypeLabel(t)}</option>
@@ -151,7 +155,9 @@ function CreateAssetForm() {
             </select>
           </div>
           <div class="mb-3">
-            <label class="form-label">Moeda</label>
+            <label class="form-label" for="assetCurrency">
+              Moeda
+            </label>
             <select id="assetCurrency" name="currency" class="form-select">
               <option value="BRL" selected>
                 BRL — Real
@@ -246,32 +252,27 @@ function AssetTable({ assets }: { assets: AssetView[] }) {
                 <span class="badge bg-light text-dark border">{asset.currency}</span>
               </td>
               <td class="text-muted small">{asset.yfTicker ?? '—'}</td>
-              <td class="text-center">
-                <a
-                  href={`/transactions/?ticker=${encodeURIComponent(asset.ticker)}`}
-                  class="btn btn-sm btn-outline-secondary"
-                  title="Ver transações"
-                >
-                  <i class="bi bi-list-ul" />
-                </a>
-                <button
-                  type="button"
-                  class="btn btn-sm btn-outline-primary"
-                  title="Editar"
-                  {...editAssetAttrs(asset)}
-                >
-                  <i class="bi bi-pencil" />
-                </button>
-                <form
-                  method="post"
-                  action={`/assets/${asset.ticker}/delete`}
-                  class="d-inline"
-                  data-confirm={`Excluir ${asset.ticker}? As transações também serão removidas.`}
-                >
-                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Excluir">
-                    <i class="bi bi-trash" />
+              <td class="text-center text-nowrap">
+                {/* Excluir mora no modal de edição, com a contagem do que some junto. */}
+                <div class="btn-group btn-group-sm">
+                  <a
+                    href={`/transactions/?ticker=${encodeURIComponent(asset.ticker)}`}
+                    class="btn btn-outline-secondary"
+                    title="Ver transações"
+                    aria-label={`Ver transações de ${asset.ticker}`}
+                  >
+                    <i class="bi bi-list-ul" />
+                  </a>
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary"
+                    title="Editar"
+                    aria-label={`Editar ${asset.ticker}`}
+                    {...editAssetAttrs(asset)}
+                  >
+                    <i class="bi bi-pencil" />
                   </button>
-                </form>
+                </div>
               </td>
             </tr>
           ))}
@@ -287,7 +288,7 @@ export function PriceWarning({ warning }: { warning: string | null }) {
   return (
     <div class="alert alert-warning alert-dismissible fade show" role="alert">
       <i class="bi bi-exclamation-triangle" /> <span>{warning}</span>
-      <button type="button" class="btn-close" data-bs-dismiss="alert" />
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fechar" />
     </div>
   )
 }

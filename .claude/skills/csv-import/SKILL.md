@@ -46,6 +46,12 @@ no name. What needs attention is always at the top, and the ordering is the same
 dividend preview. The sort is stable, so tied rows keep the order they had in the CSV; the
 `#` column still shows the original line number.
 
+Under the textarea there is a "Preencher com um exemplo" button — `data-csv-example` /
+`data-csv-example-source`, handled in `client/ui.ts`, copies a hidden `<textarea
+id="csvExampleText">` (the only place tabs and newlines survive in HTML) into the CSV field —
+and a `download` link to `public/modelos/transacoes.tsv`. Keep the example and the file in sync
+with the column format.
+
 The modal has two tabs. The **Nota de negociação** tab (hidden when `APP_ANTHROPIC_API_KEY`
 is blank) uploads a broker note PDF, shows a preview, and the **Usar no CSV** button drops
 the extracted CSV into the same textarea — from there the flow above is unchanged. See

@@ -174,6 +174,13 @@ class DividendService {
 
 `blankToNull()` turns empty/whitespace `broker` and `notes` into `null` on write.
 
+Form field ids: the "Novo Provento" form uses `newDiv*` (`newDivTicker`, `newDivType`,
+`newDivCurrency`, `newDivTotalAmount`, `newDivTaxWithheld`, `newDivDate`, `newDivNotes`), the edit
+modal uses `editDiv*`. Every `<label>` has a `for` — Biome's `noLabelWithoutControl` is on for
+`src/views/`. The CSV tab has a "Preencher com um exemplo" button (`data-csv-example`, handled in
+`client/ui.ts`, copying a hidden `<textarea id="divCsvExampleText">`) and a download link to
+`public/modelos/proventos.tsv`.
+
 ## Routes
 
 All registered by `dividendRoutes(container)` in `dividend.routes.ts`.

@@ -90,6 +90,9 @@ function Navbar({ path }: { path: string }) {
           type="button"
           data-bs-toggle="collapse"
           data-bs-target="#navMenu"
+          aria-controls="navMenu"
+          aria-expanded="false"
+          aria-label="Abrir menu"
         >
           <span class="navbar-toggler-icon" />
         </button>
@@ -112,11 +115,12 @@ function Navbar({ path }: { path: string }) {
             type="button"
             data-theme-toggle
             title="Alternar tema"
+            aria-label="Alternar tema"
           >
             <i class="bi bi-moon-fill" />
           </button>
           <form method="post" action="/logout" class="d-inline">
-            <button type="submit" class="btn btn-link nav-link px-2" title="Sair">
+            <button type="submit" class="btn btn-link nav-link px-2" title="Sair" aria-label="Sair">
               <i class="bi bi-box-arrow-right" />
             </button>
           </form>

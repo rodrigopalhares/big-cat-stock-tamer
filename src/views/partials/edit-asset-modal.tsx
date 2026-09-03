@@ -19,14 +19,16 @@ export function EditAssetModal({ classes }: { classes: AssetClassView[] }) {
             <h5 class="modal-title">
               <i class="bi bi-pencil" /> Editar Ativo — <span id="editModalTicker" />
             </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" />
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar" />
           </div>
           <form id="editAssetForm" method="post">
             {/* Preenchido pelo gatilho: a lista volta para /assets/, o detalhe para si mesmo. */}
             <input type="hidden" id="editReturnTo" name="returnTo" value="" />
             <div class="modal-body">
               <div class="mb-3">
-                <label class="form-label">Nome</label>
+                <label class="form-label" for="editName">
+                  Nome
+                </label>
                 <input
                   type="text"
                   id="editName"
@@ -36,7 +38,9 @@ export function EditAssetModal({ classes }: { classes: AssetClassView[] }) {
                 />
               </div>
               <div class="mb-3">
-                <label class="form-label">Tipo</label>
+                <label class="form-label" for="editType">
+                  Tipo
+                </label>
                 <select id="editType" name="type" class="form-select">
                   {ASSET_TYPES.map((t) => (
                     <option value={t}>{assetTypeLabel(t)}</option>
@@ -44,7 +48,7 @@ export function EditAssetModal({ classes }: { classes: AssetClassView[] }) {
                 </select>
               </div>
               <div class="mb-3">
-                <label class="form-label">
+                <label class="form-label" for="editAssetClass">
                   Classe <span class="text-muted small">(alocação)</span>
                 </label>
                 <select id="editAssetClass" name="asset_class_id" class="form-select">
@@ -55,7 +59,7 @@ export function EditAssetModal({ classes }: { classes: AssetClassView[] }) {
                 </select>
               </div>
               <div class="mb-3">
-                <label class="form-label">
+                <label class="form-label" for="editYfTicker">
                   YF Ticker <span class="text-muted small">(Yahoo Finance)</span>
                 </label>
                 <input
@@ -67,7 +71,9 @@ export function EditAssetModal({ classes }: { classes: AssetClassView[] }) {
                 />
               </div>
               <div class="mb-3">
-                <label class="form-label">Moeda</label>
+                <label class="form-label" for="editCurrency">
+                  Moeda
+                </label>
                 <select id="editCurrency" name="currency" class="form-select">
                   <option value="BRL">BRL — Real</option>
                   <option value="USD">USD — Dólar</option>
@@ -86,15 +92,37 @@ export function EditAssetModal({ classes }: { classes: AssetClassView[] }) {
                 </label>
               </div>
             </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                Cancelar
+            <div class="modal-footer justify-content-between">
+              {/*
+                Excluir saiu da lista — era uma lixeira por linha, ao lado do lápis, apagando
+                transações e proventos em cascata com um confirm genérico. Aqui ele fica atrás
+                de "Editar" e a confirmação diz quantos lançamentos somem (`client/ui.ts`).
+                O botão aponta para o formulário de fora por `form=`: form não aninha.
+              */}
+              <button
+                type="submit"
+                form="deleteAssetForm"
+                class="btn btn-outline-danger"
+                aria-label="Excluir ativo"
+              >
+                <i class="bi bi-trash" /> Excluir
               </button>
-              <button type="submit" class="btn btn-primary">
-                <i class="bi bi-check-lg" /> Salvar
-              </button>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                  Cancelar
+                </button>
+                <button type="submit" class="btn btn-primary">
+                  <i class="bi bi-check-lg" /> Salvar
+                </button>
+              </div>
             </div>
           </form>
+          <form
+            id="deleteAssetForm"
+            method="post"
+            class="d-none"
+            data-confirm="Excluir este ativo?"
+          />
         </div>
       </div>
     </div>
@@ -113,6 +141,8 @@ export function editAssetAttrs(asset: {
   currency: string
   delisted: boolean
   assetClassId: number | null
+  transactionCount: number
+  dividendCount: number
 }) {
   return {
     'data-edit-asset': true,
@@ -123,5 +153,7 @@ export function editAssetAttrs(asset: {
     'data-asset-currency': asset.currency,
     'data-asset-delisted': String(asset.delisted),
     'data-asset-class-id': asset.assetClassId === null ? '' : String(asset.assetClassId),
+    'data-asset-transaction-count': String(asset.transactionCount),
+    'data-asset-dividend-count': String(asset.dividendCount),
   }
 }

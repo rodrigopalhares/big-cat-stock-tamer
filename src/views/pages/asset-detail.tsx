@@ -240,6 +240,7 @@ function TransactionsTable({
                   type="button"
                   class="btn btn-sm btn-outline-primary border-0"
                   title="Editar"
+                  aria-label="Editar transação"
                   data-edit-tx
                   data-return-to={returnTo}
                   data-tx-id={String(t.id)}
@@ -261,7 +262,12 @@ function TransactionsTable({
                   data-confirm="Excluir esta transação?"
                 >
                   <input type="hidden" name="returnTo" value={returnTo} />
-                  <button type="submit" class="btn btn-sm btn-outline-danger border-0">
+                  <button
+                    type="submit"
+                    class="btn btn-sm btn-outline-danger border-0"
+                    title="Excluir"
+                    aria-label="Excluir transação"
+                  >
                     <i class="bi bi-trash" />
                   </button>
                 </form>
@@ -303,6 +309,7 @@ function DividendsTable({ dividends, returnTo }: { dividends: DividendView[]; re
                   type="button"
                   class="btn btn-sm btn-outline-primary border-0"
                   title="Editar"
+                  aria-label="Editar provento"
                   data-edit-div
                   data-return-to={returnTo}
                   data-div-id={String(d.id)}
@@ -322,7 +329,12 @@ function DividendsTable({ dividends, returnTo }: { dividends: DividendView[]; re
                   data-confirm="Excluir este provento?"
                 >
                   <input type="hidden" name="returnTo" value={returnTo} />
-                  <button type="submit" class="btn btn-sm btn-outline-danger border-0">
+                  <button
+                    type="submit"
+                    class="btn btn-sm btn-outline-danger border-0"
+                    title="Excluir"
+                    aria-label="Excluir provento"
+                  >
                     <i class="bi bi-trash" />
                   </button>
                 </form>

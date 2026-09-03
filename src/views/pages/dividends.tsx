@@ -9,6 +9,13 @@ import { Layout } from '../layout.js'
 
 /** Porte de src/main/resources/templates/dividends.html. */
 
+/** Três linhas com tab de verdade — o placeholder não dá para copiar. */
+const CSV_EXAMPLE = [
+  'PETR4\t01/03/2026\tDIVIDENDO\t150,00\t0,00\tBRL\tXP\t\t',
+  'PETR4\t15/03/2026\tJCP\t80,00\t12,00\tBRL\tXP\t\tIR retido na fonte',
+  'MXRF11\t14/03/2026\tRENDIMENTO\t42,10\t0,00\tBRL\tXP\t\t',
+].join('\n')
+
 export type DividendsPageProps = {
   /** Primeira página do histórico — o resto chega pela rolagem infinita. */
   dividends: DividendView[]
@@ -116,10 +123,11 @@ function NewDividendForm({ assets, today }: DividendsPageProps) {
       <div class="card-body">
         <form method="post" action="/dividends/new">
           <div class="mb-3">
-            <label class="form-label">
+            <label class="form-label" for="newDivTicker">
               Ticker <span class="text-danger">*</span>
             </label>
             <input
+              id="newDivTicker"
               type="text"
               name="ticker"
               class="form-control"
@@ -141,17 +149,19 @@ function NewDividendForm({ assets, today }: DividendsPageProps) {
             <div id="ticker-preview" class="mt-2" />
           </div>
           <div class="mb-3">
-            <label class="form-label">
+            <label class="form-label" for="newDivType">
               Tipo <span class="text-danger">*</span>
             </label>
-            <select name="type" class="form-select" required>
+            <select id="newDivType" name="type" class="form-select" required>
               {DIVIDEND_TYPES.map((t) => (
                 <option value={t}>{t}</option>
               ))}
             </select>
           </div>
           <div class="mb-3">
-            <label class="form-label">Moeda</label>
+            <label class="form-label" for="newDivCurrency">
+              Moeda
+            </label>
             <select name="currency" id="newDivCurrency" class="form-select">
               <option value="BRL" selected>
                 BRL
@@ -161,10 +171,11 @@ function NewDividendForm({ assets, today }: DividendsPageProps) {
           </div>
           <div class="row g-2 mb-3">
             <div class="col-6">
-              <label class="form-label">
+              <label class="form-label" for="newDivTotalAmount">
                 Valor Bruto <span class="text-danger">*</span>
               </label>
               <input
+                id="newDivTotalAmount"
                 type="number"
                 name="total_amount"
                 class="form-control"
@@ -174,8 +185,11 @@ function NewDividendForm({ assets, today }: DividendsPageProps) {
               />
             </div>
             <div class="col-6">
-              <label class="form-label">IR Retido</label>
+              <label class="form-label" for="newDivTaxWithheld">
+                IR Retido
+              </label>
               <input
+                id="newDivTaxWithheld"
                 type="number"
                 name="tax_withheld"
                 class="form-control"
@@ -186,14 +200,29 @@ function NewDividendForm({ assets, today }: DividendsPageProps) {
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-label">
+            <label class="form-label" for="newDivDate">
               Data <span class="text-danger">*</span>
             </label>
-            <input type="date" name="date" class="form-control" value={today} required />
+            <input
+              id="newDivDate"
+              type="date"
+              name="date"
+              class="form-control"
+              value={today}
+              required
+            />
           </div>
           <div class="mb-3">
-            <label class="form-label">Notas</label>
-            <textarea name="notes" class="form-control" rows={2} placeholder="Opcional" />
+            <label class="form-label" for="newDivNotes">
+              Notas
+            </label>
+            <textarea
+              id="newDivNotes"
+              name="notes"
+              class="form-control"
+              rows={2}
+              placeholder="Opcional"
+            />
           </div>
           <button type="submit" class="btn btn-primary w-100">
             <i class="bi bi-check-lg" /> Registrar
@@ -364,6 +393,7 @@ function DividendRow({ dividend: d }: { dividend: DividendView }) {
           type="button"
           class="btn btn-sm btn-outline-primary border-0"
           title="Editar"
+          aria-label="Editar provento"
           data-edit-div
           data-div-id={String(d.id)}
           data-div-type={d.type}
@@ -381,7 +411,12 @@ function DividendRow({ dividend: d }: { dividend: DividendView }) {
           class="d-inline"
           data-confirm="Excluir este provento?"
         >
-          <button type="submit" class="btn btn-sm btn-outline-danger border-0">
+          <button
+            type="submit"
+            class="btn btn-sm btn-outline-danger border-0"
+            title="Excluir"
+            aria-label="Excluir provento"
+          >
             <i class="bi bi-trash" />
           </button>
         </form>
@@ -399,7 +434,7 @@ function CsvImportModal() {
             <h5 class="modal-title">
               <i class="bi bi-file-earmark-spreadsheet" /> Importar Proventos
             </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" />
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar" />
           </div>
           <div class="modal-body d-flex flex-column overflow-hidden">
             {/* div em vez de ul/li pelo mesmo motivo do modal de transações: o lint não
@@ -441,6 +476,23 @@ function CsvImportModal() {
                   Formato: ticker &lt;tab&gt; data &lt;tab&gt; tipo &lt;tab&gt; valor &lt;tab&gt; IR
                   &lt;tab&gt; moeda &lt;tab&gt; corretora &lt;tab&gt; [ignorar] &lt;tab&gt; notas
                 </div>
+                <div class="form-text">
+                  <button
+                    type="button"
+                    class="btn btn-link btn-sm p-0 align-baseline"
+                    data-csv-example="divCsvTextarea"
+                    data-csv-example-source="divCsvExampleText"
+                  >
+                    Preencher com um exemplo
+                  </button>
+                  {' · '}
+                  <a href="/modelos/proventos.tsv" download>
+                    Baixar modelo (.tsv)
+                  </a>
+                </div>
+                <textarea id="divCsvExampleText" hidden readOnly>
+                  {CSV_EXAMPLE}
+                </textarea>
                 <div class="mt-3">
                   <button
                     type="button"
@@ -518,12 +570,14 @@ export function DividendModal() {
               <i class="bi bi-pencil" id="editDivModalIcon" />{' '}
               <span id="editDivModalTitle">Editar Provento</span>
             </h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" />
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar" />
           </div>
           <form id="editDivForm" method="post">
             <div class="modal-body">
               <div class="mb-3">
-                <label class="form-label">Tipo</label>
+                <label class="form-label" for="editDivType">
+                  Tipo
+                </label>
                 <select id="editDivType" name="type" class="form-select" required>
                   {DIVIDEND_TYPES.map((t) => (
                     <option value={t}>{t}</option>
@@ -531,7 +585,9 @@ export function DividendModal() {
                 </select>
               </div>
               <div class="mb-3">
-                <label class="form-label">Moeda</label>
+                <label class="form-label" for="editDivCurrency">
+                  Moeda
+                </label>
                 <select id="editDivCurrency" name="currency" class="form-select">
                   <option value="BRL">BRL</option>
                   <option value="USD">USD</option>
@@ -539,7 +595,9 @@ export function DividendModal() {
               </div>
               <div class="row g-2 mb-3">
                 <div class="col-6">
-                  <label class="form-label">Valor Bruto</label>
+                  <label class="form-label" for="editDivTotalAmount">
+                    Valor Bruto
+                  </label>
                   <input
                     type="number"
                     id="editDivTotalAmount"
@@ -551,7 +609,9 @@ export function DividendModal() {
                   />
                 </div>
                 <div class="col-6">
-                  <label class="form-label">IR Retido</label>
+                  <label class="form-label" for="editDivTaxWithheld">
+                    IR Retido
+                  </label>
                   <input
                     type="number"
                     id="editDivTaxWithheld"
@@ -564,11 +624,15 @@ export function DividendModal() {
                 </div>
               </div>
               <div class="mb-3">
-                <label class="form-label">Data</label>
+                <label class="form-label" for="editDivDate">
+                  Data
+                </label>
                 <input type="date" id="editDivDate" name="date" class="form-control" required />
               </div>
               <div class="mb-3">
-                <label class="form-label">Notas</label>
+                <label class="form-label" for="editDivNotes">
+                  Notas
+                </label>
                 <textarea id="editDivNotes" name="notes" class="form-control" rows={2} />
               </div>
             </div>
