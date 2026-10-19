@@ -5,6 +5,9 @@ import {
   categorizeAssets,
   type DatedPrice,
   filterBatchToRecords,
+  isQuoteStale,
+  type QuotedPosition,
+  quotesAsOf,
   resolveYfTicker,
 } from './price-history.js'
 
@@ -161,5 +164,54 @@ describe('filterBatchToRecords', () => {
       () => 'TD1',
     )
     expect(seen).toEqual(['TD1'])
+  })
+})
+
+describe('quotesAsOf', () => {
+  const position = (overrides: Partial<QuotedPosition>): QuotedPosition => ({
+    priceDate: isoDate('2026-10-16'),
+    quantity: 10,
+    type: 'STOCK',
+    delisted: false,
+    ...overrides,
+  })
+
+  it('devolve a cotação mais recente da carteira', () => {
+    expect(
+      quotesAsOf([
+        position({ priceDate: isoDate('2026-10-15') }),
+        position({ priceDate: isoDate('2026-10-16') }),
+        position({ priceDate: null }),
+      ]),
+    ).toBe('2026-10-16')
+  })
+
+  it('ignora deslistado, posição encerrada e tipo sem cotação', () => {
+    expect(
+      quotesAsOf([
+        position({ priceDate: isoDate('2026-10-10') }),
+        position({ priceDate: isoDate('2026-10-19'), delisted: true }),
+        position({ priceDate: isoDate('2026-10-19'), quantity: 0 }),
+        position({ priceDate: isoDate('2026-10-19'), type: 'RENDA_FIXA' }),
+      ]),
+    ).toBe('2026-10-10')
+  })
+
+  it('sem cotação nenhuma devolve null', () => {
+    expect(quotesAsOf([position({ priceDate: null })])).toBeNull()
+    expect(quotesAsOf([])).toBeNull()
+  })
+})
+
+describe('isQuoteStale', () => {
+  it.each([
+    ['2026-10-20', '2026-10-20', false], // hoje
+    ['2026-10-19', '2026-10-20', false], // D-1
+    ['2026-10-16', '2026-10-19', false], // sexta, vista na segunda
+    ['2026-10-16', '2026-10-18', false], // sexta, vista no domingo
+    ['2026-10-16', '2026-10-20', true], // sexta, vista na terça
+    ['2026-10-15', '2026-10-19', true], // quinta, vista na segunda
+  ])('cotação de %s vista em %s → %s', (asOf, today, stale) => {
+    expect(isQuoteStale(isoDate(asOf), isoDate(today))).toBe(stale)
   })
 })

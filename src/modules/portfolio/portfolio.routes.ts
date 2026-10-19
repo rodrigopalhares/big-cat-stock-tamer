@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { Container } from '../../container.js'
 import { buildMonthlyDividendSeries } from '../../domain/chart.js'
+import { isQuoteStale, quotesAsOf } from '../../domain/price-history.js'
 import { monthLabel } from '../../shared/format.js'
 import { HttpError } from '../../shared/http-error.js'
 import { firstDayOf, today, yearMonth } from '../../shared/iso-date.js'
@@ -17,10 +18,11 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
   return async (app) => {
     app.get('/portfolio/', async (_req, reply) => {
       const assets = await c.db.asset.findMany()
-      const positions = sortPositions(await c.portfolio.buildPositions(assets, true))
+      const positions = sortPositions(await c.portfolio.buildPositions(assets))
       const summary = c.portfolio.aggregatePositions(positions)
 
       const usdPosition = positions.find((p) => p.currency === 'USD' && p.exchangeRate !== null)
+      const asOf = quotesAsOf(positions)
 
       return reply.html(
         DashboardPage({
@@ -37,6 +39,8 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
           irrMonthly: summary.irrMonthly,
           hasUsd: positions.some((p) => p.currency === 'USD'),
           usdRate: usdPosition?.exchangeRate ?? null,
+          quotesAsOf: asOf,
+          quotesStale: asOf !== null && isQuoteStale(asOf, today()),
           cdi: await c.cdi.compare(summary),
           chart: await buildEvolutionChart(c, positions, await c.evolution.getEvolution()),
           dividendChart: await buildDividendChart(c),
@@ -45,16 +49,17 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
     })
 
     app.post('/portfolio/update-prices', async (_req, reply) => {
+      // É o botão "vai buscar tudo que é externo": as telas só leem o banco, então sem ele
+      // cotação, dólar e CDI só mudariam no job das 18:30.
       await c.priceHistory.runDailyUpdate()
-      // O CDI entra aqui de carona: é o botão "vai buscar tudo que é externo", e sem ele
-      // a série só apareceria no job das 18:30 — dashboard nunca busca por conta própria.
+      await c.exchangeRates.backfillFromBcb('USD', 'BRL')
       await c.cdi.runBackfill()
       return reply.type('text/html; charset=utf-8').send('')
     })
 
     app.get('/portfolio/api', async () => {
       const assets = await c.db.asset.findMany()
-      const positions = await c.portfolio.buildPositions(assets, true)
+      const positions = await c.portfolio.buildPositions(assets)
       return c.portfolio.aggregatePositions(positions)
     })
 
@@ -64,7 +69,7 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
       })
       if (asset === null) throw HttpError.notFound('Ativo não encontrado')
 
-      const positions = await c.portfolio.buildPositions([asset], true)
+      const positions = await c.portfolio.buildPositions([asset])
       const position = positions[0]
       if (position === undefined) {
         throw HttpError.notFound('Este ativo não tem transações')

@@ -1,4 +1,5 @@
 import type { CashFlow } from '../../domain/xirr.js'
+import type { IsoDate } from '../../shared/iso-date.js'
 
 /** Porte de src/main/kotlin/com/stocks/dto/PortfolioDtos.kt. */
 
@@ -12,6 +13,8 @@ export type AssetPosition = {
   totalCost: number
   totalCostBrl: number
   currentPrice: number | null
+  /** Data do último preço gravado — o dashboard não busca cotação, então pode ser antiga. */
+  priceDate: IsoDate | null
   currentPriceBrl: number | null
   currentValue: number | null
   unrealizedPnl: number | null

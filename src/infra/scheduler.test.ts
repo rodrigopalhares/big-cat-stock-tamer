@@ -9,7 +9,7 @@ import { startScheduler } from './scheduler.js'
 describe('scheduler', () => {
   const deps = (overrides: Record<string, unknown> = {}) => ({
     priceHistory: { runDailyUpdate: vi.fn(async () => {}) },
-    exchangeRates: { getRate: vi.fn(async () => 5) },
+    exchangeRates: { backfillFromBcb: vi.fn(async () => {}) },
     cdi: { runBackfill: vi.fn(async () => 0) },
     backup: { ensureBackups: vi.fn(async () => {}) },
     ...overrides,

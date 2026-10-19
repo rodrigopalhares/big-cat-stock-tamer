@@ -49,7 +49,7 @@ export function startScheduler(deps: SchedulerDeps): Scheduler {
       { timezone: TIMEZONE },
       guard('atualização diária de preços', async () => {
         await deps.priceHistory.runDailyUpdate()
-        await deps.exchangeRates.getRate('USD')
+        await deps.exchangeRates.backfillFromBcb('USD', 'BRL')
         // O CDI do dia sai à noite e às 18:30 às vezes ainda não existe. Não precisa de
         // tratamento: o backfill retoma do último dia gravado e o pega amanhã.
         await deps.cdi.runBackfill()

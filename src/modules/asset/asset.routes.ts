@@ -99,7 +99,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
         c.dividends.listDividends({ ticker }),
         c.assetClasses.listViews(),
       ])
-      const positions = await c.portfolio.buildPositions([entity], false)
+      const positions = await c.portfolio.buildPositions([entity])
 
       return reply.html(
         AssetDetailPage({

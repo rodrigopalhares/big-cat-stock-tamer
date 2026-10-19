@@ -69,6 +69,29 @@ describe('ExchangeRateService', () => {
     })
   })
 
+  describe('getLatestRate', () => {
+    it('devolve a taxa mais recente gravada sem chamar o BCB', async () => {
+      // Sem handler do BCB: se chamasse a API, o teste falharia.
+      await createExchangeRate(db, '2024-01-10', 5.1)
+      await createExchangeRate(db, '2024-03-20', 5.9)
+
+      expect(await service.getLatestRate('USD')).toBeCloseTo(5.9, 4)
+    })
+
+    it('sem taxa nenhuma gravada, busca no BCB', async () => {
+      server.use(bcbPtax('bcb_ptax_period.json'))
+      await db.asset.create({ data: { ticker: 'AAPL', currency: 'USD' } })
+      await createTransaction(db, 'AAPL', { date: '2025-03-05' })
+
+      expect(await service.getLatestRate('USD')).toBeGreaterThan(0)
+      expect(await db.exchangeRate.count()).toBeGreaterThan(0)
+    })
+
+    it('mesma moeda devolve 1', async () => {
+      expect(await service.getLatestRate('BRL')).toBe(1)
+    })
+  })
+
   describe('findRate', () => {
     it('devolve null quando não está no banco', async () => {
       expect(await service.findRate('USD', 'BRL', isoDate('2024-01-15'))).toBeNull()
@@ -132,6 +155,45 @@ describe('ExchangeRateService', () => {
       expect(stored.length).toBeGreaterThan(3)
       // Nenhum dia do intervalo fica sem taxa.
       expect(stored.every((r) => r.sellRate > 0)).toBe(true)
+    })
+
+    /** A data inicial que o backfill pediu ao BCB, no formato da URL (`'MM-dd-yyyy'`). */
+    async function requestedStart(): Promise<string | null> {
+      let start: string | null = null
+      server.use(
+        http.get(BCB_PTAX, ({ request }) => {
+          start = new URL(request.url).searchParams.get('@dataInicial')
+          return HttpResponse.json({ value: [] })
+        }),
+      )
+      await service.backfillFromBcb('USD', 'BRL')
+      return start
+    }
+
+    it('retoma de uma semana antes da última taxa gravada', async () => {
+      // Recomeçar da transação mais antiga regravava a série inteira todo dia.
+      await db.asset.create({ data: { ticker: 'AAPL', currency: 'USD' } })
+      await createTransaction(db, 'AAPL', { date: '2020-01-02' })
+      await createExchangeRate(db, '2020-01-02', 4.0)
+      await createExchangeRate(db, '2025-03-10', 5.7)
+
+      expect(await requestedStart()).toBe("'03-03-2025'")
+    })
+
+    it('sem taxa gravada, começa da transação mais antiga', async () => {
+      await db.asset.create({ data: { ticker: 'AAPL', currency: 'USD' } })
+      await createTransaction(db, 'AAPL', { date: '2020-01-02' })
+
+      expect(await requestedStart()).toBe("'01-02-2020'")
+    })
+
+    it('transação anterior ao começo da série refaz desde ela', async () => {
+      await db.asset.create({ data: { ticker: 'AAPL', currency: 'USD' } })
+      await createTransaction(db, 'AAPL', { date: '2019-06-03' })
+      await createExchangeRate(db, '2020-01-02', 4.0)
+      await createExchangeRate(db, '2025-03-10', 5.7)
+
+      expect(await requestedStart()).toBe("'06-03-2019'")
     })
 
     it('não grava nada quando o BCB devolve lista vazia', async () => {

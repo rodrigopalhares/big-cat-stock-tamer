@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { latestRows, parseTesouroCsv, rowsForTicker, splitTesouroTicker } from './tesouro-csv.js'
+import { parseTesouroCsv, rowsForTicker, splitTesouroTicker } from './tesouro-csv.js'
 
 const sample = readFileSync(
   join(import.meta.dirname, '../../../tests/fixtures/tesouro_direto_sample.csv'),
@@ -76,7 +76,7 @@ describe('splitTesouroTicker', () => {
   })
 })
 
-describe('rowsForTicker e latestRows', () => {
+describe('rowsForTicker', () => {
   const rows = parseTesouroCsv(sample)
 
   it('filtra por título e vencimento', () => {
@@ -87,14 +87,5 @@ describe('rowsForTicker e latestRows', () => {
 
   it('ticker inválido devolve vazio', () => {
     expect(rowsForTicker(rows, 'PETR4')).toEqual([])
-  })
-
-  it('latestRows mantém só a data-base mais recente', () => {
-    const latest = latestRows(rows)
-    expect(latest.every((r) => r.dataBase === '2024-03-03')).toBe(true)
-  })
-
-  it('latestRows de lista vazia devolve vazio', () => {
-    expect(latestRows([])).toEqual([])
   })
 })

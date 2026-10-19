@@ -1,4 +1,4 @@
-import { fromBrazilianDate, type IsoDate, maxDate } from '../../shared/iso-date.js'
+import { fromBrazilianDate, type IsoDate } from '../../shared/iso-date.js'
 
 /**
  * Parsing do CSV do Tesouro Transparente — puro, sem rede.
@@ -60,12 +60,4 @@ export function rowsForTicker(rows: readonly TesouroRow[], ticker: string): Teso
   const parts = splitTesouroTicker(ticker)
   if (parts === null) return []
   return rows.filter((r) => r.tipoTitulo === parts.title && r.dataVencimento === parts.maturity)
-}
-
-/** Só as linhas da data-base mais recente — é o que dá a cotação "de hoje". */
-export function latestRows(rows: readonly TesouroRow[]): TesouroRow[] {
-  const dates = rows.map((r) => r.dataBase).filter((d): d is IsoDate => d !== null)
-  const latest = maxDate(dates)
-  if (latest === null) return []
-  return rows.filter((r) => r.dataBase === latest)
 }

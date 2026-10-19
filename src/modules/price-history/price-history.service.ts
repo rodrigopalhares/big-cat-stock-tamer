@@ -25,24 +25,14 @@ export class PriceHistoryService {
     private readonly logger: Logger = silentLogger,
   ) {}
 
-  async getLatestPrice(assetTicker: string): Promise<number | null> {
+  /** Último preço gravado, com a data dele — a tela mostra de quando é a cotação. */
+  async getLatestPrice(assetTicker: string): Promise<DatedPrice | null> {
     const row = await this.db.priceHistory.findFirst({
       where: { assetId: assetTicker },
       orderBy: { date: 'desc' },
-      select: { close: true },
+      select: { date: true, close: true },
     })
-    return row?.close ?? null
-  }
-
-  async getPricesForDate(
-    assetTickers: readonly string[],
-    date: IsoDate,
-  ): Promise<Map<string, number>> {
-    const rows = await this.db.priceHistory.findMany({
-      where: { assetId: { in: [...assetTickers] }, date },
-      select: { assetId: true, close: true },
-    })
-    return new Map(rows.map((r) => [r.assetId, r.close]))
+    return row === null ? null : [row.date as IsoDate, row.close]
   }
 
   async getLastStoredDate(assetTicker: string): Promise<IsoDate | null> {

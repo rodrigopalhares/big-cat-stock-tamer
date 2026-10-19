@@ -7,7 +7,6 @@ import {
   createPriceHistory,
   createTransaction,
 } from '../../../tests/factories.js'
-import { server, tesouroCsv, yahooChart } from '../../../tests/msw.js'
 import { BcbClient } from '../../integrations/bcb/bcb.client.js'
 import { TesouroClient } from '../../integrations/tesouro/tesouro.client.js'
 import { YahooClient } from '../../integrations/yahoo/yahoo.client.js'
@@ -37,7 +36,7 @@ describe('PortfolioService', () => {
     const dividends = new DividendService(db, transactions, exchangeRates)
     const priceHistory = new PriceHistoryService(db, yahoo, tesouro)
     assets = new AssetService(db, assetClasses, priceHistory)
-    service = new PortfolioService(db, yahoo, tesouro, priceHistory, dividends, exchangeRates)
+    service = new PortfolioService(db, priceHistory, dividends, exchangeRates)
   })
 
   afterAll(async () => {
@@ -60,14 +59,14 @@ describe('PortfolioService', () => {
       await createAsset(db, 'PETR4')
 
       const all = await db.asset.findMany()
-      expect(await service.buildPositions(all, false, TODAY)).toEqual([])
+      expect(await service.buildPositions(all, TODAY)).toEqual([])
     })
 
     it('calcula valor e resultado não realizado a partir do último preço', async () => {
       await seedPosition('PETR4')
       await createPriceHistory(db, 'PETR4', '2024-06-01', 15)
 
-      const [position] = await service.buildPositions(await db.asset.findMany(), false, TODAY)
+      const [position] = await service.buildPositions(await db.asset.findMany(), TODAY)
 
       expect(position?.quantity).toBeCloseTo(10, 3)
       expect(position?.avgPrice).toBeCloseTo(10, 3)
@@ -79,7 +78,7 @@ describe('PortfolioService', () => {
     it('sem preço, valor e resultado não realizado ficam nulos', async () => {
       await seedPosition('PETR4')
 
-      const [position] = await service.buildPositions(await db.asset.findMany(), false, TODAY)
+      const [position] = await service.buildPositions(await db.asset.findMany(), TODAY)
 
       expect(position?.currentPrice).toBeNull()
       expect(position?.currentValue).toBeNull()
@@ -90,7 +89,7 @@ describe('PortfolioService', () => {
       await seedPosition('PETR4')
       await createDividend(db, 'PETR4', { totalAmount: 100, taxWithheld: 15 })
 
-      const [position] = await service.buildPositions(await db.asset.findMany(), false, TODAY)
+      const [position] = await service.buildPositions(await db.asset.findMany(), TODAY)
 
       expect(position?.dividendPnl).toBeCloseTo(85, 3)
     })
@@ -102,7 +101,7 @@ describe('PortfolioService', () => {
       await createPriceHistory(db, 'AAPL', '2024-06-01', 150)
       await createExchangeRate(db, '2024-06-30', 5)
 
-      const [position] = await service.buildPositions(await db.asset.findMany(), false, TODAY)
+      const [position] = await service.buildPositions(await db.asset.findMany(), TODAY)
 
       expect(position?.exchangeRate).toBeCloseTo(5, 3)
       expect(position?.currentValue).toBeCloseTo(1500, 3)
@@ -113,7 +112,7 @@ describe('PortfolioService', () => {
       await seedPosition('PETR4')
       await createPriceHistory(db, 'PETR4', '2024-06-01', 15)
 
-      const [position] = await service.buildPositions(await db.asset.findMany(), false, TODAY)
+      const [position] = await service.buildPositions(await db.asset.findMany(), TODAY)
 
       expect(position?.exchangeRate).toBeNull()
       expect(position?.currentValueBrl).toBe(position?.currentValue)
@@ -130,7 +129,7 @@ describe('PortfolioService', () => {
       })
       await assets.refreshPositionFields('PETR4')
 
-      const [position] = await service.buildPositions(await db.asset.findMany(), false, TODAY)
+      const [position] = await service.buildPositions(await db.asset.findMany(), TODAY)
 
       expect(position?.ticker).toBe('PETR4')
       expect(position?.realizedPnl).toBeCloseTo(50, 3)
@@ -143,87 +142,61 @@ describe('PortfolioService', () => {
       await assets.refreshPositionFields('PETR4')
       await createPriceHistory(db, 'PETR4', '2024-06-29', 120)
 
-      const [position] = await service.buildPositions(await db.asset.findMany(), false, TODAY)
+      const [position] = await service.buildPositions(await db.asset.findMany(), TODAY)
 
       expect(position?.irrAnnual).not.toBeNull()
       expect(position?.irrMonthly).not.toBeNull()
       expect(position?.irrAnnual as number).toBeGreaterThan(0)
     })
 
-    it('com fetchQuotes usa o preço do banco quando já existe o de hoje', async () => {
+    it('usa o último preço gravado sem consultar a API, e diz de quando ele é', async () => {
+      // Sem handler do Yahoo, do Tesouro nem do BCB: qualquer chamada faria o teste falhar.
       await seedPosition('PETR4', { yfTicker: 'PETR4.SA' })
-      await createPriceHistory(db, 'PETR4', TODAY, 42)
-
-      // Sem handler do Yahoo: se chamasse a API, o teste falharia.
-      const [position] = await service.buildPositions(await db.asset.findMany(), true, TODAY)
-
-      expect(position?.currentPrice).toBe(42)
-    })
-
-    it('com fetchQuotes busca no Yahoo o que falta e grava o resultado', async () => {
-      server.use(yahooChart('yahoo_chart_petr3.json'))
-      await seedPosition('PETR3', { yfTicker: 'PETR3.SA' })
-
-      const [position] = await service.buildPositions(await db.asset.findMany(), true, TODAY)
-
-      expect(position?.currentPrice).toBeCloseTo(38.45, 2)
-      const stored = await db.priceHistory.findFirst({ where: { assetId: 'PETR3', date: TODAY } })
-      expect(stored?.close).toBeCloseTo(38.45, 2)
-    })
-
-    it('grava o preço do Tesouro na data-base do arquivo, não na de hoje', async () => {
-      server.use(tesouroCsv('tesouro_direto_sample.csv'))
       await seedPosition('TD:SELIC2029', {
         type: 'TESOURO_DIRETO',
         yfTicker: 'Tesouro Selic;01/03/2029',
       })
+      await createPriceHistory(db, 'PETR4', '2024-06-27', 42)
+      await createPriceHistory(db, 'TD:SELIC2029', '2024-06-26', 14215.6)
 
-      const [position] = await service.buildPositions(await db.asset.findMany(), true, TODAY)
+      const positions = await service.buildPositions(await db.asset.findMany(), TODAY)
+      const byTicker = new Map(positions.map((p) => [p.ticker, p]))
 
-      // O PU é o da última data-base publicada (03/03/2024) e serve de preço de tela...
-      expect(position?.currentPrice).toBeCloseTo(14215.6, 2)
-      // ...mas no histórico ele entra com a data dele. Carimbar com hoje gravava o PU de um
-      // dia no outro e travava o `runBackfill`, que retoma do último preço gravado.
-      const stored = await db.priceHistory.findMany({ where: { assetId: 'TD:SELIC2029' } })
-      expect(stored.map((p) => p.date)).toEqual(['2024-03-03'])
+      expect(byTicker.get('PETR4')?.currentPrice).toBe(42)
+      expect(byTicker.get('PETR4')?.priceDate).toBe('2024-06-27')
+      expect(byTicker.get('TD:SELIC2029')?.priceDate).toBe('2024-06-26')
       expect(await db.priceHistory.count({ where: { date: TODAY } })).toBe(0)
     })
 
-    it('ativo deslistado não é consultado na API', async () => {
+    it('sem preço gravado, a data também fica nula', async () => {
+      await seedPosition('PETR4')
+
+      const [position] = await service.buildPositions(await db.asset.findMany(), TODAY)
+
+      expect(position?.priceDate).toBeNull()
+    })
+
+    it('converte pela última taxa gravada, mesmo sem a de hoje, sem chamar o BCB', async () => {
+      await createAsset(db, 'AAPL', { currency: 'USD' })
+      await createTransaction(db, 'AAPL', { quantity: 10, price: 100, date: '2024-01-01' })
+      await assets.refreshPositionFields('AAPL')
+      await createPriceHistory(db, 'AAPL', '2024-06-01', 150)
+      await createExchangeRate(db, '2024-06-27', 5.2)
+
+      const [position] = await service.buildPositions(await db.asset.findMany(), TODAY)
+
+      expect(position?.exchangeRate).toBeCloseTo(5.2, 3)
+      expect(position?.currentValueBrl).toBeCloseTo(7800, 3)
+    })
+
+    it('ativo deslistado usa o histórico', async () => {
       await seedPosition('OIBR3', { delisted: true })
       await createPriceHistory(db, 'OIBR3', '2024-06-01', 1)
 
-      const [position] = await service.buildPositions(await db.asset.findMany(), true, TODAY)
+      const [position] = await service.buildPositions(await db.asset.findMany(), TODAY)
 
       expect(position?.currentPrice).toBe(1)
       expect(position?.delisted).toBe(true)
-    })
-
-    it('posição encerrada não é consultada na API', async () => {
-      // Vendido: continua na lista pelo resultado realizado, mas sem valor de mercado a
-      // atualizar. Sem handler do Yahoo — se chamasse a API, o teste falharia.
-      await createAsset(db, 'MGLU3', {
-        yfTicker: 'MGLU3.SA',
-        hasPosition: false,
-        realizedPnl: 500,
-        realizedPnlBrl: 500,
-      })
-      await createPriceHistory(db, 'MGLU3', '2024-06-01', 3)
-
-      const [position] = await service.buildPositions(await db.asset.findMany(), true, TODAY)
-
-      // O último preço gravado, não o de hoje.
-      expect(position?.currentPrice).toBe(3)
-      expect(position?.currentValue).toBeNull()
-    })
-
-    it('tipo sem cotação usa apenas o histórico', async () => {
-      await seedPosition('CDB1', { type: 'RENDA_FIXA' })
-      await createPriceHistory(db, 'CDB1', '2024-06-01', 100)
-
-      const [position] = await service.buildPositions(await db.asset.findMany(), true, TODAY)
-
-      expect(position?.currentPrice).toBe(100)
     })
   })
 
@@ -234,7 +207,7 @@ describe('PortfolioService', () => {
       await createPriceHistory(db, 'PETR4', '2024-06-01', 15)
       await createPriceHistory(db, 'VALE3', '2024-06-01', 20)
 
-      const positions = await service.buildPositions(await db.asset.findMany(), false, TODAY)
+      const positions = await service.buildPositions(await db.asset.findMany(), TODAY)
       const summary = service.aggregatePositions(positions, TODAY)
 
       expect(summary.totalInvested).toBeCloseTo(200, 3)
@@ -257,7 +230,7 @@ describe('PortfolioService', () => {
       await seedPosition('PETR4')
       await seedPosition('VALE3')
 
-      const positions = await service.buildPositions(await db.asset.findMany(), false, TODAY)
+      const positions = await service.buildPositions(await db.asset.findMany(), TODAY)
       const summary = service.aggregatePositions(positions, TODAY)
 
       expect(summary.netContribution).toBeCloseTo(summary.totalInvested, 3)
@@ -274,7 +247,7 @@ describe('PortfolioService', () => {
       await createTransaction(db, 'VALE3', { quantity: 10, price: 10, date: '2024-03-01' })
       await assets.refreshPositionFields('VALE3')
 
-      const positions = await service.buildPositions(await db.asset.findMany(), false, TODAY)
+      const positions = await service.buildPositions(await db.asset.findMany(), TODAY)
       const summary = service.aggregatePositions(positions, TODAY)
 
       expect(summary.totalInvested).toBeCloseTo(200, 3)
@@ -285,7 +258,7 @@ describe('PortfolioService', () => {
       await seedPosition('PETR4')
       await createDividend(db, 'PETR4', { totalAmount: 100, taxWithheld: 0 })
 
-      const positions = await service.buildPositions(await db.asset.findMany(), false, TODAY)
+      const positions = await service.buildPositions(await db.asset.findMany(), TODAY)
       expect(service.aggregatePositions(positions, TODAY).dividendPnl).toBeCloseTo(100, 3)
     })
   })

@@ -69,6 +69,14 @@ export function daysBetween(from: IsoDate, to: IsoDate): number {
   return Math.round((toUtc(to).getTime() - toUtc(from).getTime()) / 86_400_000)
 }
 
+/** Dia útil anterior, contando só fim de semana — feriado não entra. */
+export function previousWeekday(date: IsoDate): IsoDate {
+  let current = addDays(date, -1)
+  // getUTCDay: 0 é domingo, 6 é sábado.
+  while ([0, 6].includes(toUtc(current).getUTCDay())) current = addDays(current, -1)
+  return current
+}
+
 /** Comparador para `sort`: negativo, zero ou positivo. */
 export function compareDates(a: IsoDate, b: IsoDate): number {
   return a < b ? -1 : a > b ? 1 : 0

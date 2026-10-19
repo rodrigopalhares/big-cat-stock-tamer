@@ -29,13 +29,13 @@ describe('PriceHistoryService', () => {
   })
 
   describe('consultas', () => {
-    it('getLatestPrice devolve o preço mais recente', async () => {
+    it('getLatestPrice devolve o preço mais recente, com a data', async () => {
       await createAsset(db, 'PETR4')
       await createPriceHistory(db, 'PETR4', '2024-01-10', 30)
       await createPriceHistory(db, 'PETR4', '2024-03-20', 35)
       await createPriceHistory(db, 'PETR4', '2024-02-15', 32)
 
-      expect(await service.getLatestPrice('PETR4')).toBe(35)
+      expect(await service.getLatestPrice('PETR4')).toEqual(['2024-03-20', 35])
     })
 
     it('getLatestPrice devolve null sem preços', async () => {
@@ -52,17 +52,6 @@ describe('PriceHistoryService', () => {
 
     it('getLastStoredDate devolve null sem preços', async () => {
       expect(await service.getLastStoredDate('PETR4')).toBeNull()
-    })
-
-    it('getPricesForDate devolve o preço de vários ativos na data', async () => {
-      await createAsset(db, 'PETR4')
-      await createAsset(db, 'VALE3')
-      await createPriceHistory(db, 'PETR4', '2024-01-10', 30)
-      await createPriceHistory(db, 'VALE3', '2024-01-10', 60)
-      await createPriceHistory(db, 'VALE3', '2024-01-11', 61)
-
-      const prices = await service.getPricesForDate(['PETR4', 'VALE3'], isoDate('2024-01-10'))
-      expect(Object.fromEntries(prices)).toEqual({ PETR4: 30, VALE3: 60 })
     })
   })
 
@@ -85,7 +74,7 @@ describe('PriceHistoryService', () => {
       await service.upsertPrices([{ assetId: 'PETR4', date: isoDate('2024-01-10'), close: 99 }])
 
       expect(await db.priceHistory.count()).toBe(1)
-      expect(await service.getLatestPrice('PETR4')).toBe(99)
+      expect(await service.getLatestPrice('PETR4')).toEqual(['2024-01-10', 99])
     })
 
     it('lista vazia não faz nada', async () => {

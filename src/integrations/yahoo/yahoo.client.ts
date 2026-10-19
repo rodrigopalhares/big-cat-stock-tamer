@@ -2,7 +2,6 @@ import type { AssetType, Currency } from '../../domain/constants.js'
 import { classifyTicker, isBrazilianReit } from '../../domain/ticker-classification.js'
 import { compareDates, type IsoDate } from '../../shared/iso-date.js'
 import { BROWSER_USER_AGENT, HttpClient, type Logger, silentLogger } from '../http.js'
-import { TtlCache } from '../ttl-cache.js'
 import { parseYahooChart } from './yahoo.schema.js'
 
 /**
@@ -12,7 +11,6 @@ import { parseYahooChart } from './yahoo.schema.js'
  */
 
 const BASE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart'
-const QUOTE_CACHE_TTL_SECONDS = 4 * 3600
 
 export type AssetInfo = {
   readonly name: string
@@ -26,19 +24,16 @@ export type DatedPrice = readonly [IsoDate, number]
 export type YahooClientOptions = {
   readonly http?: HttpClient
   readonly logger?: Logger
-  readonly now?: () => number
 }
 
 export class YahooClient {
   private readonly http: HttpClient
   private readonly logger: Logger
-  private readonly quoteCache: TtlCache<number>
 
   constructor(options: YahooClientOptions = {}) {
     this.logger = options.logger ?? silentLogger
     this.http =
       options.http ?? new HttpClient({ userAgent: BROWSER_USER_AGENT, logger: this.logger })
-    this.quoteCache = new TtlCache<number>(QUOTE_CACHE_TTL_SECONDS, options.now)
   }
 
   /**
@@ -83,29 +78,6 @@ export class YahooClient {
       yfTicker: candidates[0] as string,
       currency: classification.defaultCurrency,
     }
-  }
-
-  /** Cotação atual de vários símbolos. Consulta só o que não está em cache. */
-  async fetchQuotesBatch(yfTickers: readonly string[]): Promise<Map<string, number>> {
-    const results = new Map<string, number>()
-    if (yfTickers.length === 0) return results
-
-    const toFetch: string[] = []
-    for (const ticker of yfTickers) {
-      const cached = this.quoteCache.get(ticker)
-      if (cached !== null) results.set(ticker, cached)
-      else toFetch.push(ticker)
-    }
-
-    for (const ticker of toFetch) {
-      const result = await this.fetchChart(ticker, { range: '1d', interval: '1d' })
-      const price = result?.meta?.regularMarketPrice
-      if (typeof price === 'number' && price > 0) {
-        this.quoteCache.set(ticker, price)
-        results.set(ticker, price)
-      }
-    }
-    return results
   }
 
   /**

@@ -74,5 +74,5 @@ export function evolutionRoutes(c: Container): FastifyPluginAsync {
 
 /** As posições atuais alimentam as linhas de aporte e CDI do gráfico, como no dashboard. */
 async function positions(c: Container): Promise<AssetPosition[]> {
-  return c.portfolio.buildPositions(await c.db.asset.findMany(), true)
+  return c.portfolio.buildPositions(await c.db.asset.findMany())
 }

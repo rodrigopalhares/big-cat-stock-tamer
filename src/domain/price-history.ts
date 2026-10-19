@@ -1,4 +1,11 @@
-import { addDays, compareDates, daysBetween, type IsoDate } from '../shared/iso-date.js'
+import {
+  addDays,
+  compareDates,
+  daysBetween,
+  type IsoDate,
+  maxDate,
+  previousWeekday,
+} from '../shared/iso-date.js'
 import { type AssetType, NO_QUOTE_TYPES } from './constants.js'
 import { isTesouroTicker } from './tesouro-ticker.js'
 import { classifyTicker } from './ticker-classification.js'
@@ -148,4 +155,36 @@ export function interpolateDelistedPrices(
   }
 
   return records
+}
+
+/** O que a tela sabe de uma posição para dizer de quando são as cotações. */
+export type QuotedPosition = {
+  readonly priceDate: IsoDate | null
+  readonly quantity: number
+  readonly type: AssetType | string
+  readonly delisted: boolean
+}
+
+/**
+ * Data da cotação mais recente da carteira — a da última atualização. Null quando nenhuma
+ * posição em aberto tem cotação de mercado gravada.
+ *
+ * Deslistado fica de fora porque o preço dele é gerado todo dia, sem consulta nenhuma: com
+ * ele na conta, a data seria sempre hoje e esconderia uma atualização que não rodou.
+ */
+export function quotesAsOf(positions: readonly QuotedPosition[]): IsoDate | null {
+  return maxDate(
+    positions
+      .filter((p) => p.quantity > 0 && !p.delisted && !NO_QUOTE_TYPES.has(p.type as AssetType))
+      .map((p) => p.priceDate)
+      .filter((date): date is IsoDate => date !== null),
+  )
+}
+
+/**
+ * Cotação defasada: anterior ao último dia útil. A de ontem é o esperado — a tela não
+ * busca nada e quem grava é o job das 18:30 —, então só alerta quando ele não rodou.
+ */
+export function isQuoteStale(asOf: IsoDate, today: IsoDate): boolean {
+  return asOf < previousWeekday(today)
 }

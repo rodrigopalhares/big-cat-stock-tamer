@@ -1,11 +1,21 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { TRANSACTION_TYPES } from '../../src/domain/constants.js'
-import { monthLabel } from '../../src/shared/format.js'
-import { today } from '../../src/shared/iso-date.js'
+import { date as fmtDate, monthLabel } from '../../src/shared/format.js'
+import { addDays, today } from '../../src/shared/iso-date.js'
 import { createHarness, type Harness } from '../app-harness.js'
 import { clearAllData } from '../db.js'
 import { createAsset, createDividend, createPriceHistory, createTransaction } from '../factories.js'
-import { BCB_SGS, bcbSeries, HttpResponse, http, server, yahooChart } from '../msw.js'
+import {
+  BCB_PTAX,
+  BCB_SGS,
+  bcbSeries,
+  HttpResponse,
+  http,
+  server,
+  TESOURO_CSV,
+  YAHOO_CHART,
+  yahooChart,
+} from '../msw.js'
 
 // Porte de PortfolioControllerTest, TransactionControllerTest, DividendControllerTest
 // e MonthlyEvolutionControllerTest.
@@ -82,7 +92,6 @@ describe('rotas da aplicação', () => {
     })
 
     it('ordena as posições por tipo e depois por ticker', async () => {
-      server.use(yahooChart('yahoo_chart_empty.json'))
       for (const [ticker, type] of [
         ['VALE3', 'STOCK'],
         ['HGLG11', 'REIT'],
@@ -100,6 +109,97 @@ describe('rotas da aplicação', () => {
       expect(res.body.indexOf('HGLG11')).toBeGreaterThan(-1)
       expect(res.body.indexOf('HGLG11')).toBeLessThan(res.body.indexOf('PETR4'))
       expect(res.body.indexOf('PETR4')).toBeLessThan(res.body.indexOf('VALE3'))
+    })
+
+    describe('cotações', () => {
+      async function seedPosicao(priceDate: string) {
+        await createAsset(h.db, 'PETR4', { yfTicker: 'PETR4.SA' })
+        await createAsset(h.db, 'AAPL', { currency: 'USD', yfTicker: 'AAPL' })
+        await createTransaction(h.db, 'PETR4', { quantity: 10, price: 10, date: '2024-01-02' })
+        await createTransaction(h.db, 'AAPL', { quantity: 1, price: 100, date: '2024-01-02' })
+        await h.container.assets.refreshPositionFields('PETR4')
+        await h.container.assets.refreshPositionFields('AAPL')
+        await createPriceHistory(h.db, 'PETR4', priceDate, 15)
+        await createPriceHistory(h.db, 'AAPL', '2024-01-02', 100)
+        await h.db.exchangeRate.create({
+          data: {
+            date: '2024-01-02',
+            fromCurrency: 'USD',
+            toCurrency: 'BRL',
+            buyRate: 5,
+            sellRate: 5,
+          },
+        })
+      }
+
+      /**
+       * A primeira abertura do dia esperava ~20s por Yahoo, CSV do Tesouro e PTAX. Como no
+       * teste do CDI, a asserção é sobre a chamada: o `HttpClient` engole erro de rede, então
+       * uma busca acidental não mudaria nem o status nem o conteúdo da página.
+       */
+      it('renderizar o dashboard não chama API nenhuma', async () => {
+        await seedPosicao('2024-06-03')
+        const chamadas: string[] = []
+        const registra = (nome: string) => () => {
+          chamadas.push(nome)
+          return HttpResponse.json({})
+        }
+        server.use(
+          http.get(YAHOO_CHART, registra('yahoo')),
+          http.get(TESOURO_CSV, registra('tesouro')),
+          http.get(BCB_PTAX, registra('ptax')),
+        )
+
+        const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+        expect(res.statusCode).toBe(200)
+        expect(chamadas).toEqual([])
+      })
+
+      it('mostra a data da cotação sem alerta quando é recente', async () => {
+        await seedPosicao(today())
+
+        const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+        expect(res.body).toContain(`Cotações de ${fmtDate(today())}`)
+        expect(res.body).not.toContain('bi-exclamation-triangle-fill')
+      })
+
+      it('cotação anterior ao último dia útil aparece em vermelho', async () => {
+        await seedPosicao('2024-06-03')
+
+        const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+        expect(res.body).toMatch(/text-danger[^>]*>\s*<i class="bi bi-exclamation-triangle-fill/)
+        expect(res.body).toContain('Cotações de 03/06/2024')
+      })
+
+      it('a data é a da cotação mais recente da carteira', async () => {
+        // AAPL ficou em 02/01/2024; a mais recente é a de PETR4.
+        await seedPosicao(addDays(today(), -1))
+
+        const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+        expect(res.body).toContain(`Cotações de ${fmtDate(addDays(today(), -1))}`)
+      })
+
+      it('o botão de atualizar cotações busca o dólar', async () => {
+        await seedPosicao('2024-06-03')
+        let buscouDolar = false
+        server.use(
+          yahooChart('yahoo_chart_empty.json'),
+          bcbSeries([]),
+          http.get(BCB_PTAX, () => {
+            buscouDolar = true
+            return HttpResponse.json({ value: [] })
+          }),
+        )
+
+        const res = await h.app.inject({ method: 'POST', url: '/portfolio/update-prices' })
+
+        expect(res.statusCode).toBe(200)
+        expect(buscouDolar).toBe(true)
+      })
     })
 
     describe('comparação com o CDI', () => {
@@ -206,6 +306,7 @@ describe('rotas da aplicação', () => {
         server.use(
           yahooChart('yahoo_chart_empty.json'),
           bcbSeries([{ data: '03/01/2024', valor: '0,05' }]),
+          http.get(BCB_PTAX, () => HttpResponse.json({ value: [] })),
         )
 
         const res = await h.app.inject({ method: 'POST', url: '/portfolio/update-prices' })
@@ -227,7 +328,6 @@ describe('rotas da aplicação', () => {
     })
 
     it('GET /portfolio/api/:ticker devolve a posição do ativo', async () => {
-      server.use(yahooChart('yahoo_chart_empty.json'))
       await createAsset(h.db, 'PETR4')
       await createTransaction(h.db, 'PETR4', { quantity: 100, price: 20, date: '2024-01-02' })
       await h.container.assets.refreshPositionFields('PETR4')
@@ -241,7 +341,6 @@ describe('rotas da aplicação', () => {
 
     it('GET /portfolio/api/:ticker devolve 404 para ativo cadastrado sem transação', async () => {
       // 404 por outro motivo que o anterior: o ativo existe, mas não tem posição a montar.
-      server.use(yahooChart('yahoo_chart_empty.json'))
       await createAsset(h.db, 'PETR4')
 
       const res = await h.app.inject({ method: 'GET', url: '/portfolio/api/PETR4' })
@@ -250,7 +349,6 @@ describe('rotas da aplicação', () => {
     })
 
     it('com snapshots monta os dados do gráfico', async () => {
-      server.use(yahooChart('yahoo_chart_empty.json'))
       await createAsset(h.db, 'PETR4', { type: 'STOCK' })
       await createAsset(h.db, 'HGLG11', { type: 'REIT' })
       await createTransaction(h.db, 'PETR4', { quantity: 10, price: 10, date: '2024-01-05' })

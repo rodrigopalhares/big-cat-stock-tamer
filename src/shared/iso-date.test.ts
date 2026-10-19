@@ -13,6 +13,7 @@ import {
   maxDate,
   minDate,
   monthsBetweenInclusive,
+  previousWeekday,
   toBrazilianDate,
   today,
   toYearMonth,
@@ -182,5 +183,17 @@ describe('formato brasileiro', () => {
 
   it('converte ISO de volta para dd/MM/yyyy', () => {
     expect(toBrazilianDate(isoDate('2024-01-05'))).toBe('05/01/2024')
+  })
+})
+
+describe('previousWeekday', () => {
+  it.each([
+    ['2026-10-20', '2026-10-19'], // terça → segunda
+    ['2026-10-19', '2026-10-16'], // segunda → sexta
+    ['2026-10-18', '2026-10-16'], // domingo → sexta
+    ['2026-10-17', '2026-10-16'], // sábado → sexta
+    ['2026-03-02', '2026-02-27'], // atravessa o mês
+  ])('%s → %s', (date, expected) => {
+    expect(previousWeekday(isoDate(date))).toBe(expected)
   })
 })

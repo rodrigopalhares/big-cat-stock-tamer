@@ -37,12 +37,12 @@ export function allocationRoutes(c: Container): FastifyPluginAsync {
     app.post<{ Params: { id: string } }>('/allocation/classes/:id/target', async (req, reply) => {
       const form = TargetForm.parse(req.body)
       await c.assetClasses.updateTarget(classId(req.params.id), form.target_percent)
-      return reply.partial(AllocationBody(await c.allocation.getAllocation(false)))
+      return reply.partial(AllocationBody(await c.allocation.getAllocation()))
     })
 
     app.delete<{ Params: { id: string } }>('/allocation/classes/:id', async (req, reply) => {
       await c.assetClasses.delete(classId(req.params.id))
-      return reply.partial(AllocationBody(await c.allocation.getAllocation(false)))
+      return reply.partial(AllocationBody(await c.allocation.getAllocation()))
     })
 
     app.post<{ Params: { ticker: string } }>(
@@ -50,7 +50,7 @@ export function allocationRoutes(c: Container): FastifyPluginAsync {
       async (req, reply) => {
         const form = AssignClassForm.parse(req.body)
         await c.assetClasses.assignAsset(req.params.ticker, form.class_id)
-        return reply.partial(AllocationBody(await c.allocation.getAllocation(false)))
+        return reply.partial(AllocationBody(await c.allocation.getAllocation()))
       },
     )
 

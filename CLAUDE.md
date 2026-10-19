@@ -104,7 +104,7 @@ em silêncio.
 
 **O arquivo do Tesouro é de ontem.** O CSV sai com um dia útil de atraso, então a última
 `Data Base` publicada nunca é hoje — ao contrário do Yahoo, que devolve cotação do próprio
-dia. Por isso `fetchQuotesBatch` devolve `[data, preço]`, e não só o número: quem grava
+dia. Por isso o cliente devolve `[data, preço]`, e não só o número: quem grava
 carimba o PU com a data da fonte. Fazer como o Yahoo (`date === today` na atualização
 diária, `date: today` ao gravar) custava duas coisas ao mesmo tempo — a diária gravava zero
 preço todo dia, calada, e a tela da carteira punha o PU de um dia sob a data do outro. Pior,
@@ -138,6 +138,20 @@ para duplicar no reenvio. Só a linha nova acusa: histórico já furado não tra
 dia, o que soma conta antes do que reduz. Provento segue a mesma ideia com valor bruto positivo e
 IR entre zero e o bruto.
 
+**As telas não buscam cotação.** Dashboard, evolução e alocação montam a carteira só com o banco:
+último preço gravado (`PriceHistoryService.getLatestPrice`, com a data) e última taxa do dólar
+(`ExchangeRateService.getLatestRate`). Quem vai à rede é o job das 18:30 e o botão "Atualizar
+Cotações", que roda a mesma atualização diária, o PTAX e o CDI. Buscar no render custava ~22s na
+primeira abertura do dia — 33 chamadas ao Yahoo uma a uma, o CSV de 15 MB do Tesouro e o PTAX —
+para trocar o fechamento de ontem por um preço que ninguém tinha pedido. A tela mostra de quando é
+a cotação mais recente (`quotesAsOf`) e a pinta de vermelho quando ela é anterior ao último dia
+útil (`isQuoteStale`): de ontem é o normal, mais velho que isso quer dizer que o job não rodou.
+Feriado não entra na conta, então o dia seguinte a um feriado alerta à toa.
+
+O backfill do PTAX retoma uma semana antes da última taxa gravada, e não da transação mais
+antiga. Recomeçar de 2008 regravava a série inteira a cada dia novo; o recuo existe porque o dia
+ainda sem PTAX publicado entra com a taxa anterior repetida e só é corrigido na volta seguinte.
+
 **Nada de rede dentro de transação.** O SQLite tem escritor único; segurar o lock durante uma
 chamada HTTP trava a aplicação inteira. Busque primeiro, escreva depois.
 
@@ -155,9 +169,10 @@ Três detalhes que já custaram caro:
 - **A série não repete fim de semana**, ao contrário de `exchange_rates`. Lá repetir a cotação de
   sexta é certo, porque transação de sábado precisa de taxa; aqui repetir criaria rendimento que
   não existiu.
-- **O dashboard nunca busca a série.** Quem popula é o job das 18:30 e o botão "Atualizar
-  Cotações" — a carga inicial leva ~22s. Série defasada rende menos e faz a carteira parecer
-  melhor do que é, então a tela mostra a data da última taxa em vez de esconder o problema.
+- **O dashboard nunca busca a série** — vale para ela o mesmo que para as cotações. Quem popula
+  é o job das 18:30 e o botão "Atualizar Cotações" — a carga inicial leva ~22s. Série defasada
+  rende menos e faz a carteira parecer melhor do que é, então a tela mostra a data da última taxa
+  em vez de esconder o problema.
 
 **O CDI vem da série 4389.** A 4391 é o CDI *acumulado no mês* (% a.m.) e a 432 é a Selic meta;
 trocar uma pela outra devolve um número plausível e errado. Ver o teste que fixa o número na URL.

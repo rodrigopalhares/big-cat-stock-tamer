@@ -4,6 +4,9 @@ import type { Logger } from '../../integrations/http.js'
 import { silentLogger } from '../../integrations/http.js'
 import { addDays, type IsoDate, today } from '../../shared/iso-date.js'
 
+/** Quantos dias antes da última taxa gravada o backfill recomeça. */
+const REFETCH_DAYS = 7
+
 /**
  * Cotações de câmbio, com backfill sob demanda a partir do PTAX do Banco Central.
  * Porte de src/main/kotlin/com/stocks/service/ExchangeRateService.kt.
@@ -16,8 +19,8 @@ export class ExchangeRateService {
   ) {}
 
   /**
-   * Taxa de conversão na data. Quando não há cotação gravada, busca o período inteiro
-   * no BCB e tenta de novo; em último caso usa a cotação mais recente disponível.
+   * Taxa de conversão na data. Quando não há cotação gravada, busca no BCB o que
+   * falta e tenta de novo; em último caso usa a cotação mais recente disponível.
    *
    * Lança quando nem isso existe — sem taxa não há como converter, e gravar a transação
    * com um valor inventado seria pior que falhar.
@@ -41,6 +44,21 @@ export class ExchangeRateService {
     if (closest !== null) return closest
 
     throw new Error(`Sem cotação de ${fromCurrency}/${toCurrency} para ${date}`)
+  }
+
+  /**
+   * Taxa mais recente gravada, sem ir ao BCB — é a que as telas usam. Quem busca a do dia
+   * é o `backfillFromBcb`, chamado pelo job das 18:30 e pelo botão de atualizar cotações.
+   *
+   * Só cai no `getRate` quando não há taxa nenhuma do par: converter sem taxa trataria o
+   * dólar como real, e isso só acontece uma vez, antes da primeira cotação gravada.
+   */
+  async getLatestRate(fromCurrency: string, toCurrency = 'BRL'): Promise<number> {
+    if (fromCurrency === toCurrency) return 1
+    return (
+      (await this.findClosestRate(fromCurrency, toCurrency, today())) ??
+      this.getRate(fromCurrency, toCurrency)
+    )
   }
 
   async findRate(fromCurrency: string, toCurrency: string, date: IsoDate): Promise<number | null> {
@@ -73,7 +91,7 @@ export class ExchangeRateService {
    * o lock durante a latência do BCB bloquearia a aplicação inteira (regra §3.3 do plano).
    */
   async backfillFromBcb(fromCurrency: string, toCurrency: string): Promise<void> {
-    const startDate = (await this.findOldestTransactionDate()) ?? today()
+    const startDate = await this.backfillStart(fromCurrency, toCurrency)
     const endDate = today()
 
     const quotes = await this.bcb.fetchPtaxRange(startDate, endDate)
@@ -127,6 +145,32 @@ export class ExchangeRateService {
       create: { date, fromCurrency, toCurrency, buyRate, sellRate },
       update: { buyRate, sellRate },
     })
+  }
+
+  /**
+   * De onde o backfill começa: da transação mais antiga quando a série não a cobre, senão
+   * de uma semana antes da última taxa gravada.
+   *
+   * Recomeçar sempre do começo regravava os 18 anos de série a cada dia novo, dentro da
+   * requisição de quem pediu a taxa. O recuo existe porque o dia sem PTAX publicado ainda —
+   * hoje antes das 13h, um feriado — entra com a taxa anterior repetida, e é na volta
+   * seguinte que ela é trocada pela de verdade.
+   */
+  private async backfillStart(fromCurrency: string, toCurrency: string): Promise<IsoDate> {
+    const oldestTransaction = (await this.findOldestTransactionDate()) ?? today()
+    const [first, last] = await Promise.all(
+      (['asc', 'desc'] as const).map((order) =>
+        this.db.exchangeRate.findFirst({
+          where: { fromCurrency, toCurrency },
+          orderBy: { date: order },
+          select: { date: true },
+        }),
+      ),
+    )
+    if (first == null || last == null || oldestTransaction < first.date) return oldestTransaction
+
+    const resume = addDays(last.date as IsoDate, -REFETCH_DAYS)
+    return resume > oldestTransaction ? resume : oldestTransaction
   }
 
   private async findOldestTransactionDate(): Promise<IsoDate | null> {

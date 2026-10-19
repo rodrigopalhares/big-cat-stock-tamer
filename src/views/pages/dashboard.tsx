@@ -9,6 +9,7 @@ import {
   quantity,
   signClass,
 } from '../../shared/format.js'
+import type { IsoDate } from '../../shared/iso-date.js'
 import { AssetBadge } from '../components/badge.js'
 import { RecalculateEvolutionButton } from '../components/recalculate-button.js'
 import { Layout } from '../layout.js'
@@ -55,13 +56,17 @@ export type DashboardPageProps = {
   irrMonthly: number | null
   hasUsd: boolean
   usdRate: number | null
+  /** Data da cotação mais recente; null quando não há cotação gravada. */
+  quotesAsOf: IsoDate | null
+  /** Cotação anterior ao último dia útil — o job das 18:30 não rodou. */
+  quotesStale: boolean
   cdi: CdiComparison | null
   chart: ChartData | null
   dividendChart: DividendChartData | null
 }
 
 export function DashboardPage(props: DashboardPageProps) {
-  const { positions, hasUsd, usdRate, chart, dividendChart } = props
+  const { positions, hasUsd, usdRate, quotesAsOf, quotesStale, chart, dividendChart } = props
 
   return (
     <Layout title="Dashboard — Carteira" path="/portfolio/">
@@ -70,22 +75,25 @@ export function DashboardPage(props: DashboardPageProps) {
           <h2 class="mb-0">
             <i class="bi bi-speedometer2" /> Dashboard
           </h2>
-          <button
-            type="button"
-            class="btn btn-outline-secondary btn-sm"
-            hx-post="/portfolio/update-prices"
-            hx-swap="none"
-            data-busy-label="Atualizando..."
-            data-reload-on-success
-          >
-            <i class="bi bi-arrow-clockwise me-1" /> Atualizar Cotações
-          </button>
+          <div class="d-flex align-items-center gap-3">
+            {quotesAsOf !== null && <QuotesDate asOf={quotesAsOf} stale={quotesStale} />}
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm"
+              hx-post="/portfolio/update-prices"
+              hx-swap="none"
+              data-busy-label="Atualizando..."
+              data-reload-on-success
+            >
+              <i class="bi bi-arrow-clockwise me-1" /> Atualizar Cotações
+            </button>
+          </div>
         </div>
 
         {hasUsd && (
           <div class="alert alert-info alert-sm py-2 px-3 mb-3 small">
             <i class="bi bi-currency-exchange me-1" />
-            Totais em <strong>BRL</strong>. Ativos em USD convertidos pela cotação do dia.
+            Totais em <strong>BRL</strong>. Ativos em USD convertidos pela última cotação do dólar.
             {usdRate !== null && (
               <span class="ms-2 text-muted">USD/BRL: R$ {decimal(usdRate, 4)}</span>
             )}
@@ -324,6 +332,25 @@ function CdiComparisonCards({ cdi }: { cdi: CdiComparison | null }) {
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * De quando são as cotações da tela. A tela não busca nada: a de ontem é o normal, e o
+ * vermelho só aparece quando a atualização das 18:30 deixou de rodar.
+ */
+function QuotesDate({ asOf, stale }: { asOf: IsoDate; stale: boolean }) {
+  if (!stale) {
+    return <span class="text-muted small">Cotações de {fmtDate(asOf)}</span>
+  }
+  return (
+    <span
+      class="text-danger fw-semibold small"
+      title="A cotação mais recente é anterior ao último dia útil. Clique em Atualizar Cotações."
+    >
+      <i class="bi bi-exclamation-triangle-fill me-1" />
+      Cotações de {fmtDate(asOf)}
+    </span>
   )
 }
 

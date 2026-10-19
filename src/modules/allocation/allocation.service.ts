@@ -35,18 +35,13 @@ export class AllocationService {
     private readonly assetClasses: AssetClassService,
   ) {}
 
-  /**
-   * Alocação atual da carteira.
-   *
-   * [fetchQuotes] repassa para o portfólio a busca de cotação do dia — desligado, a
-   * tela usa o último preço gravado, que é o que os testes querem.
-   */
-  async getAllocation(fetchQuotes = true): Promise<AllocationData> {
+  /** Alocação atual da carteira, pelo último preço gravado. */
+  async getAllocation(): Promise<AllocationData> {
     const [assets, classes] = await Promise.all([
       this.db.asset.findMany(),
       this.assetClasses.list(),
     ])
-    const positions = await this.portfolio.buildPositions(assets, fetchQuotes)
+    const positions = await this.portfolio.buildPositions(assets)
     const classIdByTicker = new Map(assets.map((a) => [a.ticker, a.assetClassId]))
 
     const inputs: AllocationAssetInput[] = []

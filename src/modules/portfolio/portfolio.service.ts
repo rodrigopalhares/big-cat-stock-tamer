@@ -6,19 +6,9 @@ import {
   calculateUnrealizedPnl,
   calculateXirr,
 } from '../../domain/calculation.js'
-import { type AssetType, NO_QUOTE_TYPES } from '../../domain/constants.js'
-import {
-  type DatedPrice,
-  type PriceRecord,
-  resolveQuoteSymbol,
-  resolveTesouroSymbol,
-  resolveYfTicker,
-} from '../../domain/price-history.js'
 import { annualToMonthlyRate } from '../../domain/regression.js'
 import type { CashFlow } from '../../domain/xirr.js'
 import type { Asset, Transaction } from '../../generated/prisma/client.js'
-import type { TesouroClient } from '../../integrations/tesouro/tesouro.client.js'
-import type { YahooClient } from '../../integrations/yahoo/yahoo.client.js'
 import { compareDates, type IsoDate, today as todayIso } from '../../shared/iso-date.js'
 import { toTransactionData } from '../asset/asset.service.js'
 import type { DividendService } from '../dividend/dividend.service.js'
@@ -30,26 +20,23 @@ import type { AssetPosition, PortfolioSummary } from './portfolio.schema.js'
 export class PortfolioService {
   constructor(
     private readonly db: Db,
-    private readonly yahoo: YahooClient,
-    private readonly tesouro: TesouroClient,
     private readonly priceHistory: PriceHistoryService,
     private readonly dividends: DividendService,
     private readonly exchangeRates: ExchangeRateService,
   ) {}
 
   /**
-   * Monta a posição consolidada de cada ativo.
+   * Monta a posição consolidada de cada ativo, com o último preço gravado.
    *
-   * Com [fetchQuotes], busca cotação do dia — mas só do que ainda não está no banco,
-   * e grava o que vier da API para a próxima chamada não repetir o trabalho.
+   * Não busca nada fora: a cotação chega pelo job das 18:30 e pelo botão de atualizar
+   * cotações. Buscar aqui fazia a primeira abertura do dia esperar ~20s pelo Yahoo, pelo
+   * CSV do Tesouro e pelo PTAX, um depois do outro — e a de ontem basta para a tela, que
+   * mostra a data dela.
    */
   async buildPositions(
     assets: readonly Asset[],
-    fetchQuotes = false,
     today: IsoDate = todayIso(),
   ): Promise<AssetPosition[]> {
-    const liveQuotes = fetchQuotes ? await this.resolveLiveQuotes(assets, today) : new Map()
-
     // Uma query para todas as transações, em vez de uma por ativo (o N+1 do Kotlin).
     const [transactionsByAsset, dividendPnl, dividendCashFlows] = await Promise.all([
       this.loadTransactionsByAsset(assets.map((a) => a.ticker)),
@@ -62,10 +49,8 @@ export class PortfolioService {
       // Sem posição e sem resultado realizado, não há o que mostrar.
       if (!asset.hasPosition && asset.realizedPnl === 0) continue
 
-      const currentPrice = fetchQuotes
-        ? (liveQuotes.get(resolveQuoteSymbol(asset.ticker, asset.yfTicker, asset.type) ?? '') ??
-          (await this.priceHistory.getLatestPrice(asset.ticker)))
-        : await this.priceHistory.getLatestPrice(asset.ticker)
+      const latest = await this.priceHistory.getLatestPrice(asset.ticker)
+      const currentPrice = latest?.[1] ?? null
 
       const unrealizedPnl =
         currentPrice !== null && asset.hasPosition
@@ -83,7 +68,7 @@ export class PortfolioService {
 
       const irrAnnual = calculateXirr(allCashFlows, currentValue, today)
       const exchangeRate =
-        asset.currency === 'BRL' ? null : await this.exchangeRates.getRate(asset.currency)
+        asset.currency === 'BRL' ? null : await this.exchangeRates.getLatestRate(asset.currency)
 
       positions.push({
         ticker: asset.ticker,
@@ -95,6 +80,7 @@ export class PortfolioService {
         totalCost: asset.totalCost,
         totalCostBrl: asset.totalCostBrl,
         currentPrice,
+        priceDate: latest?.[0] ?? null,
         currentPriceBrl: scale(currentPrice, exchangeRate),
         currentValue,
         unrealizedPnl,
@@ -141,100 +127,6 @@ export class PortfolioService {
       irrMonthly: irrAnnual === null ? null : annualToMonthlyRate(irrAnnual),
       positions: [...positions],
     }
-  }
-
-  /**
-   * Cotação do dia por símbolo. Usa o que já está no banco e só chama a API para o resto,
-   * gravando o resultado — assim o dashboard recarregado não repete a busca.
-   */
-  private async resolveLiveQuotes(
-    assets: readonly Asset[],
-    today: IsoDate,
-  ): Promise<Map<string, number>> {
-    const yfToAsset = new Map<string, string>()
-    const tdToAsset = new Map<string, string>()
-
-    for (const asset of assets) {
-      // Só quem ainda está em carteira: posição encerrada não tem valor de mercado para
-      // atualizar, e a cotação do dia dela não entra em soma nenhuma. A linha do papel
-      // vendido continua na tabela, mostrando o último preço já gravado.
-      if (!asset.hasPosition) continue
-      if (asset.delisted) continue
-      if (asset.type !== null && NO_QUOTE_TYPES.has(asset.type as AssetType)) continue
-
-      if (asset.type === 'TESOURO_DIRETO') {
-        const symbol = resolveTesouroSymbol(asset.ticker, asset.yfTicker)
-        if (symbol !== null) tdToAsset.set(symbol, asset.ticker)
-      } else {
-        yfToAsset.set(resolveYfTicker(asset.ticker, asset.yfTicker), asset.ticker)
-      }
-    }
-
-    const yfTickers = [...yfToAsset.values()]
-    const storedToday =
-      yfTickers.length > 0
-        ? await this.priceHistory.getPricesForDate(yfTickers, today)
-        : new Map<string, number>()
-
-    const liveQuotes = new Map<string, number>()
-    const yfToFetch: string[] = []
-
-    for (const [symbol, assetTicker] of yfToAsset) {
-      const stored = storedToday.get(assetTicker)
-      if (stored !== undefined) liveQuotes.set(symbol, stored)
-      else yfToFetch.push(symbol)
-    }
-
-    if (yfToFetch.length > 0) {
-      const fetched = await this.yahoo.fetchQuotesBatch(yfToFetch)
-      await this.storeQuotes(fetched, yfToAsset, today, liveQuotes)
-    }
-    // O Tesouro não entra no atalho do "já tem preço de hoje": o arquivo sai com um dia
-    // útil de atraso, então nunca existe linha de hoje para reaproveitar. Consultar sempre
-    // não custa requisição — o CSV inteiro fica em cache no cliente por quatro horas.
-    if (tdToAsset.size > 0) {
-      const fetched = await this.tesouro.fetchQuotesBatch([...tdToAsset.keys()])
-      await this.storeDatedQuotes(fetched, tdToAsset, liveQuotes)
-    }
-
-    return liveQuotes
-  }
-
-  private async storeQuotes(
-    fetched: ReadonlyMap<string, number>,
-    symbolToAsset: ReadonlyMap<string, string>,
-    today: IsoDate,
-    into: Map<string, number>,
-  ): Promise<void> {
-    const records: PriceRecord[] = []
-    for (const [symbol, price] of fetched) {
-      into.set(symbol, price)
-      const assetTicker = symbolToAsset.get(symbol)
-      if (assetTicker !== undefined)
-        records.push({ assetId: assetTicker, date: today, close: price })
-    }
-    await this.priceHistory.upsertPrices(records)
-  }
-
-  /**
-   * Grava a cotação na data que a fonte declara, e usa o valor como preço de tela.
-   *
-   * O preço do Tesouro é o da última data-base publicada, que não é a de hoje. Carimbá-lo
-   * com hoje gravava o PU de um dia no outro — e deixava a série com a marca d'água em
-   * hoje, o que fazia o `runBackfill` pular o ativo e nunca preencher os dias que faltavam.
-   */
-  private async storeDatedQuotes(
-    fetched: ReadonlyMap<string, DatedPrice>,
-    symbolToAsset: ReadonlyMap<string, string>,
-    into: Map<string, number>,
-  ): Promise<void> {
-    const records: PriceRecord[] = []
-    for (const [symbol, [date, price]] of fetched) {
-      into.set(symbol, price)
-      const assetTicker = symbolToAsset.get(symbol)
-      if (assetTicker !== undefined) records.push({ assetId: assetTicker, date, close: price })
-    }
-    await this.priceHistory.upsertPrices(records)
   }
 
   private async loadTransactionsByAsset(
