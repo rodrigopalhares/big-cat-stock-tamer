@@ -313,7 +313,7 @@ function CdiComparisonCards({ cdi }: { cdi: CdiComparison | null }) {
         value={money(cdi.cdiValue)}
       />
       <Card
-        label={<>{ahead ? 'Acima do CDI' : 'Abaixo do CDI'}</>}
+        label={ahead ? 'Acima do CDI' : 'Abaixo do CDI'}
         value={money(Math.abs(cdi.difference))}
         valueClass={ahead ? 'text-success' : 'text-danger'}
       />

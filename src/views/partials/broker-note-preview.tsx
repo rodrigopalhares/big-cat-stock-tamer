@@ -18,7 +18,7 @@ import { prettyJson, tokenizeJson } from '../../shared/json-view.js'
  */
 
 export function BrokerNotePreview({ result }: { result: BrokerNoteImport }) {
-  const { note, groups, check } = result
+  const { note, groups } = result
 
   return (
     <div id="notePreview" data-broker-note-id={String(result.id)} data-csv={result.csv}>
