@@ -28,7 +28,10 @@ export function AssetsPage({
   error = null,
   warning = null,
 }: AssetsPageProps) {
-  const hasFilters = selectedType !== '' || selectedPosition !== '' || selectedDelisted !== ''
+  // O botão de limpar aparece quando algo difere do padrão (só com posição); a mensagem de
+  // lista vazia, quando há qualquer filtro — inclusive o padrão.
+  const hasFilters = selectedType !== '' || selectedPosition !== 'with' || selectedDelisted !== ''
+  const filtered = selectedType !== '' || selectedPosition !== 'all' || selectedDelisted !== ''
 
   return (
     <Layout title="Ativos — Carteira" path="/assets/">
@@ -89,7 +92,14 @@ export function AssetsPage({
                 ) : (
                   <div class="text-center py-5 text-muted">
                     <i class="bi bi-inbox fs-1" />
-                    <p class="mt-2">Nenhum ativo cadastrado ainda.</p>
+                    {filtered ? (
+                      <p class="mt-2">
+                        Nenhum ativo encontrado com esses filtros.{' '}
+                        <a href="/assets/?position=all">Ver todos</a>
+                      </p>
+                    ) : (
+                      <p class="mt-2">Nenhum ativo cadastrado ainda.</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -194,7 +204,9 @@ function Filters({
         ))}
       </select>
       <select name="position" class="form-select form-select-sm" style="width:auto" data-autosubmit>
-        <option value="">Posição: Todos</option>
+        <option value="all" selected={selectedPosition === 'all'}>
+          Posição: Todos
+        </option>
         <option value="with" selected={selectedPosition === 'with'}>
           Com posição
         </option>

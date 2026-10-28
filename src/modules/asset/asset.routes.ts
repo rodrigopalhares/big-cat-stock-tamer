@@ -82,7 +82,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
           classes: await c.assetClasses.listViews(),
           warning: priceWarning(req.query),
           selectedType: filters.type ?? '',
-          selectedPosition: filters.position ?? '',
+          selectedPosition: filters.position,
           selectedDelisted: filters.delisted ?? '',
         }),
       )
@@ -125,7 +125,7 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
             assets: await c.assets.findAll(),
             classes: await c.assetClasses.listViews(),
             selectedType: '',
-            selectedPosition: '',
+            selectedPosition: 'all',
             selectedDelisted: '',
             error: `Ativo '${ticker}' já cadastrado.`,
           }),
@@ -152,7 +152,8 @@ export function assetRoutes(c: Container): FastifyPluginAsync {
           currency: currency || 'BRL',
         }),
       )
-      return reply.redirect('/assets/', 302)
+      // Ativo recém-criado ainda não tem posição: o padrão da lista o esconderia.
+      return reply.redirect('/assets/?position=all', 302)
     })
 
     app.post<{ Params: { ticker: string } }>('/assets/:ticker/edit', async (req, reply) => {

@@ -45,7 +45,8 @@ export class AssetService {
     return assets.map(toAssetView)
   }
 
-  async findFiltered(filters: AssetFilters): Promise<AssetView[]> {
+  /** Filtro ausente não filtra — o padrão "com posição" da tela é decidido na rota. */
+  async findFiltered(filters: Partial<AssetFilters>): Promise<AssetView[]> {
     const { type, position, delisted } = filters
 
     const assets = await this.db.asset.findMany({

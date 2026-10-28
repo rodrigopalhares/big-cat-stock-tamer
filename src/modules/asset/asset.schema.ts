@@ -23,7 +23,9 @@ export type ParsedAssetRequest = z.output<typeof AssetRequest>
 
 export const AssetFilters = z.object({
   type: z.string().nullish(),
-  position: z.string().nullish(),
+  // Sem o parâmetro a tela abre só com quem tem posição — é o que se procura quase sempre.
+  // "Todos" é `all`; valor desconhecido (inclusive o `position=` de link antigo) cai no padrão.
+  position: z.enum(['with', 'without', 'all']).catch('with'),
   delisted: z.string().nullish(),
 })
 export type AssetFilters = z.infer<typeof AssetFilters>

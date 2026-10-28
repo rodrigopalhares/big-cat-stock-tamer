@@ -29,12 +29,12 @@ describe('rotas de ativos', () => {
     })
 
     it('lista vazia mostra o estado vazio', async () => {
-      const res = await h.app.inject({ method: 'GET', url: '/assets/' })
+      const res = await h.app.inject({ method: 'GET', url: '/assets/?position=all' })
       expect(res.body).toContain('Nenhum ativo cadastrado ainda')
     })
 
     it('mostra os ativos cadastrados', async () => {
-      await createAsset(h.db, 'PETR4', { name: 'Petrobras' })
+      await createAsset(h.db, 'PETR4', { name: 'Petrobras', hasPosition: true })
 
       const res = await h.app.inject({ method: 'GET', url: '/assets/' })
       expect(res.body).toContain('PETR4')
@@ -45,9 +45,53 @@ describe('rotas de ativos', () => {
       await createAsset(h.db, 'PETR4', { type: 'STOCK' })
       await createAsset(h.db, 'HGLG11', { type: 'REIT' })
 
-      const res = await h.app.inject({ method: 'GET', url: '/assets/?type=REIT' })
+      const res = await h.app.inject({ method: 'GET', url: '/assets/?type=REIT&position=all' })
       expect(res.body).toContain('HGLG11')
       expect(res.body).not.toContain('>PETR4<')
+    })
+
+    it('por padrão mostra só quem tem posição', async () => {
+      await createAsset(h.db, 'PETR4', { hasPosition: true })
+      await createAsset(h.db, 'OIBR3', { hasPosition: false })
+
+      const res = await h.app.inject({ method: 'GET', url: '/assets/' })
+
+      expect(res.body).toContain('>PETR4<')
+      expect(res.body).not.toContain('>OIBR3<')
+      expect(res.body).toContain('<option value="with" selected>')
+      // O padrão não é "filtro aplicado": sem botão de limpar.
+      expect(res.body).not.toContain('bi-x-lg')
+    })
+
+    it('position=all mostra todos e oferece voltar ao padrão', async () => {
+      await createAsset(h.db, 'PETR4', { hasPosition: true })
+      await createAsset(h.db, 'OIBR3', { hasPosition: false })
+
+      const res = await h.app.inject({ method: 'GET', url: '/assets/?position=all' })
+
+      expect(res.body).toContain('>PETR4<')
+      expect(res.body).toContain('>OIBR3<')
+      expect(res.body).toContain('<option value="all" selected>')
+      expect(res.body).toContain('bi-x-lg')
+    })
+
+    it('position vazio ou desconhecido cai no padrão', async () => {
+      await createAsset(h.db, 'OIBR3', { hasPosition: false })
+
+      for (const url of ['/assets/?position=', '/assets/?position=xyz']) {
+        const res = await h.app.inject({ method: 'GET', url })
+        expect(res.statusCode).toBe(200)
+        expect(res.body).not.toContain('>OIBR3<')
+      }
+    })
+
+    it('sem ativo com posição, a lista vazia aponta para todos', async () => {
+      await createAsset(h.db, 'OIBR3', { hasPosition: false })
+
+      const res = await h.app.inject({ method: 'GET', url: '/assets/' })
+
+      expect(res.body).toContain('Nenhum ativo encontrado com esses filtros')
+      expect(res.body).toContain('href="/assets/?position=all"')
     })
   })
 
@@ -59,8 +103,9 @@ describe('rotas de ativos', () => {
         payload: { ticker: 'PETR4', name: 'Petrobras', type: 'STOCK', currency: 'BRL' },
       })
 
+      // Ativo novo ainda não tem posição; o padrão da lista o esconderia.
       expect(res.statusCode).toBe(302)
-      expect(res.headers.location).toBe('/assets/')
+      expect(res.headers.location).toBe('/assets/?position=all')
       expect(await h.db.asset.findUnique({ where: { ticker: 'PETR4' } })).not.toBeNull()
     })
 

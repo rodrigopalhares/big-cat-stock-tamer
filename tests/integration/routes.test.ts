@@ -1432,7 +1432,7 @@ describe('rotas da aplicação', () => {
       await createTransaction(h.db, 'PETR4')
       await createDividend(h.db, 'PETR4')
 
-      const res = await h.app.inject({ method: 'GET', url: '/assets/' })
+      const res = await h.app.inject({ method: 'GET', url: '/assets/?position=all' })
 
       expect(res.body).not.toContain('action="/assets/PETR4/delete"')
       expect(res.body).toContain('data-asset-transaction-count="2"')
@@ -1495,7 +1495,7 @@ describe('rotas da aplicação', () => {
     it('tipo de ativo aparece em português no badge e no select, com o código no value', async () => {
       await createAsset(h.db, 'TD:IPCA2035', { type: 'TESOURO_DIRETO' })
 
-      const res = await h.app.inject({ method: 'GET', url: '/assets/' })
+      const res = await h.app.inject({ method: 'GET', url: '/assets/?position=all' })
 
       expect(res.body).toContain('title="TESOURO_DIRETO">Tesouro Direto</span>')
       expect(res.body).toContain('<option value="TESOURO_DIRETO">Tesouro Direto</option>')
