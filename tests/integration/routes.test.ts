@@ -4,7 +4,13 @@ import { date as fmtDate, monthLabel } from '../../src/shared/format.js'
 import { addDays, today } from '../../src/shared/iso-date.js'
 import { createHarness, type Harness } from '../app-harness.js'
 import { clearAllData } from '../db.js'
-import { createAsset, createDividend, createPriceHistory, createTransaction } from '../factories.js'
+import {
+  createAsset,
+  createAssetClass,
+  createDividend,
+  createPriceHistory,
+  createTransaction,
+} from '../factories.js'
 import {
   BCB_PTAX,
   BCB_SGS,
@@ -91,24 +97,49 @@ describe('rotas da aplicação', () => {
       expect(res.body).not.toContain('>Petrobras PN<')
     })
 
-    it('ordena as posições por tipo e depois por ticker', async () => {
-      for (const [ticker, type] of [
-        ['VALE3', 'STOCK'],
-        ['HGLG11', 'REIT'],
-        ['PETR4', 'STOCK'],
+    it('agrupa as posições por classe de alocação, com "Sem classe" por último', async () => {
+      const rf = await createAssetClass(h.db, 'Renda Fixa')
+      const intl = await createAssetClass(h.db, 'Internacional')
+      for (const [ticker, type, classId] of [
+        ['VALE3', 'STOCK', null],
+        ['IVVB11', 'ETF', intl.id],
+        ['TD:IPCA2035', 'TESOURO_DIRETO', rf.id],
+        ['AAPL34', 'BDR', intl.id],
       ] as const) {
-        await createAsset(h.db, ticker, { type })
+        await createAsset(h.db, ticker, { type, assetClassId: classId })
         await createTransaction(h.db, ticker, { quantity: 10, price: 10, date: '2024-01-02' })
         await h.container.assets.refreshPositionFields(ticker)
         await createPriceHistory(h.db, ticker, '2024-06-01', 12)
       }
 
       const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+      const at = (text: string) => res.body.indexOf(text)
 
-      // REIT antes de STOCK; dentro do mesmo tipo, por ticker.
-      expect(res.body.indexOf('HGLG11')).toBeGreaterThan(-1)
-      expect(res.body.indexOf('HGLG11')).toBeLessThan(res.body.indexOf('PETR4'))
-      expect(res.body.indexOf('PETR4')).toBeLessThan(res.body.indexOf('VALE3'))
+      // Classes em ordem alfabética; dentro da classe, por tipo (BDR antes de ETF).
+      expect(at('Subtotal Internacional')).toBeGreaterThan(at('IVVB11'))
+      expect(at('AAPL34')).toBeLessThan(at('IVVB11'))
+      expect(at('TD:IPCA2035')).toBeGreaterThan(at('Subtotal Internacional'))
+      expect(at('Subtotal Renda Fixa')).toBeGreaterThan(at('TD:IPCA2035'))
+      expect(at('VALE3')).toBeGreaterThan(at('Subtotal Renda Fixa'))
+      expect(at('Subtotal Sem classe')).toBeGreaterThan(at('VALE3'))
+
+      // Subtotal soma o grupo: 2 ativos × 10 × 12.
+      expect(res.body).toMatch(/Subtotal Internacional[\s\S]*?2 ativos[\s\S]*?240,00/)
+      expect(res.body).toContain(`data-class="${intl.id}"`)
+      expect(res.body).toContain('data-class="none"')
+      expect(res.body).toContain(`<option value="${rf.id}">Renda Fixa</option>`)
+    })
+
+    it('classe sem posição fica fora da tabela e do filtro', async () => {
+      await createAssetClass(h.db, 'Cripto')
+      await createAsset(h.db, 'PETR4')
+      await createTransaction(h.db, 'PETR4', { quantity: 10, price: 10, date: '2024-01-02' })
+      await h.container.assets.refreshPositionFields('PETR4')
+
+      const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
+
+      expect(res.body).not.toContain('Cripto')
+      expect(res.body).toContain('Subtotal Sem classe')
     })
 
     describe('cotações', () => {
@@ -1359,10 +1390,12 @@ describe('rotas da aplicação', () => {
   })
 
   describe('tabela de posições', () => {
-    it('fecha um subtotal por tipo, com a TIR do grupo, e marca as colunas secundárias', async () => {
-      await createAsset(h.db, 'PETR4', { type: 'STOCK', hasPosition: true })
-      await createAsset(h.db, 'VALE3', { type: 'STOCK', hasPosition: true })
-      await createAsset(h.db, 'HGLG11', { type: 'REIT', hasPosition: true })
+    it('fecha um subtotal por classe, com a TIR do grupo, e marca as colunas secundárias', async () => {
+      const acoes = await createAssetClass(h.db, 'Ações')
+      const fiis = await createAssetClass(h.db, 'FIIs')
+      await createAsset(h.db, 'PETR4', { type: 'STOCK', hasPosition: true, assetClassId: acoes.id })
+      await createAsset(h.db, 'VALE3', { type: 'STOCK', hasPosition: true, assetClassId: acoes.id })
+      await createAsset(h.db, 'HGLG11', { type: 'REIT', hasPosition: true, assetClassId: fiis.id })
       await createTransaction(h.db, 'PETR4', { quantity: 10, price: 10, date: '2024-01-15' })
       await createTransaction(h.db, 'VALE3', { quantity: 10, price: 20, date: '2024-01-15' })
       await createTransaction(h.db, 'HGLG11', { quantity: 1, price: 100, date: '2024-01-15' })
@@ -1373,9 +1406,9 @@ describe('rotas da aplicação', () => {
       const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
 
       expect(res.body.match(/data-subtotal/g)).toHaveLength(2)
-      expect(res.body).toContain('Subtotal Ação')
+      expect(res.body).toContain('Subtotal Ações')
       expect(res.body).toContain('· 2 ativos')
-      expect(res.body).toContain('Subtotal FII')
+      expect(res.body).toContain('Subtotal FIIs')
       expect(res.body).toContain('· 1 ativo')
       // Custo total das duas ações: 100 + 200.
       expect(res.body).toContain('R$ 300,00')

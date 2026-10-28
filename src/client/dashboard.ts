@@ -258,11 +258,11 @@ function buildDividendsChart(): void {
 
 function wireTable(): void {
   const table = document.getElementById('positionsTable')
-  const filterType = document.getElementById('filterType')
+  const filterClass = document.getElementById('filterClass')
   const filterPosition = document.getElementById('filterPosition')
   if (
     !(table instanceof HTMLTableElement) ||
-    !(filterType instanceof HTMLSelectElement) ||
+    !(filterClass instanceof HTMLSelectElement) ||
     !(filterPosition instanceof HTMLInputElement)
   ) {
     return
@@ -274,22 +274,22 @@ function wireTable(): void {
 
   wireColumnToggle(table)
 
-  // Subtotal acompanha o grupo no filtro de tipo, mas sai de cena assim que a tabela é
+  // Subtotal acompanha o grupo no filtro de classe, mas sai de cena assim que a tabela é
   // ordenada por uma coluna — não há grupo para ele fechar numa lista ordenada por TIR.
   let sorted = false
   const applyFilter = (): void => {
     for (const row of Array.from(tbody.rows)) {
-      const matchesType = filterType.value === '' || row.dataset['type'] === filterType.value
+      const matchesClass = filterClass.value === '' || row.dataset['class'] === filterClass.value
       if (row.dataset['subtotal'] !== undefined) {
-        row.style.display = matchesType && !sorted ? '' : 'none'
+        row.style.display = matchesClass && !sorted ? '' : 'none'
         continue
       }
       const hasPosition = Number(row.dataset['quantity'] ?? '0') > 0
-      row.style.display = matchesType && (!filterPosition.checked || hasPosition) ? '' : 'none'
+      row.style.display = matchesClass && (!filterPosition.checked || hasPosition) ? '' : 'none'
     }
   }
 
-  filterType.addEventListener('change', applyFilter)
+  filterClass.addEventListener('change', applyFilter)
   filterPosition.addEventListener('change', applyFilter)
   applyFilter()
 

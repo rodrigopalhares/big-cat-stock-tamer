@@ -1,14 +1,16 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { Container } from '../../container.js'
+import { UNCLASSIFIED } from '../../domain/allocation.js'
 import { buildMonthlyDividendSeries } from '../../domain/chart.js'
 import { isQuoteStale, quotesAsOf } from '../../domain/price-history.js'
+import type { Asset, AssetClass } from '../../generated/prisma/client.js'
 import { monthLabel } from '../../shared/format.js'
 import { HttpError } from '../../shared/http-error.js'
 import { firstDayOf, today, yearMonth } from '../../shared/iso-date.js'
 import {
+  type ClassGroup,
   DashboardPage,
   type DividendChartData,
-  type TypeSubtotal,
 } from '../../views/pages/dashboard.js'
 import { buildEvolutionChart } from '../evolution/evolution-chart.js'
 import type { AssetPosition } from './portfolio.schema.js'
@@ -17,8 +19,8 @@ import type { AssetPosition } from './portfolio.schema.js'
 export function portfolioRoutes(c: Container): FastifyPluginAsync {
   return async (app) => {
     app.get('/portfolio/', async (_req, reply) => {
-      const assets = await c.db.asset.findMany()
-      const positions = sortPositions(await c.portfolio.buildPositions(assets))
+      const [assets, classes] = await Promise.all([c.db.asset.findMany(), c.assetClasses.list()])
+      const positions = await c.portfolio.buildPositions(assets)
       const summary = c.portfolio.aggregatePositions(positions)
 
       const usdPosition = positions.find((p) => p.currency === 'USD' && p.exchangeRate !== null)
@@ -26,9 +28,7 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
 
       return reply.html(
         DashboardPage({
-          positions,
-          subtotals: subtotalsByType(c, positions),
-          assetTypes: [...new Set(positions.map((p) => p.type).filter(isString))].sort(),
+          groups: groupByClass(c, positions, assets, classes),
           netContribution: summary.netContribution,
           totalInvested: summary.totalInvested,
           realizedPnl: summary.realizedPnl,
@@ -96,14 +96,43 @@ async function buildDividendChart(c: Container): Promise<DividendChartData | nul
 }
 
 /**
- * Um resumo por tipo de ativo, pela mesma conta do total da carteira — inclusive a TIR,
- * que sai dos fluxos do grupo e não da média das TIRs individuais.
+ * As posições agrupadas pela classe de alocação, cada grupo com o resumo pela mesma conta do
+ * total da carteira — inclusive a TIR, que sai dos fluxos do grupo e não da média das TIRs
+ * individuais.
+ *
+ * Classes em ordem alfabética e o balde "Sem classe" por último; dentro da classe, por tipo
+ * e ticker, para os badges iguais ficarem juntos. Classe sem posição não aparece.
  */
-function subtotalsByType(c: Container, positions: readonly AssetPosition[]): TypeSubtotal[] {
-  const types = [...new Set(positions.map((p) => p.type ?? ''))]
-  return types.map((type) => {
-    const group = positions.filter((p) => (p.type ?? '') === type)
-    return { type, count: group.length, summary: c.portfolio.aggregatePositions(group) }
+function groupByClass(
+  c: Container,
+  positions: readonly AssetPosition[],
+  assets: readonly Asset[],
+  classes: readonly AssetClass[],
+): ClassGroup[] {
+  const classIdByTicker = new Map(assets.map((a) => [a.ticker, a.assetClassId]))
+  const buckets = [
+    ...[...classes]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((cls) => ({ id: cls.id as number | null, name: cls.name })),
+    { id: UNCLASSIFIED.id, name: UNCLASSIFIED.name },
+  ]
+  const known = new Set(classes.map((cls) => cls.id))
+  const classOf = (p: AssetPosition): number | null => {
+    const id = classIdByTicker.get(p.ticker) ?? null
+    return id !== null && known.has(id) ? id : null
+  }
+
+  return buckets.flatMap(({ id, name }) => {
+    const group = sortPositions(positions.filter((p) => classOf(p) === id))
+    if (group.length === 0) return []
+    return [
+      {
+        key: id === null ? 'none' : String(id),
+        name,
+        positions: group,
+        summary: c.portfolio.aggregatePositions(group),
+      },
+    ]
   })
 }
 
@@ -111,8 +140,4 @@ function sortPositions(positions: AssetPosition[]): AssetPosition[] {
   return [...positions].sort(
     (a, b) => (a.type ?? '').localeCompare(b.type ?? '') || a.ticker.localeCompare(b.ticker),
   )
-}
-
-function isString(value: string | null): value is string {
-  return value !== null
 }

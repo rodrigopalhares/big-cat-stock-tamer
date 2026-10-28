@@ -1,6 +1,5 @@
 import type { CdiComparison } from '../../modules/cdi/cdi.schema.js'
 import type { AssetPosition, PortfolioSummary } from '../../modules/portfolio/portfolio.schema.js'
-import { assetTypeLabel } from '../../shared/asset-type-labels.js'
 import {
   decimal,
   date as fmtDate,
@@ -34,18 +33,19 @@ export type DividendChartData = {
   movingAverage: number[]
 }
 
-/** Consolidado de um tipo de ativo — a linha de subtotal depois do grupo na tabela. */
-export type TypeSubtotal = {
-  type: string
-  count: number
+/** As posições de uma classe de alocação e o consolidado que fecha o grupo na tabela. */
+export type ClassGroup = {
+  /** Valor de `data-class` e do filtro: id da classe, ou `none` no balde "Sem classe". */
+  key: string
+  name: string
+  /** Ordenadas por tipo e ticker. */
+  positions: AssetPosition[]
   summary: PortfolioSummary
 }
 
 export type DashboardPageProps = {
-  /** Ordenadas por tipo e ticker — é a ordem que agrupa os subtotais. */
-  positions: AssetPosition[]
-  subtotals: TypeSubtotal[]
-  assetTypes: string[]
+  /** Classes em ordem alfabética, "Sem classe" por último. */
+  groups: ClassGroup[]
   netContribution: number
   totalInvested: number
   realizedPnl: number
@@ -66,7 +66,7 @@ export type DashboardPageProps = {
 }
 
 export function DashboardPage(props: DashboardPageProps) {
-  const { positions, hasUsd, usdRate, quotesAsOf, quotesStale, chart, dividendChart } = props
+  const { groups, hasUsd, usdRate, quotesAsOf, quotesStale, chart, dividendChart } = props
 
   return (
     <Layout title="Dashboard — Carteira" path="/portfolio/">
@@ -139,10 +139,10 @@ export function DashboardPage(props: DashboardPageProps) {
           <div class="card-body border-bottom py-2">
             <div class="row g-2 align-items-center">
               <div class="col-auto">
-                <select id="filterType" class="form-select form-select-sm">
-                  <option value="">Tipo de ativo: Todos</option>
-                  {props.assetTypes.map((t) => (
-                    <option value={t}>{assetTypeLabel(t)}</option>
+                <select id="filterClass" class="form-select form-select-sm">
+                  <option value="">Classe: Todas</option>
+                  {groups.map((g) => (
+                    <option value={g.key}>{g.name}</option>
                   ))}
                 </select>
               </div>
@@ -169,7 +169,7 @@ export function DashboardPage(props: DashboardPageProps) {
             </div>
           </div>
           <div class="card-body p-0">
-            {positions.length > 0 ? (
+            {groups.length > 0 ? (
               <PositionsTable {...props} />
             ) : (
               <div class="text-center py-5 text-muted">
@@ -412,12 +412,12 @@ function PositionsTable(props: DashboardPageProps) {
           </tr>
         </thead>
         <tbody>
-          {groupByType(props.positions).map(([type, rows]) => (
+          {props.groups.map((group) => (
             <>
-              {rows.map((p) => (
-                <PositionRow position={p} />
+              {group.positions.map((p) => (
+                <PositionRow position={p} classKey={group.key} />
               ))}
-              <SubtotalRow subtotal={props.subtotals.find((s) => s.type === type)} />
+              <SubtotalRow group={group} />
             </>
           ))}
         </tbody>
@@ -427,33 +427,21 @@ function PositionsTable(props: DashboardPageProps) {
   )
 }
 
-/** Mantém a ordem em que as posições vieram — o servidor já as ordena por tipo. */
-function groupByType(positions: readonly AssetPosition[]): Array<[string, AssetPosition[]]> {
-  const groups: Array<[string, AssetPosition[]]> = []
-  for (const p of positions) {
-    const type = p.type ?? ''
-    const last = groups[groups.length - 1]
-    if (last !== undefined && last[0] === type) last[1].push(p)
-    else groups.push([type, [p]])
-  }
-  return groups
-}
-
 /**
- * Subtotal de um tipo: o que a carteira tem em ações, em FIIs, em Tesouro. É a pergunta
- * que a tabela ordenada por tipo já sugere e obrigava a somar de cabeça.
+ * Subtotal de uma classe: o que a carteira tem em renda variável, em renda fixa, lá fora. É
+ * a pergunta que a tabela agrupada por classe já sugere e obrigava a somar de cabeça.
  *
- * `data-type` deixa o filtro de tipo esconder e mostrar a linha junto com o grupo, e
+ * `data-class` deixa o filtro de classe esconder e mostrar a linha junto com o grupo, e
  * `data-subtotal` deixa a ordenação por coluna tirá-la do caminho — subtotal no meio de
  * uma lista ordenada por TIR não faz sentido.
  */
-function SubtotalRow({ subtotal }: { subtotal: TypeSubtotal | undefined }) {
-  if (subtotal === undefined) return null
-  const { summary: s, count, type } = subtotal
+function SubtotalRow({ group }: { group: ClassGroup }) {
+  const { summary: s, key, name } = group
+  const count = group.positions.length
   return (
-    <tr data-subtotal data-type={type} class="small">
+    <tr data-subtotal data-class={key} class="small">
       <td colSpan={2}>
-        Subtotal {assetTypeLabel(type)}{' '}
+        Subtotal {name}{' '}
         <span class="text-muted fw-normal">
           · {count} {count === 1 ? 'ativo' : 'ativos'}
         </span>
@@ -486,7 +474,7 @@ function SubtotalRow({ subtotal }: { subtotal: TypeSubtotal | undefined }) {
   )
 }
 
-function PositionRow({ position: p }: { position: AssetPosition }) {
+function PositionRow({ position: p, classKey }: { position: AssetPosition; classKey: string }) {
   const hasQuantity = p.quantity > 0
   const converted = p.exchangeRate !== null
 
@@ -507,7 +495,7 @@ function PositionRow({ position: p }: { position: AssetPosition }) {
     )
 
   return (
-    <tr data-type={p.type} data-quantity={String(p.quantity)}>
+    <tr data-class={classKey} data-quantity={String(p.quantity)}>
       <td>
         {/* O nome vai no title, não no corpo da célula: além de encher a tabela, ele entrava
             no `textContent` que a ordenação lê, e "PETR4" comparava como "PETR4Petrobras PN". */}
