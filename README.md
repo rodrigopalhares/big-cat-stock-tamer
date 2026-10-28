@@ -162,8 +162,8 @@ gunzip -c data/backups/daily/stocks-2026-06-09.db.gz > data/stocks.db
 ## Serviço (systemd)
 
 Em produção a aplicação roda como serviço, com auto-start amarrado ao volume criptografado:
-um *path unit* vigia a sentinela `/storage/media/big-cat/.mounted` e sobe o serviço quando o
-volume é montado; `BindsTo` derruba junto no `umount`. As units estão versionadas em
+a unit é `WantedBy=storage-media.mount`, então o serviço sobe quando o volume é montado;
+`BindsTo` derruba junto no `umount`. As units estão versionadas em
 [`deploy/`](deploy/), com sandbox do systemd — um único caminho gravável, resto do sistema
 read-only.
 

@@ -5,9 +5,13 @@ criptografado `/storage/media` é montado, e cai quando é desmontado.
 
 ## Como funciona o auto-start
 
-- `big-cat.path` é um *path unit* que vigia a sentinela `/storage/media/big-cat/.mounted`.
-  Essa sentinela mora **dentro** do btrfs criptografado, então só existe quando o volume
-  está montado. Assim que ela aparece, o systemd sobe o `big-cat.service`.
+- `big-cat.service` é `WantedBy=storage-media.mount`: o `enable` o pendura na própria
+  mount, então o systemd sobe o app assim que `/storage/media` é montado. Não usamos
+  `multi-user.target` porque o volume é `noauto` (só abre com a senha do LUKS) e o boot
+  tentaria subir o app sem ele.
+- Um *path unit* vigiando uma sentinela dentro do volume **não funciona**: o systemd dá
+  a todo `.path` um `Requires=` implícito na mount do caminho vigiado, então no boot o
+  `.path` falha junto com a mount e nunca fica esperando.
 - `big-cat.service` roda um processo só — o scheduler (croner) e o backup sobem
   in-process, então nada de réplicas. `BindsTo=storage-media.mount` faz o app **cair
   sozinho** ao desmontar `/storage/media`.
@@ -89,23 +93,15 @@ npm ci
 npm run build
 npm run db:deploy
 
-# 2) Units
+# 2) Unit POR ULTIMO: com o volume montado, o `--now` sobe o app no mesmo segundo
 sudo cp deploy/big-cat.service /etc/systemd/system/
-sudo cp deploy/big-cat.path    /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now big-cat.path
-
-# 3) Sentinela POR ULTIMO: com o .path ja habilitado, ela sobe o app no mesmo segundo
-touch /storage/media/big-cat/.mounted
+sudo systemctl enable --now big-cat.service
 ```
 
-A sentinela vem no fim de propósito. Numa instalação virgem a ordem não importa (a unit
-ainda não existe para disparar), mas numa reinstalação ou num volume que já tem a sentinela,
-criá-la antes das migrations sobe a aplicação com o schema velho. Acesse em
-`http://<ip-da-maquina>:8001` (bind `0.0.0.0`).
-
-> O `.service` fica `disabled` de propósito — quem o inicia é o `.path`. Habilitar os dois
-> faria o systemd tentar subir o app no boot, antes do volume existir.
+A unit vem depois das migrations de propósito: o `enable --now` sobe a aplicação na hora, e
+antes delas ela subiria com o schema velho. Acesse em `http://<ip-da-maquina>:8001` (bind
+`0.0.0.0`).
 
 ## Operação no dia a dia
 
@@ -130,5 +126,5 @@ npm run db:deploy           # se houver migration nova
 sudo systemctl restart big-cat.service
 ```
 
-Mudou `big-cat.service` ou `big-cat.path`? Copie de novo para `/etc/systemd/system/` e
+Mudou `big-cat.service`? Copie de novo para `/etc/systemd/system/` e
 rode `sudo systemctl daemon-reload`.

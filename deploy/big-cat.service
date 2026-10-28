@@ -66,4 +66,6 @@ UMask=0077
 # MemoryDenyWriteExecute NAO entra: o JIT do V8 precisa de paginas W+X.
 
 [Install]
-WantedBy=multi-user.target
+# Sobe quando o volume cifrado monta (o .path nao servia: ganha Requires= implicito
+# na mount e falha no boot, antes do unlock).
+WantedBy=storage-media.mount
