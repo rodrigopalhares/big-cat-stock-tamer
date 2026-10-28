@@ -25,6 +25,19 @@ describe('AssetClassService', () => {
     return AssetClassForm.parse({ name, target_percent: String(targetPercent), color })
   }
 
+  describe('buckets', () => {
+    it('lista as classes em ordem alfabética com "Sem classe" por último', async () => {
+      const rf = await createAssetClass(db, 'Renda Fixa', { color: '#795548' })
+      const acoes = await createAssetClass(db, 'Ações', { color: '#36a2eb' })
+
+      expect(await service.buckets()).toEqual([
+        { id: acoes.id, name: 'Ações', color: '#36a2eb' },
+        { id: rf.id, name: 'Renda Fixa', color: '#795548' },
+        { id: null, name: 'Sem classe', color: '#6c757d' },
+      ])
+    })
+  })
+
   describe('create', () => {
     it('cria com nome, meta e cor', async () => {
       const created = await service.create(form('Ações', 40))

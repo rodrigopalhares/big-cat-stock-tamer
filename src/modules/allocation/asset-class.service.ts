@@ -1,8 +1,14 @@
 import type { Db } from '../../config/db.js'
+import { UNCLASSIFIED } from '../../domain/allocation.js'
 import { defaultClassNameForType } from '../../domain/asset-class.js'
 import type { AssetClass } from '../../generated/prisma/client.js'
 import { HttpError } from '../../shared/http-error.js'
-import { type AssetClassForm, type AssetClassView, toAssetClassView } from './allocation.schema.js'
+import {
+  type AssetClassForm,
+  type AssetClassView,
+  type ClassBucket,
+  toAssetClassView,
+} from './allocation.schema.js'
 
 /** CRUD das classes de alocação e a classificação padrão de ativo novo. */
 export class AssetClassService {
@@ -15,6 +21,16 @@ export class AssetClassService {
   /** O mesmo, no formato que as views recebem. */
   async listViews(): Promise<AssetClassView[]> {
     return (await this.list()).map(toAssetClassView)
+  }
+
+  /**
+   * As classes na ordem em que o dashboard agrupa: alfabética, com o balde "Sem classe" por
+   * último. Tabela e gráficos leem daqui para a mesma classe sair no mesmo lugar e na
+   * mesma cor.
+   */
+  async buckets(): Promise<ClassBucket[]> {
+    const classes = await this.list()
+    return [...classes.map(({ id, name, color }) => ({ id, name, color })), { ...UNCLASSIFIED }]
   }
 
   /** Estoura 404 se a classe não existe. Usado por quem grava `assets.asset_class_id`. */

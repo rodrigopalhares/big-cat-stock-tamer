@@ -76,8 +76,8 @@ export function buildIbovChartLine(
   })
 }
 
-/** Um provento já líquido e em reais, com a data e o tipo do ativo que o pagou. */
-export type DividendFlow = { date: IsoDate; assetType: string; net: number }
+/** Um provento já líquido e em reais, com a data e o grupo (a classe) do ativo que o pagou. */
+export type DividendFlow = { date: IsoDate; group: string; net: number }
 
 export type MonthlyDividendSeries = {
   months: YearMonth[]
@@ -90,7 +90,7 @@ export type MonthlyDividendSeries = {
 const AVERAGE_WINDOW_MONTHS = 12
 
 /**
- * Proventos somados por mês e por tipo de ativo, para o gráfico de barras empilhadas.
+ * Proventos somados por mês e por grupo, para o gráfico de barras empilhadas.
  *
  * O eixo vai do primeiro provento até [currentMonth], preenchendo com zero todo mês sem
  * recebimento — tanto os buracos no meio quanto a cauda depois do último provento. Mês
@@ -109,14 +109,14 @@ export function buildMonthlyDividendSeries(
   const months = monthsBetweenInclusive(yearMonth(first), lastMonth)
   const indexOfMonth = new Map(months.map((month, index) => [month, index]))
 
-  // Mesma ordem de legenda do gráfico de evolução: tipo de ativo em ordem alfabética.
-  const datasets = [...new Set(flows.map((f) => f.assetType))]
+  // Grupos em ordem alfabética; quem precisa de outra ordem reordena por cima.
+  const datasets = [...new Set(flows.map((f) => f.group))]
     .sort()
     .map((label) => ({ label, data: months.map(() => 0) }))
-  const dataByType = new Map(datasets.map((d) => [d.label, d.data]))
+  const dataByGroup = new Map(datasets.map((d) => [d.label, d.data]))
 
   for (const flow of flows) {
-    const data = dataByType.get(flow.assetType)
+    const data = dataByGroup.get(flow.group)
     const index = indexOfMonth.get(yearMonth(flow.date))
     if (data === undefined || index === undefined) continue
     data[index] = (data[index] as number) + flow.net

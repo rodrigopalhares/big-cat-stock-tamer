@@ -57,6 +57,12 @@ export function hexTextColor(hex: string): string {
   return textColorFor(parseHex(hex) ?? FALLBACK)
 }
 
+/** A cor da classe translúcida, como `assetTypeFill` faz com a do tipo. */
+export function hexFill(hex: string, alpha = 0.6): string {
+  const [r, g, b] = parseHex(hex) ?? FALLBACK
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
 function textColorFor([r, g, b]: Rgb): string {
   return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? '#212529' : '#fff'
 }

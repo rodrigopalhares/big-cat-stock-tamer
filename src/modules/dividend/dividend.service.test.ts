@@ -1,6 +1,11 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { clearAllData, createTestDb, type TestDb } from '../../../tests/db.js'
-import { createAsset, createDividend, createExchangeRate } from '../../../tests/factories.js'
+import {
+  createAsset,
+  createAssetClass,
+  createDividend,
+  createExchangeRate,
+} from '../../../tests/factories.js'
 import { BcbClient } from '../../integrations/bcb/bcb.client.js'
 import { YahooClient } from '../../integrations/yahoo/yahoo.client.js'
 import { isoDate } from '../../shared/iso-date.js'
@@ -355,22 +360,24 @@ describe('DividendService', () => {
       ])
     })
 
-    it('getNetFlowsByAssetType marca cada provento com o tipo do ativo', async () => {
-      await createAsset(db, 'PETR4', { type: 'STOCK' })
+    it('getNetFlowsByAssetClass marca cada provento com a classe do ativo', async () => {
+      const acoes = await createAssetClass(db, 'Ações')
+      await createAsset(db, 'PETR4', { type: 'STOCK', assetClassId: acoes.id })
       await createAsset(db, 'HGLG11', { type: 'REIT' })
       await createDividend(db, 'PETR4', { date: '2024-02-10', totalAmount: 50, taxWithheld: 7.5 })
       await createDividend(db, 'HGLG11', { date: '2024-01-10', totalAmount: 80, taxWithheld: 0 })
 
-      const flows = await service.getNetFlowsByAssetType()
+      const flows = await service.getNetFlowsByAssetClass()
 
+      // Ativo sem classe entra no balde "Sem classe", em vez de sumir do gráfico.
       expect(flows).toEqual([
-        { date: '2024-01-10', assetType: 'REIT', net: 80 },
-        { date: '2024-02-10', assetType: 'STOCK', net: 42.5 },
+        { date: '2024-01-10', group: 'Sem classe', net: 80 },
+        { date: '2024-02-10', group: 'Ações', net: 42.5 },
       ])
     })
 
-    it('getNetFlowsByAssetType devolve vazio sem proventos', async () => {
-      expect(await service.getNetFlowsByAssetType()).toEqual([])
+    it('getNetFlowsByAssetClass devolve vazio sem proventos', async () => {
+      expect(await service.getNetFlowsByAssetClass()).toEqual([])
     })
   })
 })

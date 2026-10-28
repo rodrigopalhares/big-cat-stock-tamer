@@ -33,6 +33,13 @@ export type UnpricedAsset = {
   type: string
 }
 
+/** Classe como o dashboard agrupa; id null é o balde "Sem classe". */
+export type ClassBucket = {
+  id: number | null
+  name: string
+  color: string
+}
+
 export type AssetClassView = {
   id: number
   name: string

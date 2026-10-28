@@ -380,8 +380,10 @@ describe('rotas da aplicação', () => {
     })
 
     it('com snapshots monta os dados do gráfico', async () => {
+      const fiis = await createAssetClass(h.db, 'FIIs', { color: '#9966ff' })
+      await createAssetClass(h.db, 'Cripto')
       await createAsset(h.db, 'PETR4', { type: 'STOCK' })
-      await createAsset(h.db, 'HGLG11', { type: 'REIT' })
+      await createAsset(h.db, 'HGLG11', { type: 'REIT', assetClassId: fiis.id })
       await createTransaction(h.db, 'PETR4', { quantity: 10, price: 10, date: '2024-01-05' })
       await createTransaction(h.db, 'HGLG11', { quantity: 1, price: 150, date: '2024-01-05' })
       await h.container.assets.refreshPositionFields('PETR4')
@@ -416,10 +418,11 @@ describe('rotas da aplicação', () => {
 
       expect(res.statusCode).toBe(200)
       expect(chartAttr(res.body, 'data-labels')).toEqual(['01/2024'])
-      // Uma série por tipo de ativo, somando o valor de mercado dos snapshots do mês.
+      // Uma série por classe com ativo cadastrado, na cor da classe, somando o valor de
+      // mercado dos snapshots do mês. Cripto não tem ativo e fica fora da legenda.
       expect(chartAttr(res.body, 'data-datasets')).toEqual([
-        { label: 'REIT', data: [160] },
-        { label: 'STOCK', data: [120] },
+        { label: 'FIIs', color: '#9966ff', data: [160] },
+        { label: 'Sem classe', color: '#6c757d', data: [120] },
       ])
       expect(chartAttr(res.body, 'data-invested')).toEqual([250])
       // Sem provento nem venda, o aporte é o próprio custo das compras do mês.
@@ -428,8 +431,9 @@ describe('rotas da aplicação', () => {
       expect(chartAttr(res.body, 'data-ibov')).toHaveLength(1)
     })
 
-    it('com proventos monta o gráfico mensal por tipo de ativo', async () => {
-      await createAsset(h.db, 'PETR4', { type: 'STOCK' })
+    it('com proventos monta o gráfico mensal por classe de alocação', async () => {
+      const acoes = await createAssetClass(h.db, 'Ações', { color: '#36a2eb' })
+      await createAsset(h.db, 'PETR4', { type: 'STOCK', assetClassId: acoes.id })
       await createAsset(h.db, 'HGLG11', { type: 'REIT' })
       await createDividend(h.db, 'PETR4', { date: '2024-01-10', totalAmount: 100 })
       await createDividend(h.db, 'PETR4', { date: '2024-03-10', totalAmount: 40, taxWithheld: 6 })
@@ -446,14 +450,17 @@ describe('rotas da aplicação', () => {
       expect(labels[0]).toBe('01/2024')
       expect(labels.at(-1)).toBe(monthLabel(today()))
 
-      // Uma série por tipo de ativo, com o líquido do mês e zero onde não houve provento.
+      // Uma série por classe, com o líquido do mês e zero onde não houve provento.
+      // "Sem classe" vem por último, como na tabela.
       const datasets = chartAttr(res.body, 'data-dividend-datasets') as Array<{
         label: string
+        color: string
         data: number[]
       }>
-      expect(datasets.map((d) => d.label)).toEqual(['REIT', 'STOCK'])
-      expect(datasets[0]?.data.slice(0, 3)).toEqual([0, 80, 0])
-      expect(datasets[1]?.data.slice(0, 3)).toEqual([100, 0, 34])
+      expect(datasets.map((d) => d.label)).toEqual(['Ações', 'Sem classe'])
+      expect(datasets[0]?.color).toBe('#36a2eb')
+      expect(datasets[0]?.data.slice(0, 3)).toEqual([100, 0, 34])
+      expect(datasets[1]?.data.slice(0, 3)).toEqual([0, 80, 0])
       for (const dataset of datasets) expect(dataset.data).toHaveLength(labels.length)
       expect(chartAttr(res.body, 'data-dividend-moving-average')).toHaveLength(labels.length)
     })

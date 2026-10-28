@@ -15,9 +15,12 @@ import { Layout } from '../layout.js'
 
 /** Porte de src/main/resources/templates/dashboard.html. */
 
+/** Uma série por classe de alocação, com o nome dela na legenda e a cor que ela tem na Alocação. */
+export type ClassSeries = { label: string; color: string; data: number[] }
+
 export type ChartData = {
   labels: string[]
-  datasets: Array<{ label: string; data: number[] }>
+  datasets: ClassSeries[]
   invested: number[]
   /** Aporte líquido acumulado mês a mês — o mesmo número do card, ao longo do tempo. */
   netContribution: number[]
@@ -26,10 +29,10 @@ export type ChartData = {
   cdi: Array<number | null>
 }
 
-/** Proventos por mês, uma série por tipo de ativo — barras empilhadas + média móvel. */
+/** Proventos por mês, uma série por classe de alocação — barras empilhadas + média móvel. */
 export type DividendChartData = {
   labels: string[]
-  datasets: Array<{ label: string; data: number[] }>
+  datasets: ClassSeries[]
   movingAverage: number[]
 }
 

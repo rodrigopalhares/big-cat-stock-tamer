@@ -82,10 +82,13 @@ Verificadas pelo `dependency-cruiser` no CI, não só combinadas:
   paginação: a tela traz a primeira página e a última linha é uma sentinela HTMX
   (`views/components/load-more-row.tsx`, `hx-trigger="revealed"`) que busca `/<lista>/rows?offset=`
   com os mesmos filtros. O service recebe `PageWindow` opcional e tem um `count` para o badge.
-- Cor de tipo de ativo sai de `src/shared/asset-colors.ts` — gráficos e badges leem do mesmo
-  mapa, então STOCK é o mesmo azul em toda a interface. O rótulo em português sai de
+- Cor de tipo de ativo sai de `src/shared/asset-colors.ts` — os badges leem desse mapa, então
+  STOCK é o mesmo azul em toda a interface. O rótulo em português sai de
   `src/shared/asset-type-labels.ts` (STOCK é "Ação"); o código fica em `value`, `title` e na
   chave de cor, nunca em texto de tela. Tipo novo entra nos dois mapas, e só neles.
+- Dashboard e Evolução agrupam por **classe de alocação**, não por tipo: tabela, subtotais,
+  filtro e os dois gráficos. A ordem sai de `AssetClassService.buckets()` (alfabética, "Sem
+  classe" por último) e a cor do gráfico é a da classe, a mesma da tela de Alocação.
 
 ## Decisões que valem conhecer antes de mexer
 

@@ -1,4 +1,5 @@
 import type { Db } from '../../config/db.js'
+import { UNCLASSIFIED } from '../../domain/allocation.js'
 import type { DividendFlow } from '../../domain/chart.js'
 import type { CashFlow } from '../../domain/xirr.js'
 import type { Dividend, Prisma } from '../../generated/prisma/client.js'
@@ -183,22 +184,22 @@ export class DividendService {
   }
 
   /**
-   * Proventos líquidos em reais com o tipo do ativo que os pagou — insumo do gráfico
-   * mensal do dashboard.
+   * Proventos líquidos em reais com o nome da classe do ativo que os pagou — insumo do
+   * gráfico mensal do dashboard. Ativo sem classe cai em "Sem classe".
    */
-  async getNetFlowsByAssetType(): Promise<DividendFlow[]> {
+  async getNetFlowsByAssetClass(): Promise<DividendFlow[]> {
     const dividends = await this.db.dividend.findMany({
       select: {
         date: true,
         totalAmountBrl: true,
         taxWithheldBrl: true,
-        asset: { select: { type: true } },
+        asset: { select: { assetClass: { select: { name: true } } } },
       },
       orderBy: { date: 'asc' },
     })
     return dividends.map((d) => ({
       date: d.date as IsoDate,
-      assetType: d.asset.type,
+      group: d.asset.assetClass?.name ?? UNCLASSIFIED.name,
       net: d.totalAmountBrl - d.taxWithheldBrl,
     }))
   }

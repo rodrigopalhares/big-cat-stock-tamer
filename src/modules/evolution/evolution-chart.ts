@@ -8,7 +8,8 @@ import type { AssetPosition } from '../portfolio/portfolio.schema.js'
 import type { MonthlyEvolutionSummary } from './evolution.schema.js'
 
 /**
- * Dados do gráfico de evolução: uma série por tipo de ativo, mais as linhas de referência.
+ * Dados do gráfico de evolução: uma série por classe de alocação, mais as linhas de
+ * referência. Só entram as classes que têm algum ativo cadastrado.
  * Null quando não há snapshot nenhum — aí a página nem desenha o gráfico.
  *
  * Era função privada da rota do dashboard. Saiu de lá quando a página de Evolução passou a
@@ -22,9 +23,12 @@ export async function buildEvolutionChart(
 ): Promise<ChartData | null> {
   if (evolution.months.length === 0) return null
 
-  const assets = await c.db.asset.findMany({ select: { ticker: true, type: true } })
-  const typeByTicker = new Map(assets.map((a) => [a.ticker, a.type ?? 'STOCK']))
-  const types = [...new Set(typeByTicker.values())].sort()
+  const [assets, buckets] = await Promise.all([
+    c.db.asset.findMany({ select: { ticker: true, assetClassId: true } }),
+    c.assetClasses.buckets(),
+  ])
+  const classByTicker = new Map(assets.map((a) => [a.ticker, a.assetClassId]))
+  const used = buckets.filter((b) => assets.some((a) => a.assetClassId === b.id))
 
   const invested = evolution.months.map((row) => row.totalInvested)
   const months = evolution.months.map((row) => row.month)
@@ -33,11 +37,12 @@ export async function buildEvolutionChart(
 
   return {
     labels: months.map((month) => monthLabel(month)),
-    datasets: types.map((type) => ({
-      label: type,
+    datasets: used.map((bucket) => ({
+      label: bucket.name,
+      color: bucket.color,
       data: evolution.months.map((row) =>
         row.snapshots
-          .filter((s) => typeByTicker.get(s.assetId) === type)
+          .filter((s) => (classByTicker.get(s.assetId) ?? null) === bucket.id)
           .reduce((total, s) => total + s.marketValue, 0),
       ),
     })),

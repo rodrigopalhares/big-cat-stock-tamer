@@ -1,9 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify'
 import type { Container } from '../../container.js'
-import { UNCLASSIFIED } from '../../domain/allocation.js'
 import { buildMonthlyDividendSeries } from '../../domain/chart.js'
 import { isQuoteStale, quotesAsOf } from '../../domain/price-history.js'
-import type { Asset, AssetClass } from '../../generated/prisma/client.js'
+import type { Asset } from '../../generated/prisma/client.js'
 import { monthLabel } from '../../shared/format.js'
 import { HttpError } from '../../shared/http-error.js'
 import { firstDayOf, today, yearMonth } from '../../shared/iso-date.js'
@@ -12,6 +11,7 @@ import {
   DashboardPage,
   type DividendChartData,
 } from '../../views/pages/dashboard.js'
+import type { ClassBucket } from '../allocation/allocation.schema.js'
 import { buildEvolutionChart } from '../evolution/evolution-chart.js'
 import type { AssetPosition } from './portfolio.schema.js'
 
@@ -19,7 +19,7 @@ import type { AssetPosition } from './portfolio.schema.js'
 export function portfolioRoutes(c: Container): FastifyPluginAsync {
   return async (app) => {
     app.get('/portfolio/', async (_req, reply) => {
-      const [assets, classes] = await Promise.all([c.db.asset.findMany(), c.assetClasses.list()])
+      const [assets, buckets] = await Promise.all([c.db.asset.findMany(), c.assetClasses.buckets()])
       const positions = await c.portfolio.buildPositions(assets)
       const summary = c.portfolio.aggregatePositions(positions)
 
@@ -28,7 +28,7 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
 
       return reply.html(
         DashboardPage({
-          groups: groupByClass(c, positions, assets, classes),
+          groups: groupByClass(c, positions, assets, buckets),
           netContribution: summary.netContribution,
           totalInvested: summary.totalInvested,
           realizedPnl: summary.realizedPnl,
@@ -43,7 +43,7 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
           quotesStale: asOf !== null && isQuoteStale(asOf, today()),
           cdi: await c.cdi.compare(summary),
           chart: await buildEvolutionChart(c, positions, await c.evolution.getEvolution()),
-          dividendChart: await buildDividendChart(c),
+          dividendChart: await buildDividendChart(c, buckets),
         }),
       )
     })
@@ -80,17 +80,24 @@ export function portfolioRoutes(c: Container): FastifyPluginAsync {
 }
 
 /**
- * Proventos recebidos mês a mês, uma série por tipo de ativo.
- * Null quando não há provento nenhum — aí a página nem desenha o gráfico.
+ * Proventos recebidos mês a mês, uma série por classe de alocação, na ordem e na cor da
+ * tabela. Null quando não há provento nenhum — aí a página nem desenha o gráfico.
  */
-async function buildDividendChart(c: Container): Promise<DividendChartData | null> {
-  const flows = await c.dividends.getNetFlowsByAssetType()
+async function buildDividendChart(
+  c: Container,
+  buckets: readonly ClassBucket[],
+): Promise<DividendChartData | null> {
+  const flows = await c.dividends.getNetFlowsByAssetClass()
   const series = buildMonthlyDividendSeries(flows, yearMonth(today()))
   if (series.months.length === 0) return null
 
+  const dataByClass = new Map(series.datasets.map((d) => [d.label, d.data]))
   return {
     labels: series.months.map((month) => monthLabel(firstDayOf(month))),
-    datasets: series.datasets,
+    datasets: buckets.flatMap(({ name, color }) => {
+      const data = dataByClass.get(name)
+      return data === undefined ? [] : [{ label: name, color, data }]
+    }),
     movingAverage: series.movingAverage,
   }
 }
@@ -100,30 +107,21 @@ async function buildDividendChart(c: Container): Promise<DividendChartData | nul
  * total da carteira — inclusive a TIR, que sai dos fluxos do grupo e não da média das TIRs
  * individuais.
  *
- * Classes em ordem alfabética e o balde "Sem classe" por último; dentro da classe, por tipo
- * e ticker, para os badges iguais ficarem juntos. Classe sem posição não aparece.
+ * Classes na ordem de `AssetClassService.buckets`; dentro da classe, por tipo e ticker, para
+ * os badges iguais ficarem juntos. Classe sem posição não aparece.
  */
 function groupByClass(
   c: Container,
   positions: readonly AssetPosition[],
   assets: readonly Asset[],
-  classes: readonly AssetClass[],
+  buckets: readonly ClassBucket[],
 ): ClassGroup[] {
   const classIdByTicker = new Map(assets.map((a) => [a.ticker, a.assetClassId]))
-  const buckets = [
-    ...[...classes]
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map((cls) => ({ id: cls.id as number | null, name: cls.name })),
-    { id: UNCLASSIFIED.id, name: UNCLASSIFIED.name },
-  ]
-  const known = new Set(classes.map((cls) => cls.id))
-  const classOf = (p: AssetPosition): number | null => {
-    const id = classIdByTicker.get(p.ticker) ?? null
-    return id !== null && known.has(id) ? id : null
-  }
 
   return buckets.flatMap(({ id, name }) => {
-    const group = sortPositions(positions.filter((p) => classOf(p) === id))
+    const group = sortPositions(
+      positions.filter((p) => (classIdByTicker.get(p.ticker) ?? null) === id),
+    )
     if (group.length === 0) return []
     return [
       {

@@ -181,9 +181,9 @@ describe('buildIbovChartLine', () => {
 })
 
 describe('buildMonthlyDividendSeries', () => {
-  const flow = (date: string, assetType: string, net: number): DividendFlow => ({
+  const flow = (date: string, group: string, net: number): DividendFlow => ({
     date: isoDate(date),
-    assetType,
+    group,
     net,
   })
   const month = (value: string) => toYearMonth(value)

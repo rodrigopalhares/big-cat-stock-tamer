@@ -5,8 +5,7 @@
  * O Chart.js vem da CDN como global; só o que este arquivo usa é declarado.
  */
 
-import { assetTypeColor, assetTypeFill } from '../shared/asset-colors.js'
-import { assetTypeLabel } from '../shared/asset-type-labels.js'
+import { hexFill } from '../shared/asset-colors.js'
 
 type ChartDataset = Record<string, unknown>
 declare const Chart: new (el: Element, config: Record<string, unknown>) => unknown
@@ -72,7 +71,7 @@ function buildChart(): void {
   if (dataEl === null || canvas === null) return
 
   const labels = parse<string[]>(dataEl.dataset['labels'], [])
-  const rawDatasets = parse<Array<{ label: string; data: number[] }>>(
+  const rawDatasets = parse<Array<{ label: string; color: string; data: number[] }>>(
     dataEl.dataset['datasets'],
     [],
   )
@@ -81,13 +80,13 @@ function buildChart(): void {
   const ibov = parse<Array<number | null>>(dataEl.dataset['ibov'], [])
   const cdi = parse<Array<number | null>>(dataEl.dataset['cdi'], [])
 
-  // O servidor manda o código do tipo: é a chave da cor. A legenda mostra o rótulo.
+  // Uma série por classe, com a cor que a classe tem na tela de Alocação.
   const datasets: ChartDataset[] = rawDatasets.map((ds) => ({
-    label: assetTypeLabel(ds.label),
+    label: ds.label,
     data: ds.data,
     fill: true,
-    backgroundColor: assetTypeFill(ds.label),
-    borderColor: assetTypeColor(ds.label),
+    backgroundColor: hexFill(ds.color),
+    borderColor: ds.color,
     borderWidth: 1,
     pointRadius: 0,
     pointHitRadius: 10,
@@ -166,24 +165,24 @@ function buildChart(): void {
   })
 }
 
-/** Proventos mês a mês, empilhados por tipo de ativo, com a média móvel de 12 meses. */
+/** Proventos mês a mês, empilhados por classe de alocação, com a média móvel de 12 meses. */
 function buildDividendsChart(): void {
   const dataEl = document.getElementById('dividends-data')
   const canvas = document.getElementById('dividendsChart')
   if (dataEl === null || canvas === null) return
 
   const labels = parse<string[]>(dataEl.dataset['dividendLabels'], [])
-  const rawDatasets = parse<Array<{ label: string; data: number[] }>>(
+  const rawDatasets = parse<Array<{ label: string; color: string; data: number[] }>>(
     dataEl.dataset['dividendDatasets'],
     [],
   )
   const movingAverage = parse<number[]>(dataEl.dataset['dividendMovingAverage'], [])
 
   const datasets: ChartDataset[] = rawDatasets.map((ds) => ({
-    label: assetTypeLabel(ds.label),
+    label: ds.label,
     data: ds.data,
-    backgroundColor: assetTypeFill(ds.label),
-    borderColor: assetTypeColor(ds.label),
+    backgroundColor: hexFill(ds.color),
+    borderColor: ds.color,
     borderWidth: 1,
   }))
 
@@ -234,7 +233,7 @@ function buildDividendsChart(): void {
       plugins: {
         tooltip: {
           bodyAlign: 'right',
-          // A maioria dos meses só tem um ou dois tipos; os zerados só poluiriam.
+          // A maioria dos meses só tem uma ou duas classes; as zeradas só poluiriam.
           filter: (item: { parsed: { y: number } }) => item.parsed.y !== 0,
           callbacks: {
             label: (ctx: { dataset: { label: string }; parsed: { y: number } }) =>
