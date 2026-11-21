@@ -252,15 +252,17 @@ describe('rotas da aplicação', () => {
         const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
 
         expect(res.body).not.toContain('Se fosse CDI')
+        expect(res.body).not.toContain('% do CDI')
       })
 
-      it('mostra o bloco e a data da última taxa', async () => {
+      it('mostra o % do CDI e a data da última taxa', async () => {
         await seedCarteiraComCdi()
 
         const res = await h.app.inject({ method: 'GET', url: '/portfolio/' })
 
-        expect(res.body).toContain('Se fosse CDI')
-        expect(res.body).toContain('Acima do CDI')
+        expect(res.body).toContain('% do CDI')
+        expect(res.body).not.toContain('Acima do CDI')
+        expect(res.body).not.toContain('Abaixo do CDI')
         // Sombra de 10.000 rendendo um dia; a carteira vale 15.000.
         expect(res.body).toContain('10.005,00')
         expect(res.body).toContain('02/01/2024')

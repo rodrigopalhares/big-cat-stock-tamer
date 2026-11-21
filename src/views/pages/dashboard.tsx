@@ -105,8 +105,6 @@ export function DashboardPage(props: DashboardPageProps) {
 
         <SummaryCards {...props} />
 
-        <CdiComparisonCards cdi={props.cdi} />
-
         {chart !== null ? (
           <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-white">
@@ -230,6 +228,19 @@ function EvolutionPlaceholder() {
   )
 }
 
+const CDI_HELP =
+  'Os mesmos aportes, nas mesmas datas, rendendo CDI. Comparar assim — e não a TIR contra ' +
+  'o CDI nominal do período — é o que neutraliza a irregularidade dos aportes: o cronograma ' +
+  'é idêntico dos dois lados, então a diferença que sobra é escolha de ativo, não de timing.'
+
+/**
+ * Duas fileiras que preenchem a largura: quatro cards em cima, três embaixo. O "% do CDI" é
+ * o último — a carteira contra a sombra no CDI, cujo valor e TIR ficam no rodapé da tabela.
+ *
+ * O card some sem série gravada ou sem valor de mercado — meio número aqui seria pior que
+ * nenhum. A data da última taxa fica visível de propósito: série defasada rende menos e
+ * faz a carteira parecer melhor do que é.
+ */
 function SummaryCards({
   hasUsd,
   netContribution,
@@ -238,103 +249,77 @@ function SummaryCards({
   currentValue,
   unrealizedPnl,
   dividendPnl,
+  cdi,
 }: DashboardPageProps) {
   const brlSuffix = hasUsd ? <span class="text-info"> (BRL)</span> : null
 
   return (
-    <div class="row g-3 mb-4">
-      <Card
-        label={
-          <>
-            Aporte Líquido{brlSuffix}
-            <i
-              class="bi bi-info-circle ms-1"
-              title="Dinheiro novo que saiu do bolso. Proventos e vendas reaplicados na carteira não contam como aporte."
-            />
-          </>
-        }
-        value={money(netContribution)}
-      />
-      <Card label={<>Total Investido{brlSuffix}</>} value={money(totalInvested)} />
-      <Card
-        label={<>Lucro Realizado{brlSuffix}</>}
-        value={money(realizedPnl)}
-        valueClass={realizedPnl >= 0 ? 'text-success' : 'text-danger'}
-      />
-      <Card
-        label={<>Valor de Mercado{brlSuffix}</>}
-        value={currentValue === null ? null : money(currentValue)}
-      />
-      <Card
-        label={<>Lucro Não Realizado{brlSuffix}</>}
-        value={unrealizedPnl === null ? null : money(unrealizedPnl)}
-        valueClass={
-          unrealizedPnl === null ? '' : unrealizedPnl >= 0 ? 'text-success' : 'text-danger'
-        }
-      />
-      <Card
-        label={
-          <>
-            <i class="bi bi-cash-coin me-1" />
-            Proventos Recebidos
-          </>
-        }
-        value={money(dividendPnl)}
-        valueClass="text-success"
-      />
-    </div>
-  )
-}
-
-const CDI_HELP =
-  'Os mesmos aportes, nas mesmas datas, rendendo CDI. Comparar assim — e não a TIR contra ' +
-  'o CDI nominal do período — é o que neutraliza a irregularidade dos aportes: o cronograma ' +
-  'é idêntico dos dois lados, então a diferença que sobra é escolha de ativo, não de timing.'
-
-/**
- * A carteira contra a sombra no CDI, em dinheiro. As duas TIR ficam no rodapé da tabela,
- * lado a lado — repeti-las aqui só dividiria a atenção.
- *
- * Some inteira sem série gravada ou sem valor de mercado — meio número aqui seria pior que
- * nenhum. A data da última taxa fica visível de propósito: série defasada rende menos e
- * faz a carteira parecer melhor do que é.
- */
-function CdiComparisonCards({ cdi }: { cdi: CdiComparison | null }) {
-  if (cdi === null) return null
-
-  const ahead = cdi.difference >= 0
-
-  return (
-    <div class="row g-3 mb-4">
-      <Card
-        label={
-          <>
-            Se fosse CDI
-            <i class="bi bi-info-circle ms-1" title={CDI_HELP} />
-          </>
-        }
-        value={money(cdi.cdiValue)}
-      />
-      <Card
-        label={ahead ? 'Acima do CDI' : 'Abaixo do CDI'}
-        value={money(Math.abs(cdi.difference))}
-        valueClass={ahead ? 'text-success' : 'text-danger'}
-      />
-      <Card
-        label={<>% do CDI</>}
-        value={cdi.ratioOfCdi === null ? null : percent(cdi.ratioOfCdi)}
-        valueClass={ahead ? 'text-success' : 'text-danger'}
-      />
-      {cdi.lastRateDate !== null && (
-        <div class="col-12">
-          <div class="text-muted small">
-            <i class="bi bi-info-circle me-1" />
-            Série do CDI até <strong>{fmtDate(cdi.lastRateDate)}</strong> — depois dessa data a
-            simulação não rende.
+    <>
+      <div class="row g-3 mb-3">
+        <Card
+          label={
+            <>
+              Aporte Líquido{brlSuffix}
+              <i
+                class="bi bi-info-circle ms-1"
+                title="Dinheiro novo que saiu do bolso. Proventos e vendas reaplicados na carteira não contam como aporte."
+              />
+            </>
+          }
+          value={money(netContribution)}
+        />
+        <Card label={<>Total Investido{brlSuffix}</>} value={money(totalInvested)} />
+        <Card
+          label={<>Lucro Realizado{brlSuffix}</>}
+          value={money(realizedPnl)}
+          valueClass={realizedPnl >= 0 ? 'text-success' : 'text-danger'}
+        />
+        <Card
+          label={<>Valor de Mercado{brlSuffix}</>}
+          value={currentValue === null ? null : money(currentValue)}
+        />
+      </div>
+      <div class="row g-3 mb-4">
+        <Card
+          label={<>Lucro Não Realizado{brlSuffix}</>}
+          value={unrealizedPnl === null ? null : money(unrealizedPnl)}
+          valueClass={
+            unrealizedPnl === null ? '' : unrealizedPnl >= 0 ? 'text-success' : 'text-danger'
+          }
+        />
+        <Card
+          label={
+            <>
+              <i class="bi bi-cash-coin me-1" />
+              Proventos Recebidos
+            </>
+          }
+          value={money(dividendPnl)}
+          valueClass="text-success"
+        />
+        {cdi !== null && (
+          <Card
+            label={
+              <>
+                % do CDI
+                <i class="bi bi-info-circle ms-1" title={CDI_HELP} />
+              </>
+            }
+            value={cdi.ratioOfCdi === null ? null : percent(cdi.ratioOfCdi)}
+            valueClass={cdi.difference >= 0 ? 'text-success' : 'text-danger'}
+          />
+        )}
+        {cdi?.lastRateDate != null && (
+          <div class="col-12">
+            <div class="text-muted small">
+              <i class="bi bi-info-circle me-1" />
+              Série do CDI até <strong>{fmtDate(cdi.lastRateDate)}</strong> — depois dessa data a
+              simulação não rende.
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   )
 }
 
@@ -367,7 +352,7 @@ function Card({
   valueClass?: string
 }) {
   return (
-    <div class="col-6 col-xl">
+    <div class="col-6 col-lg">
       <div class="card border-0 shadow-sm h-100">
         <div class="card-body">
           <div class="text-muted small mb-1">{label}</div>
