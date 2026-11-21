@@ -98,6 +98,26 @@ describe('rotas de alocação', () => {
       expect(summary).toContain('acima da meta')
     })
 
+    it('a barra do resumo mede o peso atual sobre a meta, não sobre o patrimônio', async () => {
+      const fii = await createAssetClass(h.db, 'Fii', { targetPercent: 40 })
+      const acoes = await createAssetClass(h.db, 'Ações', { targetPercent: 30 })
+      // Patrimônio 1.000: Fii 20% de meta 40% = 50% da meta; Ações 80% de meta 30% = 267%.
+      await position(h, 'HGLG11', 200, fii.id)
+      await position(h, 'PETR4', 800, acoes.id)
+
+      const res = await h.app.inject({ method: 'GET', url: '/allocation/' })
+      const summary =
+        /id="class-summary"[\s\S]*?(?=<div class="card border-0 shadow-sm mb-3">)/.exec(
+          res.body,
+        )?.[0]
+
+      expect(summary).toContain('width: 50.00%')
+      expect(summary).toContain('50%')
+      // Passou da meta: barra cheia, e o número diz quanto.
+      expect(summary).toContain('width: 100.00%')
+      expect(summary).toContain('267%')
+    })
+
     it('sem classe nenhuma o resumo não aparece', async () => {
       const res = await h.app.inject({ method: 'GET', url: '/allocation/' })
 

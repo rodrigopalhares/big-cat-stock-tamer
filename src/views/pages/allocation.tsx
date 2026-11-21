@@ -104,9 +104,10 @@ function Summary({ totalValue, totalTarget }: { totalValue: number; totalTarget:
 /**
  * Uma linha por classe, para ver de relance onde falta e onde sobra sem rolar os cards.
  *
- * A régua vai de 0 a 100% do patrimônio — a mesma escala em todas as linhas, para dar para
- * comparar uma classe com a outra. O traço é a meta, e o trecho entre o peso atual e a meta
- * é a distância: âmbar quando falta, azul quando passou.
+ * A barra mede o quanto da *meta* da classe já foi atingido, não o quanto ela pesa: meta de
+ * 30% com 15% na carteira é meia barra, e com 30% é a barra cheia. Assim todas as linhas
+ * têm o mesmo fim — a meta — e a classe de meta pequena não parece vazia ao lado da grande.
+ * Passou da meta, a barra fica cheia e o número ao lado (acima de 100%) diz quanto.
  */
 function ClassSummary({ buckets }: { buckets: AllocationClass[] }) {
   if (buckets.length === 0) return null
@@ -139,44 +140,42 @@ function ClassSummary({ buckets }: { buckets: AllocationClass[] }) {
 }
 
 function ScaleBar({ bucket }: { bucket: AllocationClass }) {
-  const hasTarget = bucket.id !== null
-  const current = Math.min(bucket.currentPercent, 100)
-  const target = Math.min(bucket.targetPercent, 100)
-  // Sem meta não há distância a pintar: só o peso.
-  const base = hasTarget ? Math.min(current, target) : current
-  const gap = hasTarget ? Math.abs(current - target) : 0
-  const below = bucket.deviation < 0
+  // Sem meta não há régua: a barra fica vazia. Meta zero com posição é "já passou de tudo".
+  const reached =
+    bucket.id === null
+      ? null
+      : bucket.targetPercent > 0
+        ? (bucket.currentPercent / bucket.targetPercent) * 100
+        : 100
+  const below = reached !== null && reached < 100 && bucket.distance >= 0.005
+  const filled = Math.min(reached ?? 0, 100)
 
   return (
     <div
-      class="position-relative"
+      class="d-flex align-items-center gap-2"
       title={`Atual ${decimal(bucket.currentPercent, 2)}%${
-        hasTarget ? ` · Meta ${decimal(bucket.targetPercent, 2)}%` : ''
+        bucket.id === null ? '' : ` · Meta ${decimal(bucket.targetPercent, 2)}%`
       }`}
     >
-      <div class="progress" style="height: 12px">
+      <div class="progress flex-grow-1" style="height: 12px">
         <div
           class="progress-bar"
-          style={`width: ${base.toFixed(2)}%; background-color: ${bucket.color}`}
+          style={`width: ${filled.toFixed(2)}%; background-color: ${bucket.color}`}
           role="progressbar"
-          aria-label={`Peso de ${bucket.name}`}
-          aria-valuenow={Math.round(bucket.currentPercent)}
+          aria-label={`Meta atingida de ${bucket.name}`}
+          aria-valuenow={Math.round(filled)}
           aria-valuemin={0}
           aria-valuemax={100}
         />
-        {gap > 0 && (
-          <div
-            class={`progress-bar ${below ? 'bg-warning' : 'bg-info'}`}
-            style={`width: ${gap.toFixed(2)}%; opacity: 0.55`}
-          />
-        )}
       </div>
-      {hasTarget && bucket.targetPercent > 0 && (
-        <div
-          class="position-absolute border-start border-2 border-dark"
-          style={`left: ${target.toFixed(2)}%; top: -2px; height: 16px`}
-        />
-      )}
+      <span
+        class={`num small text-end ${
+          reached === null ? 'text-muted' : below ? 'text-warning-emphasis' : 'text-info-emphasis'
+        }`}
+        style="width: 3.5rem"
+      >
+        {reached === null ? '—' : `${decimal(reached, 0)}%`}
+      </span>
     </div>
   )
 }
