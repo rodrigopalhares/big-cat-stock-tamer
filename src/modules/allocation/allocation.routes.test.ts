@@ -76,6 +76,34 @@ describe('rotas de alocação', () => {
       expect(res.body.indexOf('Fii')).toBeLessThan(res.body.indexOf('Ações'))
     })
 
+    it('o resumo por classe mostra a distância da meta em p.p. e em reais', async () => {
+      const acoes = await createAssetClass(h.db, 'Ações', { targetPercent: 40 })
+      const fii = await createAssetClass(h.db, 'Fii', { targetPercent: 30 })
+      // Patrimônio 1.000: Ações 80% (40 p.p. acima = R$ 400), Fii 20% (10 p.p. abaixo = R$ 100).
+      await position(h, 'PETR4', 800, acoes.id)
+      await position(h, 'HGLG11', 200, fii.id)
+
+      const res = await h.app.inject({ method: 'GET', url: '/allocation/' })
+      const summary =
+        /id="class-summary"[\s\S]*?(?=<div class="card border-0 shadow-sm mb-3">)/.exec(
+          res.body,
+        )?.[0]
+
+      expect(summary).toContain('Resumo por classe')
+      expect(summary).toContain('↓ <span class="num">10,00</span> p.p.')
+      expect(summary).toContain('R$ 100,00')
+      expect(summary).toContain('para a meta')
+      expect(summary).toContain('↑ <span class="num">40,00</span> p.p.')
+      expect(summary).toContain('R$ 400,00')
+      expect(summary).toContain('acima da meta')
+    })
+
+    it('sem classe nenhuma o resumo não aparece', async () => {
+      const res = await h.app.inject({ method: 'GET', url: '/allocation/' })
+
+      expect(res.body).not.toContain('Resumo por classe')
+    })
+
     it('avisa quando as metas não somam 100%', async () => {
       await createAssetClass(h.db, 'Ações', { targetPercent: 40 })
 

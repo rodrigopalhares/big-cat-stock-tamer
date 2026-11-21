@@ -54,6 +54,7 @@ export function AllocationBody({ allocation, classes, unpriced }: AllocationPage
     <div id="allocation-body">
       <Summary totalValue={totalValue} totalTarget={totalTarget} />
       <UnpricedWarning unpriced={unpriced} />
+      <ClassSummary buckets={buckets} />
 
       {buckets.length === 0 ? (
         <div class="card border-0 shadow-sm">
@@ -97,6 +98,116 @@ function Summary({ totalValue, totalTarget }: { totalValue: number; totalTarget:
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * Uma linha por classe, para ver de relance onde falta e onde sobra sem rolar os cards.
+ *
+ * A régua vai de 0 a 100% do patrimônio — a mesma escala em todas as linhas, para dar para
+ * comparar uma classe com a outra. O traço é a meta, e o trecho entre o peso atual e a meta
+ * é a distância: âmbar quando falta, azul quando passou.
+ */
+function ClassSummary({ buckets }: { buckets: AllocationClass[] }) {
+  if (buckets.length === 0) return null
+
+  return (
+    <div class="card border-0 shadow-sm mb-4" id="class-summary">
+      <div class="card-header bg-white fw-semibold">Resumo por classe</div>
+      <div class="card-body">
+        {buckets.map((bucket) => (
+          <div class="row align-items-center g-2 py-1">
+            <div class="col-12 col-md-2">
+              <span
+                class="badge"
+                style={`background-color: ${bucket.color}; color: ${hexTextColor(bucket.color)}`}
+              >
+                {bucket.name}
+              </span>
+            </div>
+            <div class="col-12 col-md-6">
+              <ScaleBar bucket={bucket} />
+            </div>
+            <div class="col-12 col-md-4 text-md-end small">
+              <GapLabel bucket={bucket} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ScaleBar({ bucket }: { bucket: AllocationClass }) {
+  const hasTarget = bucket.id !== null
+  const current = Math.min(bucket.currentPercent, 100)
+  const target = Math.min(bucket.targetPercent, 100)
+  // Sem meta não há distância a pintar: só o peso.
+  const base = hasTarget ? Math.min(current, target) : current
+  const gap = hasTarget ? Math.abs(current - target) : 0
+  const below = bucket.deviation < 0
+
+  return (
+    <div
+      class="position-relative"
+      title={`Atual ${decimal(bucket.currentPercent, 2)}%${
+        hasTarget ? ` · Meta ${decimal(bucket.targetPercent, 2)}%` : ''
+      }`}
+    >
+      <div class="progress" style="height: 12px">
+        <div
+          class="progress-bar"
+          style={`width: ${base.toFixed(2)}%; background-color: ${bucket.color}`}
+          role="progressbar"
+          aria-label={`Peso de ${bucket.name}`}
+          aria-valuenow={Math.round(bucket.currentPercent)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        />
+        {gap > 0 && (
+          <div
+            class={`progress-bar ${below ? 'bg-warning' : 'bg-info'}`}
+            style={`width: ${gap.toFixed(2)}%; opacity: 0.55`}
+          />
+        )}
+      </div>
+      {hasTarget && bucket.targetPercent > 0 && (
+        <div
+          class="position-absolute border-start border-2 border-dark"
+          style={`left: ${target.toFixed(2)}%; top: -2px; height: 16px`}
+        />
+      )}
+    </div>
+  )
+}
+
+/** "↓ 4,20 p.p. · R$ 1.234,00 para a meta" — a distância nas duas unidades. */
+function GapLabel({ bucket }: { bucket: AllocationClass }) {
+  if (bucket.id === null) {
+    return (
+      <span class="text-muted">
+        <span class="num">{decimal(bucket.currentPercent, 2)}%</span> · sem meta
+      </span>
+    )
+  }
+  if (bucket.distance < 0.005) {
+    return (
+      <span class="text-success">
+        <i class="bi bi-check-lg" /> na meta
+      </span>
+    )
+  }
+  const below = bucket.deviation < 0
+  return (
+    <span>
+      <span class={`fw-semibold ${below ? 'text-warning-emphasis' : 'text-info-emphasis'}`}>
+        {below ? '↓' : '↑'} <span class="num">{decimal(bucket.distance, 2)}</span> p.p.
+      </span>{' '}
+      <span class="text-muted">
+        · <span class="num">{money(Math.abs(bucket.rebalanceAmount))}</span>{' '}
+        {below ? 'para a meta' : 'acima da meta'}
+      </span>
+    </span>
   )
 }
 
