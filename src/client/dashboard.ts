@@ -114,6 +114,10 @@ function buildChart(): void {
     data: { labels, datasets },
     options: {
       responsive: true,
+      // A altura vem do `.chart-box` que envolve o canvas, não da proporção: com
+      // `maintainAspectRatio` o canvas e o card se medem um ao outro, e ao redimensionar a
+      // janela o gráfico ficava preso no menor tamanho que já teve.
+      maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       scales: {
         x: { grid: { display: false } },
@@ -207,6 +211,10 @@ function buildDividendsChart(): void {
     data: { labels, datasets },
     options: {
       responsive: true,
+      // A altura vem do `.chart-box` que envolve o canvas, não da proporção: com
+      // `maintainAspectRatio` o canvas e o card se medem um ao outro, e ao redimensionar a
+      // janela o gráfico ficava preso no menor tamanho que já teve.
+      maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       scales: {
         x: { stacked: true, grid: { display: false } },

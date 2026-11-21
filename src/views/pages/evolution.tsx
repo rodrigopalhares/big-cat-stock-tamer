@@ -43,7 +43,9 @@ export function EvolutionPage({ months, tickers, total, nextUrl, chart }: Evolut
         {chart !== null && (
           <div class="card border-0 shadow-sm mb-4">
             <div class="card-body">
-              <canvas id="evolutionChart" height={100} />
+              <div class="chart-box">
+                <canvas id="evolutionChart" />
+              </div>
             </div>
           </div>
         )}

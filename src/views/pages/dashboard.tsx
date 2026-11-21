@@ -113,7 +113,9 @@ export function DashboardPage(props: DashboardPageProps) {
               </span>
             </div>
             <div class="card-body">
-              <canvas id="evolutionChart" height={100} />
+              <div class="chart-box">
+                <canvas id="evolutionChart" />
+              </div>
             </div>
           </div>
         ) : (
@@ -128,7 +130,9 @@ export function DashboardPage(props: DashboardPageProps) {
               </span>
             </div>
             <div class="card-body">
-              <canvas id="dividendsChart" height={100} />
+              <div class="chart-box chart-box-sm">
+                <canvas id="dividendsChart" />
+              </div>
             </div>
           </div>
         )}

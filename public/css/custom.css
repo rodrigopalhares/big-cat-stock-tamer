@@ -15,6 +15,20 @@ body {
     border-radius: 0.5rem;
 }
 
+/*
+ * Caixa dedicada do gráfico: o Chart.js dimensiona o canvas pelo contêiner, que precisa ser
+ * `relative` e ter altura própria. Sem isso o gráfico se media pelo próprio canvas e, ao
+ * encolher a janela, não voltava a crescer.
+ */
+.chart-box {
+    position: relative;
+    height: 400px;
+}
+
+.chart-box-sm {
+    height: 300px;
+}
+
 .table th {
     font-size: 0.8rem;
     text-transform: uppercase;

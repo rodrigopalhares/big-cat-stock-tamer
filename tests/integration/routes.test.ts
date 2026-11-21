@@ -420,6 +420,9 @@ describe('rotas da aplicação', () => {
 
       expect(res.statusCode).toBe(200)
       expect(chartAttr(res.body, 'data-labels')).toEqual(['01/2024'])
+      // O canvas fica numa caixa de altura própria: sem ela o gráfico se media pelo card e,
+      // ao encolher a janela, não voltava a crescer.
+      expect(res.body).toMatch(/<div class="chart-box">\s*<canvas id="evolutionChart"/)
       // Uma série por classe com ativo cadastrado, na cor da classe, somando o valor de
       // mercado dos snapshots do mês. Cripto não tem ativo e fica fora da legenda.
       expect(chartAttr(res.body, 'data-datasets')).toEqual([
