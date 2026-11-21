@@ -114,8 +114,9 @@ describe('rotas de alocação', () => {
 
       expect(summary).toContain('width: 24.39%') // 50 / 205
       expect(summary).toContain('width: 97.56%') // 200 / 205
-      expect(summary).toContain('50%')
-      expect(summary).toContain('200%')
+      // O valor da barra só aparece no hover (title), não como número fixo.
+      expect(summary).toContain('title="50% da meta')
+      expect(summary).toContain('title="200% da meta')
       // Uma linha tracejada nos 100% por barra: 100 / 205.
       expect(summary?.match(/data-target-line/g)).toHaveLength(2)
       expect(summary?.match(/left: 48\.78%/g)).toHaveLength(2)

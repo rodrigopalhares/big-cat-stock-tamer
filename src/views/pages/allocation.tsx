@@ -79,16 +79,16 @@ function Summary({ totalValue, totalTarget }: { totalValue: number; totalTarget:
 
   return (
     <div class="card border-0 shadow-sm mb-4">
-      <div class="card-body d-flex flex-wrap align-items-center gap-4">
+      <div class="card-body py-2 d-flex flex-wrap align-items-baseline column-gap-4">
         <div>
-          <div class="text-muted small">Patrimônio total</div>
-          <div class="num fs-4 fw-semibold">{money(totalValue)}</div>
+          <span class="text-muted small me-2">Patrimônio total</span>
+          <span class="num fs-5 fw-semibold">{money(totalValue)}</span>
         </div>
         <div>
-          <div class="text-muted small">Soma das metas</div>
-          <div class={`num fs-4 fw-semibold ${offTarget ? 'text-warning' : ''}`}>
+          <span class="text-muted small me-2">Soma das metas</span>
+          <span class={`num fs-5 fw-semibold ${offTarget ? 'text-warning' : ''}`}>
             {decimal(totalTarget, 2)}%
-          </div>
+          </span>
         </div>
         {offTarget && (
           <div class="text-warning small">
@@ -118,10 +118,15 @@ function ClassSummary({ buckets }: { buckets: AllocationClass[] }) {
   return (
     <div class="card border-0 shadow-sm mb-4" id="class-summary">
       <div class="card-header bg-white fw-semibold">Resumo por classe</div>
-      <div class="card-body">
+      {/* Uma grade só para as cinco linhas: as colunas se alinham sozinhas e o conjunto
+          nome · barra · distância fica centralizado no card. */}
+      <div
+        class="card-body"
+        style="display: grid; grid-template-columns: max-content minmax(10rem, 36rem) max-content; justify-content: center; align-items: center; column-gap: 1rem; row-gap: 0.75rem"
+      >
         {buckets.map((bucket) => (
-          <div class="row align-items-center g-2 py-1">
-            <div class="col-12 col-md-2">
+          <>
+            <div class="text-end">
               <span
                 class="badge"
                 style={`background-color: ${bucket.color}; color: ${hexTextColor(bucket.color)}`}
@@ -129,13 +134,11 @@ function ClassSummary({ buckets }: { buckets: AllocationClass[] }) {
                 {bucket.name}
               </span>
             </div>
-            <div class="col-12 col-md-6">
-              <ScaleBar bucket={bucket} scale={scale} />
-            </div>
-            <div class="col-12 col-md-4 text-md-end small">
+            <ScaleBar bucket={bucket} scale={scale} />
+            <div class="small">
               <GapLabel bucket={bucket} />
             </div>
-          </div>
+          </>
         ))}
       </div>
     </div>
@@ -166,44 +169,33 @@ function reachedPercent(bucket: AllocationClass): number | null {
 
 function ScaleBar({ bucket, scale }: { bucket: AllocationClass; scale: number }) {
   const reached = reachedPercent(bucket)
-  const below = reached !== null && reached < 100 && bucket.distance >= 0.005
   const width = ((reached ?? 0) / scale) * 100
   const targetAt = (100 / scale) * 100
+  // O valor da barra só aparece ao passar o mouse: a distância ao lado já diz o que importa.
+  const title =
+    reached === null
+      ? `Sem meta · atual ${decimal(bucket.currentPercent, 2)}%`
+      : `${decimal(reached, 0)}% da meta · atual ${decimal(bucket.currentPercent, 2)}% · meta ${decimal(bucket.targetPercent, 2)}%`
 
   return (
-    <div
-      class="d-flex align-items-center gap-2"
-      title={`Atual ${decimal(bucket.currentPercent, 2)}%${
-        bucket.id === null ? '' : ` · Meta ${decimal(bucket.targetPercent, 2)}%`
-      }`}
-    >
-      <div class="position-relative flex-grow-1">
-        <div class="progress" style="height: 12px">
-          <div
-            class="progress-bar"
-            style={`width: ${width.toFixed(2)}%; background-color: ${bucket.color}`}
-            role="progressbar"
-            aria-label={`Meta atingida de ${bucket.name}`}
-            aria-valuenow={Math.round(reached ?? 0)}
-            aria-valuemin={0}
-            aria-valuemax={Math.round(scale)}
-          />
-        </div>
-        {/* Fora do .progress, que corta o que passa da borda: o traço é a meta (100%). */}
+    <div class="position-relative" title={title}>
+      <div class="progress" style="height: 12px">
         <div
-          class="position-absolute border-start border-2 border-danger"
-          style={`left: ${targetAt.toFixed(2)}%; top: -3px; height: 18px; border-left-style: dashed !important`}
-          data-target-line
+          class="progress-bar"
+          style={`width: ${width.toFixed(2)}%; background-color: ${bucket.color}`}
+          role="progressbar"
+          aria-label={`Meta atingida de ${bucket.name}`}
+          aria-valuenow={Math.round(reached ?? 0)}
+          aria-valuemin={0}
+          aria-valuemax={Math.round(scale)}
         />
       </div>
-      <span
-        class={`num small text-end ${
-          reached === null ? 'text-muted' : below ? 'text-warning-emphasis' : 'text-info-emphasis'
-        }`}
-        style="width: 3.5rem"
-      >
-        {reached === null ? '—' : `${decimal(reached, 0)}%`}
-      </span>
+      {/* Fora do .progress, que corta o que passa da borda: o traço é a meta (100%). */}
+      <div
+        class="position-absolute border-start border-2 border-danger"
+        style={`left: ${targetAt.toFixed(2)}%; top: -3px; height: 18px; border-left-style: dashed !important`}
+        data-target-line
+      />
     </div>
   )
 }
