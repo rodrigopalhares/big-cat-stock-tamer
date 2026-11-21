@@ -157,15 +157,23 @@ function ScaleBar({ bucket }: { bucket: AllocationClass }) {
         bucket.id === null ? '' : ` · Meta ${decimal(bucket.targetPercent, 2)}%`
       }`}
     >
-      <div class="progress flex-grow-1" style="height: 12px">
+      <div class="position-relative flex-grow-1">
+        <div class="progress" style="height: 12px">
+          <div
+            class="progress-bar"
+            style={`width: ${filled.toFixed(2)}%; background-color: ${bucket.color}`}
+            role="progressbar"
+            aria-label={`Meta atingida de ${bucket.name}`}
+            aria-valuenow={Math.round(filled)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          />
+        </div>
+        {/* Fora do .progress, que corta o que passa da borda: o traço é a meta (100%). */}
         <div
-          class="progress-bar"
-          style={`width: ${filled.toFixed(2)}%; background-color: ${bucket.color}`}
-          role="progressbar"
-          aria-label={`Meta atingida de ${bucket.name}`}
-          aria-valuenow={Math.round(filled)}
-          aria-valuemin={0}
-          aria-valuemax={100}
+          class="position-absolute end-0 border-start border-2 border-danger"
+          style="top: -3px; height: 18px; border-left-style: dashed !important"
+          data-target-line
         />
       </div>
       <span

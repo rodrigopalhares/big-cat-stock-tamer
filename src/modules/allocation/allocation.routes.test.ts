@@ -116,6 +116,8 @@ describe('rotas de alocação', () => {
       // Passou da meta: barra cheia, e o número diz quanto.
       expect(summary).toContain('width: 100.00%')
       expect(summary).toContain('267%')
+      // Uma linha tracejada de meta por barra.
+      expect(summary?.match(/data-target-line/g)).toHaveLength(2)
     })
 
     it('sem classe nenhuma o resumo não aparece', async () => {
