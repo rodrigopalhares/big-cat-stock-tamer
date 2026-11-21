@@ -106,11 +106,14 @@ function Summary({ totalValue, totalTarget }: { totalValue: number; totalTarget:
  *
  * A barra mede o quanto da *meta* da classe já foi atingido, não o quanto ela pesa: meta de
  * 30% com 15% na carteira é meia barra, e com 30% é a barra cheia. Assim todas as linhas
- * têm o mesmo fim — a meta — e a classe de meta pequena não parece vazia ao lado da grande.
- * Passou da meta, a barra fica cheia e o número ao lado (acima de 100%) diz quanto.
+ * têm a meta no mesmo lugar — e a classe de meta pequena não parece vazia ao lado da grande.
+ * A régua vai de 0 a max(120%, maior barra + 5%) e a linha vermelha marca os 100%; o que
+ * passou da meta ultrapassa a linha, e o número ao lado diz quanto.
  */
 function ClassSummary({ buckets }: { buckets: AllocationClass[] }) {
   if (buckets.length === 0) return null
+
+  const scale = summaryScale(buckets)
 
   return (
     <div class="card border-0 shadow-sm mb-4" id="class-summary">
@@ -127,7 +130,7 @@ function ClassSummary({ buckets }: { buckets: AllocationClass[] }) {
               </span>
             </div>
             <div class="col-12 col-md-6">
-              <ScaleBar bucket={bucket} />
+              <ScaleBar bucket={bucket} scale={scale} />
             </div>
             <div class="col-12 col-md-4 text-md-end small">
               <GapLabel bucket={bucket} />
@@ -139,16 +142,33 @@ function ClassSummary({ buckets }: { buckets: AllocationClass[] }) {
   )
 }
 
-function ScaleBar({ bucket }: { bucket: AllocationClass }) {
-  // Sem meta não há régua: a barra fica vazia. Meta zero com posição é "já passou de tudo".
-  const reached =
-    bucket.id === null
-      ? null
-      : bucket.targetPercent > 0
-        ? (bucket.currentPercent / bucket.targetPercent) * 100
-        : 100
+/** Fim da régua em % da meta: 120, ou a maior barra mais 5 se ela passar disso. */
+const MIN_SCALE = 120
+const SCALE_MARGIN = 5
+
+/**
+ * A mesma régua para todas as linhas, senão a barra de uma classe não se compara com a
+ * da outra. O piso de 120% deixa a linha da meta sempre com folga à direita; a margem de
+ * 5 pontos evita que a classe mais acima da meta encoste na borda.
+ */
+function summaryScale(buckets: AllocationClass[]): number {
+  const highest = Math.max(0, ...buckets.map((bucket) => reachedPercent(bucket) ?? 0))
+  return Math.max(MIN_SCALE, highest + SCALE_MARGIN)
+}
+
+/** Quanto da meta já foi atingido, em %; null sem meta (balde "Sem classe"). */
+function reachedPercent(bucket: AllocationClass): number | null {
+  if (bucket.id === null) return null
+  // Meta zero com posição é "já passou de tudo".
+  if (bucket.targetPercent <= 0) return 100
+  return (bucket.currentPercent / bucket.targetPercent) * 100
+}
+
+function ScaleBar({ bucket, scale }: { bucket: AllocationClass; scale: number }) {
+  const reached = reachedPercent(bucket)
   const below = reached !== null && reached < 100 && bucket.distance >= 0.005
-  const filled = Math.min(reached ?? 0, 100)
+  const width = ((reached ?? 0) / scale) * 100
+  const targetAt = (100 / scale) * 100
 
   return (
     <div
@@ -161,18 +181,18 @@ function ScaleBar({ bucket }: { bucket: AllocationClass }) {
         <div class="progress" style="height: 12px">
           <div
             class="progress-bar"
-            style={`width: ${filled.toFixed(2)}%; background-color: ${bucket.color}`}
+            style={`width: ${width.toFixed(2)}%; background-color: ${bucket.color}`}
             role="progressbar"
             aria-label={`Meta atingida de ${bucket.name}`}
-            aria-valuenow={Math.round(filled)}
+            aria-valuenow={Math.round(reached ?? 0)}
             aria-valuemin={0}
-            aria-valuemax={100}
+            aria-valuemax={Math.round(scale)}
           />
         </div>
         {/* Fora do .progress, que corta o que passa da borda: o traço é a meta (100%). */}
         <div
-          class="position-absolute end-0 border-start border-2 border-danger"
-          style="top: -3px; height: 18px; border-left-style: dashed !important"
+          class="position-absolute border-start border-2 border-danger"
+          style={`left: ${targetAt.toFixed(2)}%; top: -3px; height: 18px; border-left-style: dashed !important`}
           data-target-line
         />
       </div>

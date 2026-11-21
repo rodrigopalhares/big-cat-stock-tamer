@@ -100,8 +100,9 @@ describe('rotas de alocação', () => {
 
     it('a barra do resumo mede o peso atual sobre a meta, não sobre o patrimônio', async () => {
       const fii = await createAssetClass(h.db, 'Fii', { targetPercent: 40 })
-      const acoes = await createAssetClass(h.db, 'Ações', { targetPercent: 30 })
-      // Patrimônio 1.000: Fii 20% de meta 40% = 50% da meta; Ações 80% de meta 30% = 267%.
+      const acoes = await createAssetClass(h.db, 'Ações', { targetPercent: 40 })
+      // Patrimônio 1.000: Fii 20% de meta 40% = 50% da meta; Ações 80% de meta 40% = 200%.
+      // Régua: 200 + 5 = 205 (passa do piso de 120).
       await position(h, 'HGLG11', 200, fii.id)
       await position(h, 'PETR4', 800, acoes.id)
 
@@ -111,13 +112,26 @@ describe('rotas de alocação', () => {
           res.body,
         )?.[0]
 
-      expect(summary).toContain('width: 50.00%')
+      expect(summary).toContain('width: 24.39%') // 50 / 205
+      expect(summary).toContain('width: 97.56%') // 200 / 205
       expect(summary).toContain('50%')
-      // Passou da meta: barra cheia, e o número diz quanto.
-      expect(summary).toContain('width: 100.00%')
-      expect(summary).toContain('267%')
-      // Uma linha tracejada de meta por barra.
+      expect(summary).toContain('200%')
+      // Uma linha tracejada nos 100% por barra: 100 / 205.
       expect(summary?.match(/data-target-line/g)).toHaveLength(2)
+      expect(summary?.match(/left: 48\.78%/g)).toHaveLength(2)
+    })
+
+    it('com todas as classes abaixo da meta a régua do resumo vai a 120%', async () => {
+      const fii = await createAssetClass(h.db, 'Fii', { targetPercent: 40 })
+      await createAssetClass(h.db, 'Ações', { targetPercent: 60 })
+      // Patrimônio 1.000 (800 sem classe): Fii 20% de meta 40% = 50%; piso de 120 > 50 + 5.
+      await position(h, 'HGLG11', 200, fii.id)
+      await position(h, 'BTC', 800, null)
+
+      const res = await h.app.inject({ method: 'GET', url: '/allocation/' })
+
+      expect(res.body).toContain('width: 41.67%') // 50 / 120
+      expect(res.body).toContain('left: 83.33%') // 100 / 120
     })
 
     it('sem classe nenhuma o resumo não aparece', async () => {
